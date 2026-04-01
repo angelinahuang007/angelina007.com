@@ -1,0 +1,133 @@
+version: '3.9'
+
+services:
+  # Next.js application
+  next-app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: angelina-next-app
+    restart: always
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_SITE_URL: https://angelina007.com
+      NEXT_PUBLIC_ANALYTICS_ID: ${NEXT_PUBLIC_ANALYTICS_ID:-}
+      NEXT_PUBLIC_SANITY_PROJECT_ID: ${NEXT_PUBLIC_SANITY_PROJECT_ID:-}
+      NEXT_PUBLIC_SANITY_DATASET: ${NEXT_PUBLIC_SANITY_DATASET:-production}
+      SANITY_API_TOKEN: ${SANITY_API_TOKEN:-}
+    expose:
+      - 3000
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - angelina-network
+    depends_on:
+      - certbot
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: angelina-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+      - ./certbot/www:/var/www/certbot:ro
+    depends_on:
+      - next-app
+    networks:
+      - angelina-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Certbot for SSL certificate management
+  certbot:
+    image: certbot/certbot
+    container_name: angelina-certbot
+    restart: always
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    entrypoint: >
+      /bin/sh -c "
+      if [ ! -d /etc/letsencrypt/live/angelina007.com ]; then
+        certbot certonly --webroot -w /var/www/certbot
+          -d angelina007.com -d www.angelina007.com
+          --email admin@angelina007.com
+          --agree-tos --non-interactive --expand;
+      fi;
+      trap exit TERM;
+      while :; do
+        certbot renew --webroot -w /var/www/certbot --quiet;
+        sleep 12h & wait $${!};
+      done
+      "
+    networks:
+      - angelina-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Optional: Umami Analytics
+  # Uncomment to enable analytics tracking
+  # umami:
+  #   image: ghcr.io/umami-software/umami:latest
+  #   container_name: angelina-umami
+  #   restart: always
+  #   environment:
+  #     DATABASE_URL: postgresql://umami:${UMAMI_DB_PASSWORD:-umami}@postgres:5432/umami
+  #     DATABASE_TYPE: postgresql
+  #     HASH_SALT: ${UMAMI_HASH_SALT:-}
+  #     TRACKER_SCRIPT_NAME: track
+  #   depends_on:
+  #     - postgres
+  #   networks:
+  #     - angelina-network
+  #   logging:
+  #     driver: "json-file"
+  #     options:
+  #       max-size: "10m"
+  #       max-file: "3"
+  #
+  # postgres:
+  #   image: postgres:15-alpine
+  #   container_name: angelina-postgres
+  #   restart: always
+  #   environment:
+  #     POSTGRES_DB: umami
+  #     POSTGRES_USER: umami
+  #     POSTGRES_PASSWORD: ${UMAMI_DB_PASSWORD:-umami}
+  #   volumes:
+  #     - umami_db:/var/lib/postgresql/data
+  #   networks:
+  #     - angelina-network
+  #   logging:
+  #     driver: "json-file"
+  #     options:
+  #       max-size: "10m"
+  #       max-file: "3"
+
+networks:
+  angelina-network:
+    driver: bridge
+
+# volumes:
+#   umami_db:
+#     driver: local
