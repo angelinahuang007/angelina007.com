@@ -1,0 +1,140 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linter
+        run: npm run lint
+
+      - name: Build Next.js application
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SITE_URL: https://angelina007.com
+          NEXT_PUBLIC_SANITY_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_SANITY_PROJECT_ID }}
+          NEXT_PUBLIC_SANITY_DATASET: ${{ secrets.NEXT_PUBLIC_SANITY_DATASET }}
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build
+          path: |
+            .next/
+            public/
+            node_modules/
+          retention-days: 1
+
+  deploy:
+    name: Deploy to Production
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    environment:
+      name: production
+      url: https://angelina007.com
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: build
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DROPLET_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.DROPLET_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to Digital Ocean
+        run: |
+          ssh ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }} << 'EOF'
+            set -e
+
+            # Navigate to project directory
+            cd ~/angelina007.com
+
+            # Pull latest changes
+            git pull origin main
+
+            # Load environment variables from .env.production
+            if [ -f .env.production ]; then
+              export $(cat .env.production | grep -v '^#' | xargs)
+            fi
+
+            # Build Docker images
+            docker compose build
+
+            # Start containers with updated images
+            docker compose up -d
+
+            # Run any post-deployment tasks
+            docker compose exec -T next-app npm run build || true
+
+            # Verify deployment
+            sleep 5
+            docker compose ps
+
+            echo "Deployment completed successfully"
+          EOF
+
+      - name: Verify deployment
+        run: |
+          sleep 10
+          curl -f https://angelina007.com/ || exit 1
+          echo "Deployment verified"
+
+  notify:
+    name: Notify on Deployment
+    needs: [build-and-test, deploy]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Determine status
+        id: status
+        run: |
+          if [ "${{ needs.deploy.result }}" == "success" ]; then
+            echo "status=Success" >> $GITHUB_OUTPUT
+            echo "emoji=✅" >> $GITHUB_OUTPUT
+          else
+            echo "status=Failed" >> $GITHUB_OUTPUT
+            echo "emoji=❌" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Deployment notification
+        run: |
+          echo "${{ steps.status.outputs.emoji }} Deployment ${{ steps.status.outputs.status }}"
+          echo "Repository: ${{ github.repository }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Author: ${{ github.actor }}"

@@ -1,0 +1,36 @@
+# Development Dockerfile with hot reload support
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Create non-root user for consistency with production
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+# Copy dependency files
+COPY package.json package-lock.json* yarn.lock* ./
+
+# Install dependencies (including dev dependencies for development)
+RUN if [ -f yarn.lock ]; then yarn install; \
+    elif [ -f package-lock.json ]; then npm ci; \
+    else npm install; \
+    fi
+
+# Copy source code
+COPY . .
+
+# Ensure proper ownership for non-root user
+RUN chown -R nextjs:nodejs /app
+
+# Switch to non-root user
+USER nextjs
+
+# Expose development port
+EXPOSE 3000
+
+# Set environment for development
+ENV NODE_ENV=development
+
+# Run Next.js dev server with source code mounted as volume
+# The volume mount at runtime will override this COPY
+CMD ["npm", "run", "dev"]

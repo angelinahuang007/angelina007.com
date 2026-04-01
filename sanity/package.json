@@ -1,0 +1,24 @@
+{
+  "name": "angelina007-sanity",
+  "version": "1.0.0",
+  "description": "Sanity Studio for Angelina007 Portfolio CMS",
+  "private": true,
+  "scripts": {
+    "dev": "sanity dev",
+    "start": "sanity start",
+    "build": "sanity build",
+    "deploy": "sanity deploy",
+    "build:cli": "cd .. && npm run build"
+  },
+  "dependencies": {
+    "sanity": "^3.0.0",
+    "@sanity/vision": "^3.0.0",
+    "@sanity/cli": "^3.0.0"
+  },
+  "devDependencies": {
+    "@sanity/pkg-utils": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

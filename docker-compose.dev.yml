@@ -1,0 +1,41 @@
+version: '3.9'
+
+services:
+  # Next.js development container with hot reload
+  next-app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dev
+    container_name: angelina-next-app-dev
+    ports:
+      - "3000:3000"
+    volumes:
+      # Mount entire source directory for hot reload
+      - .:/app
+      # Exclude node_modules to avoid permission issues
+      - /app/node_modules
+      - /app/.next
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+      NEXT_PUBLIC_ANALYTICS_ID: ${NEXT_PUBLIC_ANALYTICS_ID:-}
+      NEXT_PUBLIC_SANITY_PROJECT_ID: ${NEXT_PUBLIC_SANITY_PROJECT_ID:-}
+      NEXT_PUBLIC_SANITY_DATASET: ${NEXT_PUBLIC_SANITY_DATASET:-production}
+      SANITY_API_TOKEN: ${SANITY_API_TOKEN:-}
+    networks:
+      - angelina-network-dev
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  angelina-network-dev:
+    driver: bridge

@@ -1,0 +1,160 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-dark-bg: #0f0f14;
+  --color-dark-bg-secondary: #1a1b27;
+  --color-dark-text: #e4e4e7;
+  --color-dark-text-muted: #a1a1aa;
+  --color-dark-accent: #6366f1;
+  --color-dark-accent-light: #818cf8;
+  --color-dark-sky: #38bdf8;
+
+  --color-light-bg: #ffffff;
+  --color-light-bg-secondary: #f4f4f5;
+  --color-light-text: #18181b;
+  --color-light-text-muted: #52525b;
+  --color-light-accent: #b45309;
+  --color-light-accent-light: #d97706;
+  --color-light-sky: #d97706;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-white dark:bg-[#0f0f14] text-light-text dark:text-dark-text transition-colors duration-300;
+}
+
+* {
+  @apply border-light-text/10 dark:border-dark-text/10;
+}
+
+/* Smooth theme transitions */
+html.dark {
+  color-scheme: dark;
+}
+
+html.light {
+  color-scheme: light;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  @apply w-2 h-2;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-light-bg-secondary dark:bg-dark-bg-secondary;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-light-text-muted/40 dark:bg-dark-text-muted/40 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-light-text-muted/60 dark:bg-dark-text-muted/60;
+}
+
+/* Selection color */
+::selection {
+  @apply bg-light-accent/20 dark:bg-dark-accent/20 text-light-text dark:text-dark-text;
+}
+
+/* Code highlighting */
+code {
+  @apply font-mono text-sm;
+}
+
+pre {
+  @apply bg-light-bg-secondary dark:bg-dark-bg-secondary rounded-md p-4 overflow-x-auto;
+}
+
+/* Links */
+a {
+  @apply transition-colors duration-200;
+}
+
+/* Headings */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  @apply font-bold tracking-tight;
+}
+
+h1 {
+  @apply text-4xl md:text-5xl lg:text-6xl;
+}
+
+h2 {
+  @apply text-3xl md:text-4xl lg:text-5xl;
+}
+
+h3 {
+  @apply text-2xl md:text-3xl lg:text-4xl;
+}
+
+h4 {
+  @apply text-xl md:text-2xl lg:text-3xl;
+}
+
+h5 {
+  @apply text-lg md:text-xl lg:text-2xl;
+}
+
+h6 {
+  @apply text-base md:text-lg lg:text-xl;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+.animate-slide-in-up {
+  animation: slideInUp 0.5s ease-out;
+}
+
+/* Utility classes */
+.glass {
+  @apply backdrop-blur-md bg-white/10 dark:bg-black/20 border border-white/20 dark:border-white/10;
+}
+
+.gradient-text {
+  @apply text-light-accent dark:text-dark-accent;
+}

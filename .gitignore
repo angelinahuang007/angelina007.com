@@ -1,0 +1,125 @@
+# ─── Dependencies ───
+node_modules/
+/.pnp
+.pnp.js
+
+# ─── Next.js ───
+/.next/
+/out/
+.next/
+
+# ─── Build outputs ───
+/build
+/dist
+dist/
+
+# ─── Environment variables ───
+.env
+.env.local
+.env.*.local
+.env.production.local
+.env.development.local
+.env.test.local
+!.env.example
+
+# ─── Testing ───
+/coverage
+
+# ─── TypeScript ───
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# ─── Logs ───
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# ─── Package manager ───
+.npm
+.yarn/cache
+.yarn/unplugged
+package-lock.json.bak
+yarn.lock.bak
+
+# ─── IDE / Editors ───
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+.history/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.swp
+*.swo
+*~
+.#*
+
+# ─── macOS ───
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# ─── Linux ───
+.directory
+.Trash-*
+
+# ─── Windows ───
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ─── Docker ───
+docker-compose.override.yml
+
+# ─── Vercel ───
+.vercel/
+
+# ─── Sanity ───
+/sanity/dist
+/sanity/node_modules
+/sanity/.env.local
+/sanity/.env.*.local
+
+# ─── SSL / Certificates ───
+certbot/
+!certbot/.gitkeep
+*.pem
+*.key
+*.crt
+*.csr
+
+# ─── Cache ───
+.cache/
+.eslintcache
+.turbo/
+
+# ─── Temporary files ───
+tmp/
+temp/
+*.tmp
+*.bak
+
+# ─── Database (dev) ───
+db.sqlite
+db.sqlite3
+
+# ─── Testing frameworks ───
+.chromatic/
+.playwright/
+test-results/
