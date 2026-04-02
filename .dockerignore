@@ -1,0 +1,13 @@
+node_modules
+.next
+.git
+.gitignore
+sanity
+certbot
+scripts
+docker
+*.md
+.env*
+!.env.example
+.vscode
+.idea

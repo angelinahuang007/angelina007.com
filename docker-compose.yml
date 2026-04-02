@@ -25,8 +25,6 @@ services:
       start_period: 40s
     networks:
       - angelina-network
-    depends_on:
-      - certbot
     logging:
       driver: "json-file"
       options:
@@ -59,18 +57,12 @@ services:
   certbot:
     image: certbot/certbot
     container_name: angelina-certbot
-    restart: always
     volumes:
       - ./certbot/conf:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot
+    # Auto-renew every 12 hours (only renews if cert is near expiry)
     entrypoint: >
       /bin/sh -c "
-      if [ ! -d /etc/letsencrypt/live/angelina007.com ]; then
-        certbot certonly --webroot -w /var/www/certbot
-          -d angelina007.com -d www.angelina007.com
-          --email admin@angelina007.com
-          --agree-tos --non-interactive --expand;
-      fi;
       trap exit TERM;
       while :; do
         certbot renew --webroot -w /var/www/certbot --quiet;
@@ -85,49 +77,6 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Optional: Umami Analytics
-  # Uncomment to enable analytics tracking
-  # umami:
-  #   image: ghcr.io/umami-software/umami:latest
-  #   container_name: angelina-umami
-  #   restart: always
-  #   environment:
-  #     DATABASE_URL: postgresql://umami:${UMAMI_DB_PASSWORD:-umami}@postgres:5432/umami
-  #     DATABASE_TYPE: postgresql
-  #     HASH_SALT: ${UMAMI_HASH_SALT:-}
-  #     TRACKER_SCRIPT_NAME: track
-  #   depends_on:
-  #     - postgres
-  #   networks:
-  #     - angelina-network
-  #   logging:
-  #     driver: "json-file"
-  #     options:
-  #       max-size: "10m"
-  #       max-file: "3"
-  #
-  # postgres:
-  #   image: postgres:15-alpine
-  #   container_name: angelina-postgres
-  #   restart: always
-  #   environment:
-  #     POSTGRES_DB: umami
-  #     POSTGRES_USER: umami
-  #     POSTGRES_PASSWORD: ${UMAMI_DB_PASSWORD:-umami}
-  #   volumes:
-  #     - umami_db:/var/lib/postgresql/data
-  #   networks:
-  #     - angelina-network
-  #   logging:
-  #     driver: "json-file"
-  #     options:
-  #       max-size: "10m"
-  #       max-file: "3"
-
 networks:
   angelina-network:
     driver: bridge
-
-# volumes:
-#   umami_db:
-#     driver: local
