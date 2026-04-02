@@ -90,6 +90,7 @@ See `docker/` and `.github/workflows/deploy.yml` for configuration.
 
 ## Documentation
 
+- [Deploy Guide](DEPLOY.md) — Step-by-step deployment on Digital Ocean
 - [Development Guide](DEVELOPMENT_GUIDE.md) — Full technical spec, architecture decisions, and milestones
 - [Development Guide (Chinese)](DEVELOPMENT_GUIDE_CN.md) — 开发指南中文版
 - [Content Guide](CONTENT_GUIDE.md) — Content preparation checklist for populating the site
