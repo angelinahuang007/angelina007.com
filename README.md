@@ -1,99 +1,73 @@
 # angelina007.com
 
-Personal portfolio and blog for **Angelina Huang** — a creative technologist at the intersection of computing and art.
+Personal portfolio and blog for **Angelina Huang** — a creative technologist working at the intersection of computing and art.
 
 Live at [angelina007.com](https://angelina007.com)
 
 ## Overview
 
-A modern, responsive portfolio website showcasing projects in machine learning, graphics programming, game development, and creative coding. Features a dual-theme design with an interactive canvas background — a cosmic starfield in dark mode and warm animated blobs with a playful cat in light mode.
+A modern, responsive portfolio and blog that showcases projects in machine learning, graphics programming, game development, and creative coding. The site has a dual-theme aesthetic — a cosmic starfield in dark mode and warm animated blobs with a playful cat in light mode — and a mobile-friendly CMS so blog posts can be written from anywhere.
 
 ## Tech Stack
 
-- **Framework**: Next.js 14+ (App Router, SSR/SSG hybrid)
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS with custom theme tokens
-- **Fonts**: Space Mono (headings/body) + Space Grotesk (long-form text) + JetBrains Mono (code)
-- **Animation**: Canvas API (interactive backgrounds), Framer Motion (UI transitions)
-- **CMS**: Sanity.io (headless, mobile-friendly editing)
-- **Deployment**: Docker + Nginx reverse proxy on Digital Ocean
-- **CI/CD**: GitHub Actions
+- **Framework:** Next.js 14 (App Router, SSR/SSG hybrid)
+- **Language:** TypeScript
+- **Styling:** Tailwind CSS with custom theme tokens
+- **Fonts:** Space Mono, Space Grotesk, JetBrains Mono (via `next/font/google`)
+- **Animation:** Canvas API for backgrounds, Framer Motion for UI transitions
+- **CMS:** Sanity.io (headless, mobile-friendly editing)
+- **Deployment:** Docker + Nginx reverse proxy on a Digital Ocean droplet
+- **CI/CD:** GitHub Actions (push-to-main deploy)
+- **SSL:** Let's Encrypt via Certbot (auto-renewing)
 
-## Color System
-
-| Mode | Background | Accent | Text |
-|------|-----------|--------|------|
-| Dark | `#0f0f14` / `#1a1b27` | Indigo `#6366f1` | `#e4e4e7` / `#a1a1aa` |
-| Light | `#ffffff` / `#f4f4f5` | Warm Orange `#b45309` | `#18181b` / `#52525b` |
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 18+
-- npm or yarn
-
-### Local Development
+## Quick Start
 
 ```bash
+# Install and run
 npm install
 npm run dev
-```
+# → http://localhost:3000
 
-Open [http://localhost:3000](http://localhost:3000).
-
-### With Docker
-
-```bash
-# Development
+# Or with Docker
 docker compose -f docker-compose.dev.yml up
 
-# Production
-docker compose up --build
+# Sanity Studio (blog editor)
+cd sanity && npm install && npm run dev
+# → http://localhost:3333
 ```
 
-### Sanity Studio (CMS)
-
-```bash
-cd sanity
-npm install
-npm run dev
-# Opens at http://localhost:3333
-```
+Before running, copy `.env.example` to `.env.local` and set at least `NEXT_PUBLIC_SITE_URL`. Sanity-backed content pulls automatically once `NEXT_PUBLIC_SANITY_PROJECT_ID` and `NEXT_PUBLIC_SANITY_DATASET` are configured; otherwise the site falls back to `src/lib/placeholder-data.ts`.
 
 ## Project Structure
 
 ```
 src/
-├── app/           # Next.js App Router pages
+├── app/             Next.js App Router pages (home, portfolio, blog, about, contact)
 ├── components/
-│   ├── home/      # Hero, FeaturedProjects, LatestPosts, CosmicBackground
-│   ├── layout/    # Navbar, Footer, ThemeToggle, ThemeProvider
-│   ├── ui/        # Button, Card, Tag, SectionHeading
-│   ├── portfolio/ # ProjectCard, ProjectGrid, FilterBar
-│   ├── blog/      # PostCard, PostList, TableOfContents
-│   └── shared/    # Analytics
-├── lib/           # Constants, utilities, Sanity client, placeholder data
-├── styles/        # Global CSS + Tailwind config
-└── types/         # TypeScript interfaces
+│   ├── home/        Hero, FeaturedProjects, LatestPosts, CosmicBackground
+│   ├── layout/      Navbar, Footer, ThemeToggle, ThemeProvider
+│   ├── ui/          Button, Card, Tag, SectionHeading
+│   ├── portfolio/   ProjectCard, ProjectGrid, FilterBar
+│   ├── blog/        PostCard, PostList, TableOfContents
+│   └── shared/      Analytics
+├── lib/             constants, utils, Sanity client, placeholder data
+├── styles/          Global CSS + Tailwind directives
+└── types/           Shared TypeScript interfaces
+
+sanity/              Sanity Studio config + schemas (post, category, project)
+docker/              Dockerfile, Dockerfile.dev, nginx.conf
+.github/workflows/   deploy.yml (GitHub Actions CI/CD)
+scripts/             init-ssl.sh
 ```
 
-## Deployment
+## Deployment (summary)
 
-Deployed via GitHub Actions on push to `main`:
-
-1. GitHub Actions builds a Docker image
-2. Image is pushed to the Digital Ocean Droplet
-3. Docker Compose runs Next.js behind Nginx with SSL (Let's Encrypt)
-
-See `docker/` and `.github/workflows/deploy.yml` for configuration.
+Deploys happen automatically on push to `main` via GitHub Actions, which builds the Docker image on the Digital Ocean droplet and restarts the stack. First-time setup, SSH key generation, DNS configuration, SSL bootstrap, and ops commands are all covered in `DesignDoc.md` (sections on Deployment Architecture and Runbook).
 
 ## Documentation
 
-- [Deploy Guide](DEPLOY.md) — Step-by-step deployment on Digital Ocean
-- [Development Guide](DEVELOPMENT_GUIDE.md) — Full technical spec, architecture decisions, and milestones
-- [Development Guide (Chinese)](DEVELOPMENT_GUIDE_CN.md) — 开发指南中文版
-- [Content Guide](CONTENT_GUIDE.md) — Content preparation checklist for populating the site
+- [DesignDoc.md](DesignDoc.md) — full technical spec: architecture, pages, components, theme system, Sanity schemas, deployment, runbook, and SEO strategy. This is the document to read if you want to understand or rebuild the site.
+- [archive.md](archive.md) — supplementary material: Chinese (中文) development guide, content preparation checklist, placeholder-data reference, and historical notes.
 
 ## License
 
