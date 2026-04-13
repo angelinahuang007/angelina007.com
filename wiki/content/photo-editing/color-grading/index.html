@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Color Grading & LUTs</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        .grading-container {
+            display: flex; flex-wrap: wrap;
+            gap: 20px;
+            height: 100%;
+        }
+        .preview-area {
+            flex: 1;
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            overflow-y: auto;
+        }
+        .color-wheels {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 12px;
+        }
+        .color-wheel-box {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+        }
+        .color-wheel-box h3 {
+            margin: 0 0 8px 0;
+            font-size: 11px;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-family: 'Space Grotesk', sans-serif;
+        }
+        .wheel-canvas {
+            width: 100%;
+            aspect-ratio: 1;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+        .preview-box {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+            height: 200px;
+        }
+        .preview-box h3 {
+            margin: 0;
+            padding: 12px;
+            background: var(--border-strong);
+            color: var(--accent);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-family: 'Space Grotesk', sans-serif;
+            border-bottom: 1px solid var(--border);
+        }
+        .preview-box canvas {
+            width: 100%;
+            height: calc(100% - 40px);
+            display: block;
+        }
+        .lut-cube {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+            height: 200px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .lut-cube canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        .control-panel {
+            width: 280px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 16px;
+            overflow-y: auto;
+            color: var(--text);
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 13px;
+        }
+        .control-group {
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        .control-group h4 {
+            margin: 0 0 8px 0;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: var(--accent);
+            letter-spacing: 0.5px;
+        }
+        .preset-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
+        .preset-btn {
+            padding: 8px;
+            background: var(--border);
+            border: 1px solid var(--border-strong);
+            color: var(--text);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            font-family: 'Space Grotesk', sans-serif;
+            transition: all 0.2s;
+        }
+        .preset-btn:hover {
+            background: var(--border-strong);
+            border-color: var(--accent);
+        }
+        .preset-btn.active {
+            background: var(--accent);
+            color: var(--bg-secondary);
+            border-color: var(--accent);
+        }
+        .slider-row {
+            margin-bottom: 12px;
+        }
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+            font-size: 11px;
+        }
+        input[type="range"] {
+            width: 100%;
+            height: 4px;
+            border-radius: 2px;
+            background: var(--border-strong);
+            outline: none;
+            -webkit-appearance: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--accent);
+            border: none;
+            cursor: pointer;
+        }
+        .info-text {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 12px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="grading-container">
+        <div class="preview-area">
+            <div class="color-wheels">
+                <div class="color-wheel-box">
+                    <h3>Shadows</h3>
+                    <canvas class="wheel-canvas" id="shadowWheel"></canvas>
+                </div>
+                <div class="color-wheel-box">
+                    <h3>Midtones</h3>
+                    <canvas class="wheel-canvas" id="midtoneWheel"></canvas>
+                </div>
+                <div class="color-wheel-box">
+                    <h3>Highlights</h3>
+                    <canvas class="wheel-canvas" id="highlightWheel"></canvas>
+                </div>
+            </div>
+
+            <div class="preview-box">
+                <h3>Graded Image</h3>
+                <canvas id="previewCanvas"></canvas>
+            </div>
+
+            <div class="lut-cube">
+                <canvas id="lutCanvas" width="200" height="200"></canvas>
+            </div>
+        </div>
+
+        <div class="control-panel">
+            <div class="control-group">
+                <h4>Presets</h4>
+                <div class="preset-grid">
+                    <button class="preset-btn" data-preset="neutral">Neutral</button>
+                    <button class="preset-btn active" data-preset="tealOrange">Teal/Orange</button>
+                    <button class="preset-btn" data-preset="vintage">Vintage</button>
+                    <button class="preset-btn" data-preset="noir">Film Noir</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h4>Shadow Grading</h4>
+                <div class="slider-row">
+                    <div class="slider-label"><span>Saturation</span><span id="shadowSat">0</span></div>
+                    <input type="range" id="shadowSatSlider" min="-100" max="100" value="0">
+                </div>
+                <div class="slider-row">
+                    <div class="slider-label"><span>Hue Shift</span><span id="shadowHue">0</span></div>
+                    <input type="range" id="shadowHueSlider" min="-180" max="180" value="0">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h4>Midtone Grading</h4>
+                <div class="slider-row">
+                    <div class="slider-label"><span>Saturation</span><span id="midtoneSat">0</span></div>
+                    <input type="range" id="midtoneSatSlider" min="-100" max="100" value="0">
+                </div>
+                <div class="slider-row">
+                    <div class="slider-label"><span>Hue Shift</span><span id="midtoneHue">0</span></div>
+                    <input type="range" id="midtoneHueSlider" min="-180" max="180" value="0">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h4>Highlight Grading</h4>
+                <div class="slider-row">
+                    <div class="slider-label"><span>Saturation</span><span id="highlightSat">0</span></div>
+                    <input type="range" id="highlightSatSlider" min="-100" max="100" value="0">
+                </div>
+                <div class="slider-row">
+                    <div class="slider-label"><span>Hue Shift</span><span id="highlightHue">0</span></div>
+                    <input type="range" id="highlightHueSlider" min="-180" max="180" value="0">
+                </div>
+            </div>
+
+            <div class="info-text">
+                Adjust color wheels to grade shadows, midtones, and highlights. Presets apply professional color grades.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class ColorGrading {
+            constructor() {
+                this.shadowCanvas = document.getElementById('shadowWheel');
+                this.shadowCtx = this.shadowCanvas.getContext('2d');
+                this.midtoneCanvas = document.getElementById('midtoneWheel');
+                this.midtoneCtx = this.midtoneCanvas.getContext('2d');
+                this.highlightCanvas = document.getElementById('highlightWheel');
+                this.highlightCtx = this.highlightCanvas.getContext('2d');
+                this.previewCanvas = document.getElementById('previewCanvas');
+                this.previewCtx = this.previewCanvas.getContext('2d');
+                this.lutCanvas = document.getElementById('lutCanvas');
+                this.lutCtx = this.lutCanvas.getContext('2d');
+
+                this.grading = {
+                    shadows: { hue: 0, sat: 0 },
+                    midtones: { hue: 0, sat: 0 },
+                    highlights: { hue: 0, sat: 0 }
+                };
+
+                this.presetValues = {
+                    neutral: { shadows: {hue: 0, sat: 0}, midtones: {hue: 0, sat: 0}, highlights: {hue: 0, sat: 0} },
+                    tealOrange: { shadows: {hue: 180, sat: 30}, midtones: {hue: 0, sat: 0}, highlights: {hue: 30, sat: 40} },
+                    vintage: { shadows: {hue: 45, sat: 20}, midtones: {hue: 30, sat: 15}, highlights: {hue: 20, sat: 10} },
+                    noir: { shadows: {hue: 200, sat: -50}, midtones: {hue: 0, sat: -30}, highlights: {hue: 0, sat: -50} }
+                };
+
+                this.resizeCanvases();
+                window.addEventListener('resize', () => this.resizeCanvases());
+                this.setupEvents();
+                this.applyPreset('tealOrange');
+            }
+
+            resizeCanvases() {
+                const rect = this.shadowCanvas.parentElement.getBoundingClientRect();
+                this.shadowCanvas.width = rect.width;
+                this.shadowCanvas.height = rect.height;
+                this.midtoneCanvas.width = rect.width;
+                this.midtoneCanvas.height = rect.height;
+                this.highlightCanvas.width = rect.width;
+                this.highlightCanvas.height = rect.height;
+
+                const prevRect = this.previewCanvas.parentElement.getBoundingClientRect();
+                this.previewCanvas.width = prevRect.width;
+                this.previewCanvas.height = prevRect.height - 40;
+
+                this.render();
+            }
+
+            setupEvents() {
+                document.querySelectorAll('[data-preset]').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        document.querySelectorAll('[data-preset]').forEach(b => b.classList.remove('active'));
+                        e.target.classList.add('active');
+                        this.applyPreset(e.target.dataset.preset);
+                    });
+                });
+
+                const sliders = {
+                    'shadowSatSlider': ['shadows', 'sat'],
+                    'shadowHueSlider': ['shadows', 'hue'],
+                    'midtoneSatSlider': ['midtones', 'sat'],
+                    'midtoneHueSlider': ['midtones', 'hue'],
+                    'highlightSatSlider': ['highlights', 'sat'],
+                    'highlightHueSlider': ['highlights', 'hue']
+                };
+
+                Object.entries(sliders).forEach(([id, [tone, prop]]) => {
+                    document.getElementById(id).addEventListener('input', (e) => {
+                        const val = parseFloat(e.target.value);
+                        this.grading[tone][prop] = val;
+                        const labelId = id.replace('Slider', '');
+                        document.getElementById(labelId).textContent = Math.round(val);
+                        this.render();
+                    });
+                });
+            }
+
+            applyPreset(name) {
+                const preset = this.presetValues[name];
+                Object.entries(preset).forEach(([tone, values]) => {
+                    this.grading[tone] = { ...values };
+                });
+
+                document.getElementById('shadowSatSlider').value = preset.shadows.sat;
+                document.getElementById('shadowHueSlider').value = preset.shadows.hue;
+                document.getElementById('midtoneSatSlider').value = preset.midtones.sat;
+                document.getElementById('midtoneHueSlider').value = preset.midtones.hue;
+                document.getElementById('highlightSatSlider').value = preset.highlights.sat;
+                document.getElementById('highlightHueSlider').value = preset.highlights.hue;
+
+                document.getElementById('shadowSat').textContent = Math.round(preset.shadows.sat);
+                document.getElementById('shadowHue').textContent = Math.round(preset.shadows.hue);
+                document.getElementById('midtoneSat').textContent = Math.round(preset.midtones.sat);
+                document.getElementById('midtoneHue').textContent = Math.round(preset.midtones.hue);
+                document.getElementById('highlightSat').textContent = Math.round(preset.highlights.sat);
+                document.getElementById('highlightHue').textContent = Math.round(preset.highlights.hue);
+
+                this.render();
+            }
+
+            renderWheel(ctx, canvas, tone) {
+                const w = canvas.width;
+                const h = canvas.height;
+                const cx = w / 2;
+                const cy = h / 2;
+                const radius = Math.min(w, h) / 2 - 20;
+
+                // Background
+                ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+                ctx.fillRect(0, 0, w, h);
+
+                // Color wheel
+                for (let angle = 0; angle < 360; angle += 6) {
+                    const rad = (angle * Math.PI) / 180;
+                    const hsl = `hsl(${angle}, 100%, 50%)`;
+                    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+                    grad.addColorStop(0, 'hsl(0, 0%, 80%)');
+                    grad.addColorStop(1, hsl);
+
+                    ctx.fillStyle = grad;
+                    ctx.beginPath();
+                    ctx.moveTo(cx, cy);
+                    ctx.arc(cx, cy, radius, rad, rad + (6 * Math.PI) / 180);
+                    ctx.fill();
+                }
+
+                // Pointer for current grading
+                const hue = this.grading[tone].hue;
+                const sat = Math.abs(this.grading[tone].sat) / 100;
+                const pointerRadius = radius * sat * 0.5;
+                const pointerAngle = (hue * Math.PI) / 180;
+                const px = cx + Math.cos(pointerAngle) * pointerRadius;
+                const py = cy + Math.sin(pointerAngle) * pointerRadius;
+
+                ctx.fillStyle = this.grading[tone].sat >= 0 ? '#fff' : '#000';
+                ctx.strokeStyle = this.grading[tone].sat >= 0 ? '#000' : '#fff';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(px, py, 8, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+
+                // Center dot
+                ctx.fillStyle = Wiki.colors().textMuted;
+                ctx.beginPath();
+                ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            renderPreview() {
+                const w = this.previewCanvas.width;
+                const h = this.previewCanvas.height;
+
+                // Base gradient
+                const grad = this.previewCtx.createLinearGradient(0, 0, w, h);
+                grad.addColorStop(0, '#333333');
+                grad.addColorStop(0.33, '#666666');
+                grad.addColorStop(0.67, '#999999');
+                grad.addColorStop(1, '#cccccc');
+                this.previewCtx.fillStyle = grad;
+                this.previewCtx.fillRect(0, 0, w, h);
+
+                // Apply grading by rendering colored rectangles
+                const tones = ['shadows', 'midtones', 'highlights'];
+                const positions = [0, w / 3, (2 * w) / 3];
+
+                tones.forEach((tone, idx) => {
+                    const hsl = `hsl(${this.grading[tone].hue}, ${Math.abs(this.grading[tone].sat)}%, 50%)`;
+                    this.previewCtx.fillStyle = hsl;
+                    this.previewCtx.globalAlpha = Math.abs(this.grading[tone].sat) / 200;
+                    this.previewCtx.fillRect(positions[idx], 0, w / 3, h);
+                });
+
+                this.previewCtx.globalAlpha = 1;
+            }
+
+            renderLUT() {
+                const w = this.lutCanvas.width;
+                const h = this.lutCanvas.height;
+
+                this.lutCtx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+                this.lutCtx.fillRect(0, 0, w, h);
+
+                // Simplified 3D LUT visualization as 2D grid
+                const gridSize = 8;
+                const cellW = w / gridSize;
+                const cellH = h / gridSize;
+
+                for (let y = 0; y < gridSize; y++) {
+                    for (let x = 0; x < gridSize; x++) {
+                        const hue = (x / gridSize) * 360;
+                        const light = (y / gridSize) * 100;
+
+                        // Apply grading based on lightness (approximate shadows/midtones/highlights)
+                        let gradedHue = hue;
+                        if (light < 33) {
+                            gradedHue = hue + this.grading.shadows.hue;
+                        } else if (light < 67) {
+                            gradedHue = hue + this.grading.midtones.hue;
+                        } else {
+                            gradedHue = hue + this.grading.highlights.hue;
+                        }
+
+                        this.lutCtx.fillStyle = `hsl(${gradedHue % 360}, 75%, ${light}%)`;
+                        this.lutCtx.fillRect(x * cellW, y * cellH, cellW, cellH);
+                    }
+                }
+            }
+
+            render() {
+                this.renderWheel(this.shadowCtx, this.shadowCanvas, 'shadows');
+                this.renderWheel(this.midtoneCtx, this.midtoneCanvas, 'midtones');
+                this.renderWheel(this.highlightCtx, this.highlightCanvas, 'highlights');
+                this.renderPreview();
+                this.renderLUT();
+            }
+        }
+
+        const grading = new ColorGrading();
+    </script>
+</body>
+</html>

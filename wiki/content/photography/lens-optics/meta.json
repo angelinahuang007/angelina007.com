@@ -1,0 +1,19 @@
+{
+  "title": "Photography Lens Optics and Image Formation",
+  "category": "photography",
+  "order": 2,
+  "tags": [
+    "photography",
+    "lens",
+    "optics",
+    "depth-of-field",
+    "bokeh",
+    "aberration"
+  ],
+  "description": "Physical principles of lens design including focal length, depth of field, bokeh characteristics, aberrations, and how optical properties map to 3D camera models in rendering.",
+  "related": [
+    "photography/exposure-fundamentals",
+    "graphics-fundamentals/ray-tracing-fundamentals",
+    "photography/virtual-cinematography"
+  ]
+}

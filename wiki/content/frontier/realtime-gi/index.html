@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time Global Illumination</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        body { background: var(--bg-dark); color: var(--fg-light); }
+        .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+        .controls { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+        button { padding: 8px 16px; background: var(--accent); color: var(--bg-dark); border: none; border-radius: 4px; cursor: pointer; font-family: 'Space Mono'; font-weight: 700; }
+        button.active { background: var(--accent-alt); }
+        button:hover { opacity: 0.8; }
+        #canvas { border: 1px solid var(--fg-dark); background: var(--bg-darker); display: block; margin: 0 auto; }
+        .info { font-size: 0.9em; color: var(--fg-muted); margin-top: 10px; font-family: 'Space Mono'; }
+        .papers-section { margin-top: 40px; padding-top: 24px; border-top: 1px solid var(--border-strong, rgba(228,228,231,0.2)); }
+        .papers-section h2 { font-family: 'Space Mono', monospace; font-size: 1.1rem; color: var(--accent, #6366f1); margin-bottom: 16px; }
+        .paper-list { display: flex; flex-direction: column; gap: 12px; }
+        .paper-card { display: block; background: var(--bg-secondary, #1a1b27); border: 1px solid var(--border, rgba(228,228,231,0.1)); border-radius: 8px; padding: 16px; text-decoration: none; transition: border-color 0.2s; }
+        .paper-card:hover { border-color: var(--accent, #6366f1); }
+        .paper-title { font-family: 'Space Mono', monospace; font-size: 0.9rem; font-weight: 700; color: var(--text, #e4e4e7); margin-bottom: 4px; }
+        .paper-authors { font-size: 0.8rem; color: var(--text-muted, #a1a1aa); margin-bottom: 8px; }
+        .paper-desc { font-size: 0.85rem; color: var(--text-dim, #71717a); line-height: 1.5; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Real-time Global Illumination</h1>
+        <p>Compare different GI techniques: Direct, SSAO, Probe-based, Voxel GI, and Path Trace reference.</p>
+
+        <div class="controls">
+            <button id="directBtn" class="active">Direct Only</button>
+            <button id="ssaoBtn">SSAO</button>
+            <button id="probeBtn">Probe-Based</button>
+            <button id="voxelBtn">Voxel GI</button>
+            <button id="pathBtn">Path Trace (Ref)</button>
+        </div>
+
+        <canvas id="canvas" width="800" height="500"></canvas>
+        <div class="info" id="info">Click to move light. See performance cost change with each technique.</div>
+    </div>
+
+    <script>
+        const canvas = Wiki.createCanvas('canvas', 800, 500);
+        const ctx = canvas.getContext('2d');
+        let currentMethod = 'direct';
+        let lightX = 450;
+        let lightY = 250;
+        let time = 0;
+
+        const room = {
+            x: 100,
+            y: 100,
+            w: 700,
+            h: 400,
+            walls: [
+                { x: 100, y: 100, w: 700, h: 5, color: '#cc5555' }, // Top
+                { x: 100, y: 495, w: 700, h: 5, color: '#5555cc' }, // Bottom
+                { x: 100, y: 100, w: 5, h: 400, color: '#55cc55' }, // Left
+                { x: 795, y: 100, w: 5, h: 400, color: '#cc55cc' }  // Right
+            ]
+        };
+
+        function drawDirect() {
+            // Just direct light from point source
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.fillRect(room.x, room.y, room.w, room.h);
+
+            // Direct illumination falloff
+            const maxDist = 400;
+            for (let y = room.y; y < room.y + room.h; y += 20) {
+                for (let x = room.x; x < room.x + room.w; x += 20) {
+                    const dx = x - lightX;
+                    const dy = y - lightY;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    const brightness = Math.max(0, 1 - dist / maxDist);
+                    ctx.fillStyle = `rgba(255, 255, 200, ${brightness * 0.6})`;
+                    ctx.fillRect(x, y, 20, 20);
+                }
+            }
+        }
+
+        function drawSSAO() {
+            // Screen Space Ambient Occlusion
+            ctx.fillStyle = '#333';
+            ctx.fillRect(room.x, room.y, room.w, room.h);
+
+            // Direct light
+            const maxDist = 300;
+            for (let y = room.y; y < room.y + room.h; y += 15) {
+                for (let x = room.x; x < room.x + room.w; x += 15) {
+                    const dx = x - lightX;
+                    const dy = y - lightY;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    const brightness = Math.max(0, 1 - dist / maxDist);
+
+                    // SSAO: darken corners and edges
+                    const toWall = Math.min(
+                        Math.abs(x - room.x),
+                        Math.abs(x - (room.x + room.w)),
+                        Math.abs(y - room.y),
+                        Math.abs(y - (room.y + room.h))
+                    );
+                    const occlusion = Math.max(0, 1 - (50 - toWall) / 50) * 0.5;
+
+                    ctx.fillStyle = `rgba(255, 255, 200, ${(brightness * 0.6 - occlusion * 0.3)})`;
+                    ctx.fillRect(x, y, 15, 15);
+                }
+            }
+        }
+
+        function drawProbes() {
+            // Probe-based GI
+            ctx.fillStyle = '#222';
+            ctx.fillRect(room.x, room.y, room.w, room.h);
+
+            // Grid of probes
+            const probeSpacing = 80;
+            const probes = [];
+            for (let py = room.y + probeSpacing; py < room.y + room.h; py += probeSpacing) {
+                for (let px = room.x + probeSpacing; px < room.x + room.w; px += probeSpacing) {
+                    probes.push({ x: px, y: py });
+                }
+            }
+
+            // Sample from nearby probes
+            for (let y = room.y; y < room.y + room.h; y += 20) {
+                for (let x = room.x; x < room.x + room.w; x += 20) {
+                    let color = 0;
+                    let totalWeight = 0;
+
+                    probes.forEach(probe => {
+                        const dx = x - probe.x;
+                        const dy = y - probe.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        const weight = Math.max(0, 1 - dist / probeSpacing);
+
+                        const px = probe.x;
+                        const py = probe.y;
+                        const ldx = px - lightX;
+                        const ldy = py - lightY;
+                        const ldist = Math.sqrt(ldx * ldx + ldy * ldy);
+                        const lightInfluence = Math.max(0, 1 - ldist / 400);
+
+                        color += lightInfluence * weight;
+                        totalWeight += weight;
+                    });
+
+                    color /= totalWeight;
+                    ctx.fillStyle = `rgba(255, 255, 200, ${color * 0.6})`;
+                    ctx.fillRect(x, y, 20, 20);
+                }
+            }
+
+            // Draw probe positions
+            ctx.fillStyle = '#00ff00';
+            ctx.globalAlpha = 0.5;
+            probes.forEach(probe => {
+                ctx.beginPath();
+                ctx.arc(probe.x, probe.y, 4, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1;
+        }
+
+        function drawVoxelGI() {
+            // Voxel-based GI
+            ctx.fillStyle = '#1a1a1a';
+            ctx.fillRect(room.x, room.y, room.w, room.h);
+
+            // Voxel grid with light propagation
+            const voxelSize = 30;
+            time++;
+
+            for (let y = room.y; y < room.y + room.h; y += voxelSize) {
+                for (let x = room.x; x < room.x + room.w; x += voxelSize) {
+                    const dx = x - lightX;
+                    const dy = y - lightY;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    let brightness = Math.max(0, 1 - dist / 350);
+
+                    // Propagate to neighbors (simplified)
+                    if (dist < 300) {
+                        const neighborInfluence = Math.sin(time / 20 + x / 100 + y / 100) * 0.2 + 0.3;
+                        brightness += neighborInfluence;
+                    }
+
+                    ctx.fillStyle = `rgba(255, 220, 150, ${brightness * 0.5})`;
+                    ctx.fillRect(x, y, voxelSize - 1, voxelSize - 1);
+
+                    // Voxel borders
+                    ctx.strokeStyle = 'rgba(100, 100, 100, 0.3)';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(x, y, voxelSize - 1, voxelSize - 1);
+                }
+            }
+        }
+
+        function drawPathTrace() {
+            // Reference: Path tracing (converged)
+            ctx.fillStyle = '#0a0a0a';
+            ctx.fillRect(room.x, room.y, room.w, room.h);
+
+            // Multiple bounces simulation
+            const maxBounces = 4;
+            let bounceLight = [];
+            bounceLight.push({ x: lightX, y: lightY, brightness: 1 });
+
+            for (let bounce = 0; bounce < maxBounces; bounce++) {
+                const nextBounce = [];
+                bounceLight.forEach(source => {
+                    const factor = Math.pow(0.8, bounce);
+                    for (let y = room.y; y < room.y + room.h; y += 25) {
+                        for (let x = room.x; x < room.x + room.w; x += 25) {
+                            const dx = x - source.x;
+                            const dy = y - source.y;
+                            const dist = Math.sqrt(dx * dx + dy * dy);
+                            const brightness = Math.max(0, 1 - dist / 350) * source.brightness * factor;
+
+                            if (brightness > 0.01) {
+                                ctx.fillStyle = `rgba(255, 240, 200, ${brightness * 0.3})`;
+                                ctx.fillRect(x, y, 25, 25);
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Wall colors contribute
+            room.walls.forEach(wall => {
+                const dx = lightX - (wall.x + wall.w / 2);
+                const dy = lightY - (wall.y + wall.h / 2);
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const influence = Math.max(0, 1 - dist / 500);
+
+                const rgba = wall.color.match(/\d+/g);
+                ctx.fillStyle = `rgba(${rgba[0]}, ${rgba[1]}, ${rgba[2]}, ${influence * 0.2})`;
+
+                if (wall.w > wall.h) {
+                    ctx.fillRect(wall.x, wall.y - 20, wall.w, 20);
+                    ctx.fillRect(wall.x, wall.y + wall.h, wall.w, 20);
+                } else {
+                    ctx.fillRect(wall.x - 20, wall.y, 20, wall.h);
+                    ctx.fillRect(wall.x + wall.w, wall.y, 20, wall.h);
+                }
+            });
+        }
+
+        function draw() {
+            ctx.fillStyle = Wiki.colors().bg;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw room
+            room.walls.forEach(wall => {
+                ctx.fillStyle = wall.color;
+                ctx.globalAlpha = 0.4;
+                ctx.fillRect(wall.x, wall.y, wall.w, wall.h);
+                ctx.globalAlpha = 1;
+            });
+
+            // Draw GI technique
+            if (currentMethod === 'direct') drawDirect();
+            else if (currentMethod === 'ssao') drawSSAO();
+            else if (currentMethod === 'probe') drawProbes();
+            else if (currentMethod === 'voxel') drawVoxelGI();
+            else if (currentMethod === 'path') drawPathTrace();
+
+            // Draw light source
+            ctx.fillStyle = '#ffff00';
+            ctx.globalAlpha = 0.9;
+            ctx.beginPath();
+            ctx.arc(lightX, lightY, 8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+
+            ctx.strokeStyle = '#ffe66d';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Title and method
+            ctx.fillStyle = Wiki.colors().fg;
+            ctx.font = 'bold 18px Space Grotesk';
+            ctx.fillText('Global Illumination Comparison', 20, 35);
+
+            ctx.font = 'bold 14px Space Grotesk';
+            ctx.fillText(currentMethod.toUpperCase(), 500, 35);
+
+            // Performance metrics
+            const metrics = {
+                direct: { cost: '< 1ms', quality: 'Low', bounces: '0' },
+                ssao: { cost: '1-2ms', quality: 'Medium', bounces: '1' },
+                probe: { cost: '2-3ms', quality: 'Medium-High', bounces: '2-3' },
+                voxel: { cost: '3-5ms', quality: 'High', bounces: '3-4' },
+                path: { cost: '100-500ms', quality: 'Reference', bounces: '4+' }
+            };
+
+            const m = metrics[currentMethod];
+            ctx.font = 'bold 11px Space Mono';
+            ctx.fillStyle = '#4ecdc4';
+            ctx.textAlign = 'left';
+            ctx.fillText('Cost: ' + m.cost, 20, 550);
+            ctx.fillText('Quality: ' + m.quality, 250, 550);
+            ctx.fillText('Light Bounces: ' + m.bounces, 500, 550);
+
+            // Performance bar
+            const costs = { direct: 1, ssao: 15, probe: 25, voxel: 40, path: 300 };
+            const costNorm = Math.min(1, costs[currentMethod] / 300);
+            ctx.fillStyle = 'rgba(100, 100, 100, 0.5)';
+            ctx.fillRect(20, 575, 860, 15);
+            ctx.fillStyle = costNorm > 0.5 ? '#ff6b6b' : '#4ecdc4';
+            ctx.fillRect(20, 575, costNorm * 860, 15);
+
+            ctx.strokeStyle = Wiki.colors().fg;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(0, 0, canvas.width, canvas.height);
+        }
+
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            lightX = e.clientX - rect.left;
+            lightY = e.clientY - rect.top;
+        });
+
+        document.getElementById('directBtn').addEventListener('click', () => {
+            currentMethod = 'direct';
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('directBtn').classList.add('active');
+        });
+
+        document.getElementById('ssaoBtn').addEventListener('click', () => {
+            currentMethod = 'ssao';
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('ssaoBtn').classList.add('active');
+        });
+
+        document.getElementById('probeBtn').addEventListener('click', () => {
+            currentMethod = 'probe';
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('probeBtn').classList.add('active');
+        });
+
+        document.getElementById('voxelBtn').addEventListener('click', () => {
+            currentMethod = 'voxel';
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('voxelBtn').classList.add('active');
+        });
+
+        document.getElementById('pathBtn').addEventListener('click', () => {
+            currentMethod = 'path';
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('pathBtn').classList.add('active');
+        });
+
+        Wiki.animate(draw);
+    </script>
+
+    <div class="container papers-section">
+        <h2>Key Papers</h2>
+        <div class="paper-list">
+            <a href="https://research.nvidia.com/publication/2020-07_spatiotemporal-reservoir-resampling-real-time-ray-tracing-dynamic-direct" class="paper-card">
+                <div class="paper-title">Spatiotemporal Reservoir Resampling for Real-Time Ray Tracing with Dynamic Direct Lighting (ReSTIR)</div>
+                <div class="paper-authors">Bitterli, Wyman, Pharr, Shirley, Lefohn, Jarosz — SIGGRAPH 2020</div>
+                <div class="paper-desc">提出基于蓄水池采样的时空复用技术，在每像素仅追踪少量光线的情况下实现高质量直接光照。通过时间和空间上的样本共享，达到同等质量下 6-60 倍的加速，成为现代实时光追渲染的核心采样技术。</div>
+            </a>
+
+            <a href="https://jcgt.org/published/0008/02/01/" class="paper-card">
+                <div class="paper-title">Dynamic Diffuse Global Illumination with Ray-Traced Irradiance Fields (DDGI)</div>
+                <div class="paper-authors">Majercik, Guertin, Nowrouzezahrai, McGuire — JCGT 2019</div>
+                <div class="paper-desc">提出基于探针（probe）的动态漫反射全局光照方案。在场景中放置 3D 网格探针，通过硬件光追更新探针的辐照度和可见性数据，实现实时动态 GI。被广泛应用于游戏引擎中。</div>
+            </a>
+
+            <a href="https://research.nvidia.com/publication/2011-09_interactive-indirect-illumination-using-voxel-cone-tracing" class="paper-card">
+                <div class="paper-title">Interactive Indirect Illumination Using Voxel Cone Tracing</div>
+                <div class="paper-authors">Crassin, Neyret, Sainz, Green, Eisemann — Pacific Graphics / CGF 2011</div>
+                <div class="paper-desc">提出体素锥追踪 (VCT) 方法，将场景体素化到 mipmap 3D 纹理中，然后追踪圆锥来近似积分。实现了交互式帧率下的漫反射和镜面反射间接光照，开创了基于体素的实时 GI 方向。</div>
+            </a>
+
+            <a href="https://research.nvidia.com/publication/2021-06_restir-gi-path-resampling-real-time-path-tracing" class="paper-card">
+                <div class="paper-title">ReSTIR GI: Path Resampling for Real-Time Path Tracing</div>
+                <div class="paper-authors">Ouyang, Bitterli, Jarosz, Yue — SIGGRAPH 2021</div>
+                <div class="paper-desc">将 ReSTIR 的蓄水池重采样扩展到多次弹射的全局光照。不仅处理直接光照，还能高效复用间接光照路径，为实时全路径追踪迈出了关键一步。</div>
+            </a>
+
+            <a href="https://advances.realtimerendering.com/s2022/index.html" class="paper-card">
+                <div class="paper-title">Lumen: Real-time Global Illumination in Unreal Engine 5</div>
+                <div class="paper-authors">Hillaire (Epic Games) — SIGGRAPH 2022 Advances in Real-Time Rendering</div>
+                <div class="paper-desc">Epic Games 在 UE5 中的 Lumen 全局光照系统技术介绍。结合了屏幕空间追踪、软件光追和硬件光追等多种技术，在不同硬件条件下动态选择最优方案，实现了完全动态的实时 GI。</div>
+            </a>
+
+            <a href="https://advances.realtimerendering.com/s2010/index.html" class="paper-card">
+                <div class="paper-title">Light Propagation Volumes in CryEngine 3</div>
+                <div class="paper-authors">Kaplanyan, Dachsbacher — SIGGRAPH 2010 Advances in Real-Time Rendering</div>
+                <div class="paper-desc">提出光传播体积 (LPV) 方法，将光以球谐函数形式注入 3D 网格，然后迭代传播到相邻体素。首个在游戏中广泛应用的实时漫反射 GI 方案，被 CryEngine 3 和早期 UE4 采用。</div>
+            </a>
+        </div>
+    </div>
+</body>
+</html>

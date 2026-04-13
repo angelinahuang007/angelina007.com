@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unreal Materials & Nanite</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        body { background: var(--bg-primary); color: var(--text-primary); font-family: 'Space+Grotesk', sans-serif; }
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        .tabs { display: flex; gap: 1rem; margin-bottom: 2rem; }
+        .tab-btn { padding: 0.6rem 1.2rem; border: 2px solid var(--accent-primary); background: var(--bg-secondary); color: var(--text-primary); cursor: pointer; border-radius: 4px; font-weight: 600; transition: all 0.3s; }
+        .tab-btn.active { background: var(--accent-primary); color: var(--bg-primary); }
+        .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+        #meshCanvas, #materialCanvas { border: 2px solid var(--accent-primary); border-radius: 8px; background: var(--bg-secondary); }
+        .control-panel { background: var(--bg-secondary); padding: 1.5rem; border-radius: 8px; border: 1px solid var(--accent-secondary); }
+        .control-group { margin-bottom: 1.5rem; }
+        .control-group label { display: block; margin-bottom: 0.5rem; font-weight: 600; }
+        input[type="range"] { width: 100%; cursor: pointer; }
+        .stat-item { padding: 0.75rem; margin: 0.5rem 0; background: var(--bg-primary); border-left: 4px solid var(--accent-primary); border-radius: 4px; font-family: 'JetBrains+Mono', monospace; font-size: 0.9rem; }
+        .layer-toggle { padding: 0.5rem; margin: 0.5rem 0; display: flex; align-items: center; }
+        .layer-toggle input { margin-right: 0.5rem; width: 20px; height: 20px; cursor: pointer; }
+        @media (max-width: 768px) { .layout { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Materials & Nanite Visualization</h1>
+        <p>Interactive Nanite LOD system and material layer stacking.</p>
+
+        <div class="tabs">
+            <button class="tab-btn active" id="naniteTab">Nanite LOD</button>
+            <button class="tab-btn" id="materialTab">Material Layers</button>
+        </div>
+
+        <div class="layout">
+            <div>
+                <canvas id="meshCanvas" width="550" height="500"></canvas>
+                <p style="font-size: 0.85rem; color: var(--text-secondary); text-align: center; margin-top: 0.5rem;">Drag slider to adjust distance / LOD</p>
+            </div>
+
+            <div class="control-panel" id="naniteControls">
+                <h3>Nanite Settings</h3>
+                <div class="control-group">
+                    <label>Distance (Camera)</label>
+                    <input type="range" id="distanceSlider" min="1" max="200" step="1" value="50">
+                    <span id="distanceVal">50m</span>
+                </div>
+                <div class="control-group">
+                    <label>Current LOD</label>
+                    <div class="stat-item" id="currentLOD">LOD 3 (Medium Quality)</div>
+                </div>
+                <div class="control-group">
+                    <label>Triangle Count</label>
+                    <div class="stat-item" id="triangleCount">1,245,600 tris</div>
+                </div>
+                <div class="control-group">
+                    <label>Memory</label>
+                    <div class="stat-item" id="memoryUsage">12.4 MB</div>
+                </div>
+
+                <h3 style="margin-top: 2rem;">LOD Breakdown</h3>
+                <div class="stat-item">LOD 0 (Full): 4,982,400 tris</div>
+                <div class="stat-item">LOD 1: 2,491,200 tris</div>
+                <div class="stat-item">LOD 2: 1,245,600 tris</div>
+                <div class="stat-item">LOD 3: 622,800 tris</div>
+                <div class="stat-item">LOD 4 (Shadow): 311,400 tris</div>
+            </div>
+
+            <canvas id="materialCanvas" width="550" height="500" style="display: none;"></canvas>
+
+            <div class="control-panel" id="materialControls" style="display: none;">
+                <h3>Material Layers</h3>
+                <div class="layer-toggle">
+                    <input type="checkbox" id="baseColorToggle" checked>
+                    <label for="baseColorToggle" style="margin: 0;">Base Color</label>
+                </div>
+                <div class="layer-toggle">
+                    <input type="checkbox" id="roughnessToggle" checked>
+                    <label for="roughnessToggle" style="margin: 0;">Roughness</label>
+                </div>
+                <div class="layer-toggle">
+                    <input type="checkbox" id="normalToggle" checked>
+                    <label for="normalToggle" style="margin: 0;">Normal Map</label>
+                </div>
+                <div class="layer-toggle">
+                    <input type="checkbox" id="metallicToggle" checked>
+                    <label for="metallicToggle" style="margin: 0;">Metallic</label>
+                </div>
+
+                <h3 style="margin-top: 2rem;">Result Preview</h3>
+                <div class="stat-item">Combined Material</div>
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 1rem;">Material layers are blended and applied to geometry in real-time.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { colors, onThemeChange } = Wiki;
+        const meshCanvas = document.getElementById('meshCanvas');
+        const materialCanvas = document.getElementById('materialCanvas');
+        const meshCtx = meshCanvas.getContext('2d');
+        const matCtx = materialCanvas.getContext('2d');
+
+        let distance = 50;
+        let showMaterial = false;
+        let rotation = 0;
+
+        const lodData = [
+            { name: 'LOD 0', tris: 4982400, clusters: 256, minDist: 0, maxDist: 20 },
+            { name: 'LOD 1', tris: 2491200, clusters: 128, minDist: 20, maxDist: 50 },
+            { name: 'LOD 2', tris: 1245600, clusters: 64, minDist: 50, maxDist: 100 },
+            { name: 'LOD 3', tris: 622800, clusters: 32, minDist: 100, maxDist: 150 },
+            { name: 'LOD 4', tris: 311400, clusters: 16, minDist: 150, maxDist: 200 }
+        ];
+
+        function getThemeColors() {
+            const theme = colors();
+            return {
+                bg: theme['bg-primary'],
+                text: theme['text-primary'],
+                accent: theme['accent-primary'],
+                secondary: theme['accent-secondary']
+            };
+        }
+
+        function getCurrentLOD(dist) {
+            for (let lod of lodData) {
+                if (dist >= lod.minDist && dist < lod.maxDist) return lod;
+            }
+            return lodData[lodData.length - 1];
+        }
+
+        function updateStats() {
+            const lod = getCurrentLOD(distance);
+            document.getElementById('currentLOD').textContent = lod.name + ' (' + (5 - lodData.indexOf(lod)) + '/5 quality)';
+            document.getElementById('triangleCount').textContent = (lod.tris).toLocaleString() + ' tris';
+            document.getElementById('memoryUsage').textContent = (lod.tris / 1000000 * 12).toFixed(1) + ' MB';
+            document.getElementById('distanceVal').textContent = distance + 'm';
+        }
+
+        function drawNanite() {
+            const theme = getThemeColors();
+            meshCtx.fillStyle = theme.bg;
+            meshCtx.fillRect(0, 0, meshCanvas.width, meshCanvas.height);
+
+            const centerX = meshCanvas.width / 2;
+            const centerY = meshCanvas.height / 2;
+            const meshSize = 120;
+
+            // Distance indicator
+            meshCtx.fillStyle = theme.secondary + '33';
+            const distCircle = (distance / 200) * 200;
+            meshCtx.beginPath();
+            meshCtx.arc(centerX, centerY, distCircle, 0, Math.PI * 2);
+            meshCtx.fill();
+
+            meshCtx.strokeStyle = theme.secondary;
+            meshCtx.lineWidth = 1;
+            meshCtx.stroke();
+
+            // Mesh representation
+            const lod = getCurrentLOD(distance);
+            const clusters = lod.clusters;
+            const gridSize = Math.sqrt(clusters);
+
+            for (let i = 0; i < clusters; i++) {
+                const row = Math.floor(i / gridSize);
+                const col = i % gridSize;
+                const x = centerX - meshSize/2 + (col + 0.5) * (meshSize / gridSize);
+                const y = centerY - meshSize/2 + (row + 0.5) * (meshSize / gridSize);
+
+                const hue = (i / clusters * 360) % 360;
+                meshCtx.fillStyle = `hsl(${hue}, 70%, 50%)`;
+                const clusterSize = meshSize / gridSize;
+                meshCtx.fillRect(x - clusterSize/2 + 1, y - clusterSize/2 + 1, clusterSize - 2, clusterSize - 2);
+
+                meshCtx.strokeStyle = theme.secondary;
+                meshCtx.lineWidth = 1;
+                meshCtx.strokeRect(x - clusterSize/2 + 1, y - clusterSize/2 + 1, clusterSize - 2, clusterSize - 2);
+            }
+
+            // Info text
+            meshCtx.fillStyle = theme.text;
+            meshCtx.font = 'bold 12px Space+Mono';
+            meshCtx.textAlign = 'center';
+            meshCtx.fillText(lod.name + ' - Clusters: ' + lod.clusters, centerX, meshCanvas.height - 30);
+            meshCtx.font = '10px Space+Grotesk';
+            meshCtx.fillText('Distance: ' + distance + 'm', centerX, meshCanvas.height - 10);
+
+            requestAnimationFrame(drawNanite);
+        }
+
+        function drawMaterial() {
+            const theme = getThemeColors();
+            matCtx.fillStyle = theme.bg;
+            matCtx.fillRect(0, 0, materialCanvas.width, materialCanvas.height);
+
+            const centerX = materialCanvas.width / 2;
+            const centerY = materialCanvas.height / 2;
+            const sphereRadius = 100;
+
+            // Base color
+            const baseColorEnabled = document.getElementById('baseColorToggle').checked;
+            const roughnessEnabled = document.getElementById('roughnessToggle').checked;
+            const normalEnabled = document.getElementById('normalToggle').checked;
+            const metallicEnabled = document.getElementById('metallicToggle').checked;
+
+            // Draw sphere with material
+            rotation += 0.02;
+
+            const gradient = matCtx.createRadialGradient(centerX - 30, centerY - 30, 20, centerX, centerY, sphereRadius);
+
+            let r = 0.7, g = 0.7, b = 0.7;
+            if (baseColorEnabled) {
+                r = 0.8; g = 0.6; b = 0.4;
+            }
+            if (metallicEnabled) {
+                r = 1.0; g = 0.95; b = 0.8;
+            }
+
+            gradient.addColorStop(0, `rgba(${Math.floor(r*255)}, ${Math.floor(g*255)}, ${Math.floor(b*255)}, 1)`);
+            gradient.addColorStop(1, `rgba(${Math.floor(r*128)}, ${Math.floor(g*128)}, ${Math.floor(b*128)}, 0.6)`);
+
+            matCtx.fillStyle = gradient;
+            matCtx.beginPath();
+            matCtx.arc(centerX, centerY, sphereRadius, 0, Math.PI * 2);
+            matCtx.fill();
+
+            // Normal map visualization
+            if (normalEnabled) {
+                matCtx.strokeStyle = theme.accent + '44';
+                matCtx.lineWidth = 1;
+                for (let i = 0; i < 8; i++) {
+                    matCtx.beginPath();
+                    const angle = (i / 8) * Math.PI * 2;
+                    matCtx.arc(centerX, centerY, sphereRadius * (0.3 + i * 0.08), 0, Math.PI * 2);
+                    matCtx.stroke();
+                }
+            }
+
+            // Roughness effect
+            if (roughnessEnabled) {
+                matCtx.fillStyle = theme.secondary + '22';
+                for (let i = 0; i < 50; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const r = Math.random() * sphereRadius;
+                    const x = centerX + Math.cos(angle) * r;
+                    const y = centerY + Math.sin(angle) * r;
+                    matCtx.fillRect(x, y, 2, 2);
+                }
+            }
+
+            // Specular highlight
+            if (baseColorEnabled || metallicEnabled) {
+                matCtx.fillStyle = `rgba(255, 255, 255, ${metallicEnabled ? 0.6 : 0.3})`;
+                matCtx.beginPath();
+                matCtx.arc(centerX - 40, centerY - 40, 25, 0, Math.PI * 2);
+                matCtx.fill();
+            }
+
+            // Layer info
+            matCtx.fillStyle = theme.text;
+            matCtx.font = 'bold 12px Space+Mono';
+            matCtx.textAlign = 'center';
+            let layerText = 'Enabled Layers: ';
+            let count = 0;
+            if (baseColorEnabled) count++;
+            if (roughnessEnabled) count++;
+            if (normalEnabled) count++;
+            if (metallicEnabled) count++;
+            matCtx.fillText(layerText + count + '/4', centerX, materialCanvas.height - 30);
+            matCtx.font = '10px Space+Grotesk';
+            matCtx.fillText('Real-time Material Blending', centerX, materialCanvas.height - 10);
+
+            requestAnimationFrame(drawMaterial);
+        }
+
+        document.getElementById('distanceSlider').addEventListener('input', (e) => {
+            distance = parseInt(e.target.value);
+            updateStats();
+        });
+
+        document.getElementById('naniteTab').addEventListener('click', () => {
+            showMaterial = false;
+            document.getElementById('naniteTab').classList.add('active');
+            document.getElementById('materialTab').classList.remove('active');
+            document.getElementById('naniteControls').style.display = 'block';
+            document.getElementById('materialControls').style.display = 'none';
+            meshCanvas.style.display = 'block';
+            materialCanvas.style.display = 'none';
+            drawNanite();
+        });
+
+        document.getElementById('materialTab').addEventListener('click', () => {
+            showMaterial = true;
+            document.getElementById('materialTab').classList.add('active');
+            document.getElementById('naniteTab').classList.remove('active');
+            document.getElementById('naniteControls').style.display = 'none';
+            document.getElementById('materialControls').style.display = 'block';
+            meshCanvas.style.display = 'none';
+            materialCanvas.style.display = 'block';
+            drawMaterial();
+        });
+
+        document.getElementById('baseColorToggle').addEventListener('change', drawMaterial);
+        document.getElementById('roughnessToggle').addEventListener('change', drawMaterial);
+        document.getElementById('normalToggle').addEventListener('change', drawMaterial);
+        document.getElementById('metallicToggle').addEventListener('change', drawMaterial);
+
+        onThemeChange(() => {
+            if (showMaterial) {
+                drawMaterial();
+            } else {
+                drawNanite();
+            }
+        });
+
+        updateStats();
+        drawNanite();
+    </script>
+</body>
+</html>

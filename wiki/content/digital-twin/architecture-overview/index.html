@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Twin Architecture</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        body { background: var(--bg-dark); color: var(--fg-light); }
+        .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+        .controls { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+        button { padding: 8px 16px; background: var(--accent); color: var(--bg-dark); border: none; border-radius: 4px; cursor: pointer; font-family: 'Space Mono'; font-weight: 700; }
+        button.active { background: var(--accent-alt); }
+        button:hover { opacity: 0.8; }
+        #canvas { border: 1px solid var(--fg-dark); background: var(--bg-darker); display: block; margin: 0 auto; }
+        .info { font-size: 0.9em; color: var(--fg-muted); margin-top: 10px; font-family: 'Space Mono'; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Digital Twin Architecture</h1>
+        <p>Interactive architecture diagram showing data flow through the digital twin layers.</p>
+
+        <div class="controls">
+            <button id="buildingBtn" class="active">Smart Building</button>
+            <button id="factoryBtn">Manufacturing</button>
+            <button id="cityBtn">Urban</button>
+            <button id="animateBtn">Animate Data Flow</button>
+        </div>
+
+        <canvas id="canvas" width="800" height="500"></canvas>
+        <div class="info" id="info">Click layers to expand and see sub-components. Animated particles show data flowing upward.</div>
+    </div>
+
+    <script>
+        const canvas = Wiki.createCanvas('canvas', 800, 500);
+        const ctx = canvas.getContext('2d');
+        let domain = 'building';
+        let expandedLayer = null;
+        let animationTime = 0;
+        let isAnimating = false;
+
+        const layers = [
+            { name: 'Physical World', y: 500, color: '#ff6b6b', components: ['Sensors', 'Actuators', 'Assets'] },
+            { name: 'Data Ingestion', y: 400, color: '#ffe66d', components: ['Gateways', 'Adapters', 'Validators'] },
+            { name: 'Data Processing', y: 300, color: '#4ecdc4', components: ['Streams', 'Events', 'Rules Engine'] },
+            { name: 'Digital Model', y: 200, color: '#a8dadc', components: ['State', 'Geometry', 'Physics'] },
+            { name: 'Visualization', y: 100, color: '#00d4ff', components: ['Dashboards', 'AR/VR', 'Alerts'] }
+        ];
+
+        const domainConfigs = {
+            building: {
+                title: 'Smart Building',
+                assets: ['HVAC', 'Lighting', 'Security', 'Energy'],
+                sensors: ['Temperature', 'Humidity', 'Motion', 'CO2']
+            },
+            factory: {
+                title: 'Manufacturing',
+                assets: ['Robots', 'Conveyor', 'CNC', 'Press'],
+                sensors: ['Vibration', 'Temperature', 'Power', 'Position']
+            },
+            city: {
+                title: 'Urban System',
+                assets: ['Traffic', 'Parking', 'Water', 'Grid'],
+                sensors: ['Flow', 'Occupancy', 'Quality', 'Load']
+            }
+        };
+
+        const particles = [];
+
+        class DataParticle {
+            constructor() {
+                this.x = 450;
+                this.y = 500;
+                this.targetY = Math.random() * 400;
+                this.speed = 0.5 + Math.random() * 0.5;
+                this.color = `hsl(${Math.random() * 60 + 180}, 100%, 50%)`;
+            }
+            update() {
+                if (this.y > this.targetY) {
+                    this.y -= this.speed;
+                } else {
+                    return true;
+                }
+                return false;
+            }
+        }
+
+        function draw() {
+            ctx.fillStyle = Wiki.colors().bg;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Title
+            ctx.fillStyle = Wiki.colors().fg;
+            ctx.font = 'bold 20px Space Grotesk';
+            ctx.fillText(domainConfigs[domain].title + ' Digital Twin', 20, 30);
+
+            // Draw layers
+            layers.forEach((layer, idx) => {
+                const layerHeight = 80;
+                const x = 150;
+                const width = 600;
+                const isExpanded = expandedLayer === idx;
+
+                // Background
+                ctx.fillStyle = layer.color;
+                ctx.globalAlpha = isExpanded ? 0.3 : 0.2;
+                ctx.fillRect(x, layer.y - layerHeight / 2, width, layerHeight);
+                ctx.globalAlpha = 1;
+
+                // Border
+                ctx.strokeStyle = layer.color;
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x, layer.y - layerHeight / 2, width, layerHeight);
+
+                // Text
+                ctx.fillStyle = layer.color;
+                ctx.font = 'bold 14px Space Grotesk';
+                ctx.fillText(layer.name, x + 20, layer.y - 20);
+
+                if (isExpanded) {
+                    ctx.font = '11px Space Mono';
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                    layer.components.forEach((comp, i) => {
+                        ctx.fillText('• ' + comp, x + 20 + (i % 2) * 250, layer.y + 5 + Math.floor(i / 2) * 15);
+                    });
+                }
+            });
+
+            // Draw data flow arrows
+            ctx.strokeStyle = 'rgba(200, 200, 200, 0.5)';
+            ctx.lineWidth = 2;
+            for (let i = 0; i < layers.length - 1; i++) {
+                const fromY = layers[i].y - 40;
+                const toY = layers[i + 1].y + 40;
+                ctx.beginPath();
+                ctx.moveTo(450, fromY);
+                ctx.lineTo(450, toY);
+                ctx.stroke();
+
+                // Arrow head
+                const arrowSize = 10;
+                ctx.beginPath();
+                ctx.moveTo(450, toY);
+                ctx.lineTo(450 - arrowSize / 2, toY - arrowSize);
+                ctx.lineTo(450 + arrowSize / 2, toY - arrowSize);
+                ctx.closePath();
+                ctx.fillStyle = 'rgba(200, 200, 200, 0.5)';
+                ctx.fill();
+            }
+
+            // Draw and update particles
+            if (isAnimating) {
+                for (let i = particles.length - 1; i >= 0; i--) {
+                    const particle = particles[i];
+                    const isDone = particle.update();
+
+                    ctx.fillStyle = particle.color;
+                    ctx.beginPath();
+                    ctx.arc(particle.x, particle.y, 3, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    if (isDone) {
+                        particles.splice(i, 1);
+                    }
+                }
+
+                animationTime++;
+                if (animationTime % 10 === 0 && particles.length < 20) {
+                    particles.push(new DataParticle());
+                }
+            }
+
+            ctx.strokeStyle = Wiki.colors().fg;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(0, 0, canvas.width, canvas.height);
+        }
+
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+
+            layers.forEach((layer, idx) => {
+                const x = 150, y = layer.y, w = 600, h = 80;
+                if (clickX >= x && clickX <= x + w && clickY >= y - h/2 && clickY <= y + h/2) {
+                    expandedLayer = expandedLayer === idx ? null : idx;
+                }
+            });
+            draw();
+        });
+
+        document.getElementById('buildingBtn').addEventListener('click', () => {
+            domain = 'building';
+            expandedLayer = null;
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('buildingBtn').classList.add('active');
+            draw();
+        });
+
+        document.getElementById('factoryBtn').addEventListener('click', () => {
+            domain = 'factory';
+            expandedLayer = null;
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('factoryBtn').classList.add('active');
+            draw();
+        });
+
+        document.getElementById('cityBtn').addEventListener('click', () => {
+            domain = 'city';
+            expandedLayer = null;
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('cityBtn').classList.add('active');
+            draw();
+        });
+
+        document.getElementById('animateBtn').addEventListener('click', () => {
+            isAnimating = !isAnimating;
+            particles.length = 0;
+            animationTime = 0;
+            document.getElementById('animateBtn').textContent = isAnimating ? 'Stop Flow' : 'Animate Data Flow';
+            if (isAnimating) {
+                Wiki.animate(draw);
+            } else {
+                draw();
+            }
+        });
+
+        draw();
+    </script>
+</body>
+</html>

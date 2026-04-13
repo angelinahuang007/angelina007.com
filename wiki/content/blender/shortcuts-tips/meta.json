@@ -1,0 +1,17 @@
+{
+  "title": "Blender Shortcuts, Tips, and Productivity",
+  "category": "blender",
+  "order": 5,
+  "tags": [
+    "blender",
+    "shortcuts",
+    "tips",
+    "productivity",
+    "hotkeys"
+  ],
+  "description": "Comprehensive reference for Blender keyboard shortcuts organized by mode, viewport navigation, hidden gems, performance tips, and productivity-enhancing addons and workflows.",
+  "related": [
+    "game-engines/unity/shortcuts-tips",
+    "game-engines/unreal/shortcuts-tips"
+  ]
+}

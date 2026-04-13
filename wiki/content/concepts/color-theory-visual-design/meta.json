@@ -1,0 +1,18 @@
+{
+  "title": "Color Theory and Visual Design",
+  "category": "concepts",
+  "order": 1,
+  "tags": [
+    "color-theory",
+    "design",
+    "color-space",
+    "perception",
+    "harmony"
+  ],
+  "description": "Comprehensive guide to color theory, color spaces, perceptual principles, harmony schemes, and applications across photography, 3D rendering, and UI/UX design.",
+  "related": [
+    "photography/color-theory-photography",
+    "photo-editing/color-grading",
+    "graphics-fundamentals/pbr-rendering"
+  ]
+}

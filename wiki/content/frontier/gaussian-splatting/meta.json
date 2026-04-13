@@ -1,0 +1,18 @@
+{
+  "title": "3D Gaussian Splatting",
+  "category": "frontier",
+  "order": 2,
+  "tags": [
+    "gaussian-splatting",
+    "3DGS",
+    "real-time",
+    "novel-view",
+    "differentiable-rendering"
+  ],
+  "description": "Technical deep-dive into 3D Gaussian Splatting, differentiable rasterization, adaptive density control, training pipelines, and comparison with NeRF for real-time rendering.",
+  "related": [
+    "frontier/neural-radiance-fields",
+    "graphics-fundamentals/rasterization-pipeline",
+    "frontier/ai-content-generation"
+  ]
+}

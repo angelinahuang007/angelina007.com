@@ -1,0 +1,20 @@
+{
+  "title": "Anti-Aliasing and Sampling Theory",
+  "category": "graphics-fundamentals",
+  "tags": [
+    "anti-aliasing",
+    "sampling",
+    "aliasing",
+    "msaa",
+    "taa",
+    "dlss",
+    "fxaa"
+  ],
+  "description": "Sampling theory, Nyquist theorem, aliasing causes, SSAA/MSAA/FXAA/SMAA/TAA/DLSS, temporal stability, and comparison of quality vs performance.",
+  "related": [
+    "graphics-fundamentals/rasterization-pipeline",
+    "game-engines/unity/performance-optimization",
+    "game-engines/unreal/nanite-lumen"
+  ],
+  "order": 10
+}

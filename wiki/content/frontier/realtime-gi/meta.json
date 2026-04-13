@@ -1,0 +1,19 @@
+{
+  "title": "Real-Time Global Illumination",
+  "category": "frontier",
+  "order": 4,
+  "tags": [
+    "GI",
+    "real-time",
+    "DDGI",
+    "SVOGI",
+    "ReSTIR",
+    "ray-tracing"
+  ],
+  "description": "Technical overview of real-time global illumination techniques including probe-based methods, screen-space approaches, voxel techniques, and industry implementations like Lumen.",
+  "related": [
+    "graphics-fundamentals/global-illumination",
+    "game-engines/unreal/nanite-lumen",
+    "graphics-fundamentals/realtime-rendering-pipeline"
+  ]
+}

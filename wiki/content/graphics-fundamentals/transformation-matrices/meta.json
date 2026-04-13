@@ -1,0 +1,18 @@
+{
+  "title": "Transformation Matrices and Coordinate Spaces",
+  "category": "graphics-fundamentals",
+  "tags": [
+    "matrices",
+    "transformations",
+    "homogeneous-coordinates",
+    "quaternions",
+    "projection",
+    "coordinates"
+  ],
+  "description": "Deep dive into 4x4 transformation matrices, homogeneous coordinates, quaternions vs Euler angles, and projection matrices for graphics pipelines.",
+  "related": [
+    "graphics-fundamentals/rasterization-pipeline",
+    "game-engines/unity/coordinate-systems-transforms"
+  ],
+  "order": 2
+}

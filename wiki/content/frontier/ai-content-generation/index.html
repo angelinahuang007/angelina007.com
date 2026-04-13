@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Content Generation — Diffusion Models</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--bg-dark); color: var(--fg-light); font-family: 'Space Grotesk', sans-serif; }
+
+        .page { max-width: 900px; margin: 0 auto; padding: 24px; }
+        h1 { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+        .subtitle { color: var(--fg-muted); font-size: 13px; margin-bottom: 20px; }
+
+        /* Pipeline diagram */
+        .pipeline {
+            display: flex; align-items: center; gap: 8px;
+            padding: 16px; margin-bottom: 20px;
+            background: var(--bg-darker); border: 1px solid var(--fg-dark); border-radius: 8px;
+            overflow-x: auto;
+        }
+        .pipe-block {
+            display: flex; flex-direction: column; align-items: center; gap: 4px;
+            padding: 10px 14px; min-width: 90px;
+            border-radius: 6px; text-align: center;
+            font-size: 11px; font-family: 'Space Mono';
+            transition: all 0.2s;
+        }
+        .pipe-block.active { box-shadow: 0 0 12px rgba(99,102,241,0.4); transform: scale(1.05); }
+        .pipe-label { font-weight: 700; font-size: 10px; white-space: nowrap; }
+        .pipe-sub { font-size: 9px; color: var(--fg-muted); }
+        .pipe-arrow { color: var(--fg-dark); font-size: 16px; flex-shrink: 0; }
+
+        .pipe-text { background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); color: #93c5fd; }
+        .pipe-encoder { background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.3); color: #c4b5fd; }
+        .pipe-latent { background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); color: #fcd34d; }
+        .pipe-unet { background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #fca5a5; }
+        .pipe-decoder { background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #6ee7b7; }
+
+        /* Main viz area */
+        .viz-layout { display: grid; grid-template-columns: 1fr 280px; gap: 20px; }
+
+        /* Canvas area */
+        .canvas-area {
+            background: var(--bg-darker); border: 1px solid var(--fg-dark); border-radius: 8px;
+            padding: 16px; display: flex; flex-direction: column; gap: 12px;
+        }
+
+        .step-bar {
+            display: flex; align-items: center; gap: 12px;
+        }
+        .step-bar label { font-family: 'Space Mono'; font-size: 11px; font-weight: 700; color: var(--accent); white-space: nowrap; }
+        .step-slider { flex: 1; accent-color: var(--accent); }
+        .step-value { font-family: 'JetBrains Mono'; font-size: 12px; min-width: 60px; text-align: right; }
+
+        .grid-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+        .grid-frame {
+            display: flex; flex-direction: column; align-items: center; gap: 4px;
+        }
+        .grid-label { font-family: 'Space Mono'; font-size: 9px; color: var(--fg-dark); text-transform: uppercase; }
+
+        canvas { border-radius: 4px; image-rendering: pixelated; }
+
+        .controls-row {
+            display: flex; gap: 8px; flex-wrap: wrap;
+        }
+        .ctrl-btn {
+            padding: 6px 14px;
+            font-family: 'Space Mono'; font-size: 11px; font-weight: 700;
+            border: 1px solid var(--fg-dark); background: transparent; color: var(--fg-muted);
+            border-radius: 4px; cursor: pointer; transition: all 0.15s;
+        }
+        .ctrl-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .ctrl-btn.active { background: var(--accent); color: var(--bg-dark); border-color: var(--accent); }
+
+        /* Right panel */
+        .info-panel { display: flex; flex-direction: column; gap: 14px; }
+        .info-card {
+            background: var(--bg-darker); border: 1px solid var(--fg-dark); border-radius: 8px; padding: 14px;
+        }
+        .info-card h3 {
+            font-family: 'Space Mono'; font-size: 11px; font-weight: 700;
+            color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;
+        }
+        .info-card p { font-size: 12px; color: var(--fg-muted); line-height: 1.6; }
+        .info-card code { font-family: 'JetBrains Mono'; font-size: 11px; color: var(--accent); background: rgba(99,102,241,0.1); padding: 1px 4px; border-radius: 2px; }
+
+        /* Noise bar chart */
+        .noise-chart { display: flex; align-items: flex-end; gap: 2px; height: 50px; margin-top: 8px; }
+        .noise-bar { flex: 1; background: var(--accent); border-radius: 2px 2px 0 0; transition: height 0.2s; min-width: 3px; }
+
+        .prompt-input {
+            width: 100%; padding: 8px; font-family: 'Space Grotesk'; font-size: 12px;
+            background: var(--bg-dark); color: var(--fg-light); border: 1px solid var(--fg-dark); border-radius: 4px;
+        }
+        .prompt-input::placeholder { color: var(--fg-dark); }
+
+        /* Key Papers section */
+        .papers-section { margin-top: 40px; padding-top: 24px; border-top: 1px solid var(--border-strong, rgba(228,228,231,0.2)); }
+        .papers-section h2 { font-family: 'Space Mono', monospace; font-size: 1.1rem; color: var(--accent, #6366f1); margin-bottom: 16px; }
+        .paper-list { display: flex; flex-direction: column; gap: 12px; }
+        .paper-card { display: block; background: var(--bg-secondary, #1a1b27); border: 1px solid var(--border, rgba(228,228,231,0.1)); border-radius: 8px; padding: 16px; text-decoration: none; transition: border-color 0.2s; }
+        .paper-card:hover { border-color: var(--accent, #6366f1); }
+        .paper-title { font-family: 'Space Mono', monospace; font-size: 0.9rem; font-weight: 700; color: var(--text, #e4e4e7); margin-bottom: 4px; }
+        .paper-authors { font-size: 0.8rem; color: var(--text-muted, #a1a1aa); margin-bottom: 8px; }
+        .paper-desc { font-size: 0.85rem; color: var(--text-dim, #71717a); line-height: 1.5; }
+    </style>
+</head>
+<body>
+<div class="page">
+    <h1>AI Content Generation — Diffusion Models</h1>
+    <p class="subtitle">Visualize how text-to-image diffusion models iteratively denoise random noise into coherent images.</p>
+
+    <!-- Pipeline diagram -->
+    <div class="pipeline" id="pipeline">
+        <div class="pipe-block pipe-text" data-stage="text"><div class="pipe-label">Text Prompt</div><div class="pipe-sub">"a cat"</div></div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-block pipe-encoder" data-stage="encoder"><div class="pipe-label">CLIP Encoder</div><div class="pipe-sub">77 × 768</div></div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-block pipe-latent" data-stage="noise"><div class="pipe-label">Random Noise</div><div class="pipe-sub">64 × 64 × 4</div></div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-block pipe-unet" data-stage="unet"><div class="pipe-label">U-Net ×T</div><div class="pipe-sub">Predict noise</div></div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-block pipe-latent" data-stage="latent"><div class="pipe-label">Clean Latent</div><div class="pipe-sub">64 × 64 × 4</div></div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-block pipe-decoder" data-stage="decoder"><div class="pipe-label">VAE Decoder</div><div class="pipe-sub">512 × 512</div></div>
+    </div>
+
+    <div class="viz-layout">
+        <div class="canvas-area">
+            <div class="controls-row">
+                <button class="ctrl-btn active" data-mode="denoise">Denoising Process</button>
+                <button class="ctrl-btn" data-mode="forward">Forward Diffusion</button>
+                <button class="ctrl-btn" data-mode="guidance">Classifier-Free Guidance</button>
+            </div>
+
+            <div class="step-bar">
+                <label>Step:</label>
+                <input class="step-slider" type="range" id="stepSlider" min="0" max="50" value="0">
+                <span class="step-value" id="stepLabel">0 / 50</span>
+            </div>
+
+            <div class="grid-row" id="gridRow"></div>
+
+            <div id="equationArea" style="text-align:center; font-family:'JetBrains Mono'; font-size:12px; color:var(--fg-muted); padding:4px 0;"></div>
+        </div>
+
+        <div class="info-panel">
+            <div class="info-card" id="stepInfo">
+                <h3>How It Works</h3>
+                <p>Starting from pure Gaussian noise, the U-Net predicts how much noise is present at each timestep. That predicted noise is subtracted, producing a slightly cleaner image. Repeated over 20–50 steps, structure emerges from chaos.</p>
+            </div>
+
+            <div class="info-card">
+                <h3>Noise Level</h3>
+                <div class="noise-chart" id="noiseChart"></div>
+                <p style="margin-top:6px;">Signal-to-noise ratio across denoising steps. Early steps remove gross structure noise; later steps refine fine details.</p>
+            </div>
+
+            <div class="info-card">
+                <h3>Key Equation</h3>
+                <p><code>x_{t-1} = (x_t - ε_θ(x_t, t, c)) / √α_t</code></p>
+                <p style="margin-top:4px;">At each step, subtract the predicted noise <code>ε_θ</code> conditioned on text embedding <code>c</code>, then rescale.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="papers-section">
+        <h2>Key Papers</h2>
+        <div class="paper-list">
+            <a href="https://arxiv.org/abs/2006.11239" class="paper-card" target="_blank" rel="noopener noreferrer">
+                <div class="paper-title">Denoising Diffusion Probabilistic Models (DDPM)</div>
+                <div class="paper-authors">Ho, Jain, Abbeel — NeurIPS 2020</div>
+                <div class="paper-desc">扩散模型的奠基论文。证明了通过逐步去噪的马尔可夫链可以生成高质量图像，在 CIFAR-10 上取得了 FID 3.17 的最优结果。建立了"前向加噪 + 反向去噪"的框架，成为后续所有扩散模型的基础。</div>
+            </a>
+
+            <a href="https://arxiv.org/abs/2207.12598" class="paper-card" target="_blank" rel="noopener noreferrer">
+                <div class="paper-title">Classifier-Free Diffusion Guidance</div>
+                <div class="paper-authors">Ho, Salimans — NeurIPS Workshop 2021</div>
+                <div class="paper-desc">提出无需额外分类器的引导方法，通过同时训练有条件和无条件的去噪模型，在推理时插值两者的输出来控制生成方向。成为 Stable Diffusion、DALL-E 等系统的核心采样策略。</div>
+            </a>
+
+            <a href="https://arxiv.org/abs/2112.10752" class="paper-card" target="_blank" rel="noopener noreferrer">
+                <div class="paper-title">High-Resolution Image Synthesis with Latent Diffusion Models</div>
+                <div class="paper-authors">Rombach, Blattmann, Lorenz, Esser, Ommer — CVPR 2022</div>
+                <div class="paper-desc">Stable Diffusion 的基础论文。将扩散过程从像素空间迁移到 VAE 的潜空间，大幅降低了计算成本。使高分辨率图像生成变得可行，并引入交叉注意力机制实现文本条件控制。</div>
+            </a>
+
+            <a href="https://arxiv.org/abs/2307.01952" class="paper-card" target="_blank" rel="noopener noreferrer">
+                <div class="paper-title">SDXL: Improving Latent Diffusion Models for High-Resolution Image Synthesis</div>
+                <div class="paper-authors">Podell, English, Lacey, Blattmann, Dockhorn, Müller, Penna, Rombach — 2023</div>
+                <div class="paper-desc">Stable Diffusion XL 的技术报告。通过更大的 U-Net 骨干、多阶段精炼流程和改进的条件机制，显著提升了生成图像的分辨率和细节质量。</div>
+            </a>
+
+            <a href="https://arxiv.org/abs/2010.02502" class="paper-card" target="_blank" rel="noopener noreferrer">
+                <div class="paper-title">Denoising Diffusion Implicit Models (DDIM)</div>
+                <div class="paper-authors">Song, Meng, Ermon — ICLR 2021</div>
+                <div class="paper-desc">提出非马尔可夫去噪过程，使扩散模型可以用更少的步数（10-50 步而非 1000 步）完成采样，大幅加速生成。同时实现了确定性采样和潜空间插值。</div>
+            </a>
+
+            <a href="https://arxiv.org/abs/2209.14988" class="paper-card" target="_blank" rel="noopener noreferrer">
+                <div class="paper-title">DreamFusion: Text-to-3D using 2D Diffusion</div>
+                <div class="paper-authors">Poole, Jain, Barron, Mildenhall (Google) — ICLR 2023</div>
+                <div class="paper-desc">将 2D 扩散模型的知识蒸馏到 3D 表示（NeRF）中，提出 Score Distillation Sampling (SDS)。无需 3D 训练数据，仅用文本提示即可生成 3D 物体，开创了 text-to-3D 领域。</div>
+            </a>
+
+            <a href="https://arxiv.org/abs/1706.03762" class="paper-card" target="_blank" rel="noopener noreferrer">
+                <div class="paper-title">Attention Is All You Need</div>
+                <div class="paper-authors">Vaswani, Shazeer, Parmar, Uszkoreit, Jones, Gomez, Kaiser, Polosukhin — NeurIPS 2017</div>
+                <div class="paper-desc">提出 Transformer 架构。虽非直接的图像生成论文，但其自注意力机制成为了 CLIP、扩散模型的交叉注意力、以及 Vision Transformer 的核心组件，深刻影响了 AI 内容生成的整个技术栈。</div>
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+const GRID = 16; // 16x16 pixel grid for visualization
+const CELL = 8;  // Each cell is 8px
+const STEPS = 50;
+
+let mode = 'denoise';
+let currentStep = 0;
+
+// Generate a target "image" pattern (simple cat silhouette)
+function generateTarget() {
+    const img = [];
+    for (let y = 0; y < GRID; y++) {
+        img[y] = [];
+        for (let x = 0; x < GRID; x++) {
+            // Simple cat-like shape
+            const cx = x - 8, cy = y - 8;
+            const dist = Math.sqrt(cx*cx + cy*cy);
+            // Head
+            if (dist < 5) {
+                img[y][x] = { r: 200, g: 150, b: 80 }; // orange cat
+            }
+            // Ears
+            else if ((x >= 4 && x <= 6 && y >= 2 && y <= 5) || (x >= 10 && x <= 12 && y >= 2 && y <= 5)) {
+                img[y][x] = { r: 180, g: 130, b: 60 };
+            }
+            // Eyes
+            else if ((x === 6 && y === 7) || (x === 10 && y === 7)) {
+                img[y][x] = { r: 50, g: 200, b: 50 };
+            }
+            // Nose
+            else if (x === 8 && y === 9) {
+                img[y][x] = { r: 255, g: 150, b: 150 };
+            }
+            // Body
+            else if (y >= 11 && x >= 5 && x <= 11 && y <= 15) {
+                img[y][x] = { r: 210, g: 160, b: 90 };
+            }
+            // Background
+            else {
+                const bg = 30 + Math.sin(x*0.5)*10 + Math.cos(y*0.3)*10;
+                img[y][x] = { r: bg, g: bg + 10, b: bg + 30 };
+            }
+        }
+    }
+    return img;
+}
+
+// Generate pure noise
+function generateNoise() {
+    const n = [];
+    for (let y = 0; y < GRID; y++) {
+        n[y] = [];
+        for (let x = 0; x < GRID; x++) {
+            n[y][x] = { r: Math.random()*255, g: Math.random()*255, b: Math.random()*255 };
+        }
+    }
+    return n;
+}
+
+const target = generateTarget();
+const noise = generateNoise();
+
+// Interpolate between noise and target based on step
+function getImageAtStep(step, totalSteps, isForward) {
+    const t = step / totalSteps;
+    const blend = isForward ? t : (1 - t); // forward: 0=clean→1=noise; reverse: 0=noise→1=clean
+    const img = [];
+    for (let y = 0; y < GRID; y++) {
+        img[y] = [];
+        for (let x = 0; x < GRID; x++) {
+            const s = target[y][x];
+            const n = noise[y][x];
+            // Non-linear: early steps do more, late steps refine
+            const noiseWeight = isForward
+                ? Math.pow(blend, 0.7)   // forward: accelerating noise
+                : Math.pow(blend, 1.5);  // reverse: structure emerges quickly, details slowly
+            img[y][x] = {
+                r: Math.round(s.r * (1 - noiseWeight) + n.r * noiseWeight),
+                g: Math.round(s.g * (1 - noiseWeight) + n.g * noiseWeight),
+                b: Math.round(s.b * (1 - noiseWeight) + n.b * noiseWeight),
+            };
+        }
+    }
+    return img;
+}
+
+function drawGrid(canvas, imageData) {
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (let y = 0; y < GRID; y++) {
+        for (let x = 0; x < GRID; x++) {
+            const c = imageData[y][x];
+            ctx.fillStyle = `rgb(${c.r},${c.g},${c.b})`;
+            ctx.fillRect(x * CELL, y * CELL, CELL, CELL);
+        }
+    }
+}
+
+function createCanvas() {
+    const c = document.createElement('canvas');
+    c.width = GRID * CELL;
+    c.height = GRID * CELL;
+    c.style.width = (GRID * CELL * 2) + 'px';
+    c.style.height = (GRID * CELL * 2) + 'px';
+    return c;
+}
+
+function render() {
+    const row = document.getElementById('gridRow');
+    row.innerHTML = '';
+    const eq = document.getElementById('equationArea');
+
+    if (mode === 'denoise') {
+        // Show 3 frames: current noisy, predicted noise, result
+        const noisy = getImageAtStep(currentStep, STEPS, false);
+        const predictedNoise = [];
+        const result = getImageAtStep(Math.min(currentStep + 1, STEPS), STEPS, false);
+
+        // Predicted noise = difference
+        for (let y = 0; y < GRID; y++) {
+            predictedNoise[y] = [];
+            for (let x = 0; x < GRID; x++) {
+                predictedNoise[y][x] = {
+                    r: Math.abs(noisy[y][x].r - result[y][x].r) * 3,
+                    g: Math.abs(noisy[y][x].g - result[y][x].g) * 3,
+                    b: Math.abs(noisy[y][x].b - result[y][x].b) * 3,
+                };
+            }
+        }
+
+        const frames = [
+            { label: `x_t (step ${currentStep})`, data: noisy },
+            { label: 'ε_θ (predicted noise)', data: predictedNoise },
+            { label: `x_{t-1} (step ${currentStep+1})`, data: result },
+        ];
+        if (currentStep >= STEPS) {
+            frames[2] = { label: 'Final output', data: target };
+        }
+
+        frames.forEach(f => {
+            const frame = document.createElement('div');
+            frame.className = 'grid-frame';
+            const c = createCanvas();
+            drawGrid(c, f.data);
+            const label = document.createElement('div');
+            label.className = 'grid-label';
+            label.textContent = f.label;
+            frame.appendChild(c);
+            frame.appendChild(label);
+            row.appendChild(frame);
+
+            // Arrow between frames
+            if (f !== frames[frames.length - 1]) {
+                const arrow = document.createElement('div');
+                arrow.style.cssText = 'font-size:20px;color:var(--fg-dark);align-self:center;padding:0 4px;';
+                arrow.textContent = '→';
+                row.appendChild(arrow);
+            }
+        });
+
+        eq.innerHTML = `<span style="color:var(--accent)">x<sub>${currentStep > 0 ? 't-1' : 't'}</sub> = (x<sub>t</sub> − ε<sub>θ</sub>(x<sub>t</sub>, t, c)) / √ᾱ<sub>t</sub></span>`;
+
+    } else if (mode === 'forward') {
+        // Show progression: clean → noisy
+        const snapshots = [0, 10, 25, 40, 50];
+        snapshots.forEach((s, i) => {
+            const frame = document.createElement('div');
+            frame.className = 'grid-frame';
+            const c = createCanvas();
+            const img = getImageAtStep(s, STEPS, true);
+            drawGrid(c, img);
+            const label = document.createElement('div');
+            label.className = 'grid-label';
+            label.textContent = `t = ${s}`;
+            frame.appendChild(c);
+            frame.appendChild(label);
+            row.appendChild(frame);
+            if (i < snapshots.length - 1) {
+                const arrow = document.createElement('div');
+                arrow.style.cssText = 'font-size:16px;color:var(--fg-dark);align-self:center;padding:0 2px;';
+                arrow.textContent = '→';
+                row.appendChild(arrow);
+            }
+        });
+        // Highlight current step
+        eq.innerHTML = `<span style="color:var(--accent)">q(x<sub>t</sub> | x<sub>t-1</sub>) = N(x<sub>t</sub>; √(1-β<sub>t</sub>)·x<sub>t-1</sub>, β<sub>t</sub>·I)</span>`;
+
+    } else if (mode === 'guidance') {
+        // Show: unconditioned vs conditioned vs guided
+        const uncond = getImageAtStep(currentStep, STEPS, false); // slightly different
+        const cond = getImageAtStep(currentStep, STEPS, false);
+        // Guided = cond + scale*(cond - uncond) — simulate stronger signal
+        const guided = [];
+        const scale = 7.5;
+        for (let y = 0; y < GRID; y++) {
+            guided[y] = [];
+            for (let x = 0; x < GRID; x++) {
+                const diff_r = (cond[y][x].r - 128) * 0.15;
+                const diff_g = (cond[y][x].g - 128) * 0.15;
+                const diff_b = (cond[y][x].b - 128) * 0.15;
+                guided[y][x] = {
+                    r: Wiki.clamp(Math.round(cond[y][x].r + diff_r * scale), 0, 255),
+                    g: Wiki.clamp(Math.round(cond[y][x].g + diff_g * scale), 0, 255),
+                    b: Wiki.clamp(Math.round(cond[y][x].b + diff_b * scale), 0, 255),
+                };
+            }
+        }
+
+        [
+            { label: 'Unconditioned ε', data: uncond },
+            { label: 'Conditioned ε', data: cond },
+            { label: `Guided (scale=${scale})`, data: guided }
+        ].forEach((f, i, arr) => {
+            const frame = document.createElement('div');
+            frame.className = 'grid-frame';
+            const c = createCanvas();
+            drawGrid(c, f.data);
+            const label = document.createElement('div');
+            label.className = 'grid-label';
+            label.textContent = f.label;
+            frame.appendChild(c);
+            frame.appendChild(label);
+            row.appendChild(frame);
+            if (i < arr.length - 1) {
+                const arrow = document.createElement('div');
+                arrow.style.cssText = 'font-size:16px;color:var(--fg-dark);align-self:center;padding:0 2px;';
+                arrow.textContent = i === 0 ? '−' : '=';
+                row.appendChild(arrow);
+            }
+        });
+        eq.innerHTML = `<span style="color:var(--accent)">ε̃ = ε<sub>uncond</sub> + s · (ε<sub>cond</sub> − ε<sub>uncond</sub>)&nbsp;&nbsp;where s = ${scale}</span>`;
+    }
+
+    // Update noise chart
+    updateNoiseChart();
+    updatePipelineHighlight();
+    updateStepInfo();
+}
+
+function updateNoiseChart() {
+    const chart = document.getElementById('noiseChart');
+    chart.innerHTML = '';
+    for (let i = 0; i <= STEPS; i += 2) {
+        const bar = document.createElement('div');
+        bar.className = 'noise-bar';
+        const noiseLevel = mode === 'forward'
+            ? Math.pow(i / STEPS, 0.7) * 100
+            : Math.pow(1 - i / STEPS, 0.7) * 100;
+        bar.style.height = noiseLevel + '%';
+        bar.style.opacity = i <= currentStep ? '1' : '0.2';
+        if (Math.abs(i - currentStep) < 2) bar.style.background = '#ef4444';
+        chart.appendChild(bar);
+    }
+}
+
+function updatePipelineHighlight() {
+    document.querySelectorAll('.pipe-block').forEach(b => b.classList.remove('active'));
+    if (mode === 'denoise' || mode === 'guidance') {
+        if (currentStep === 0) document.querySelector('[data-stage="noise"]').classList.add('active');
+        else if (currentStep >= STEPS) document.querySelector('[data-stage="decoder"]').classList.add('active');
+        else document.querySelector('[data-stage="unet"]').classList.add('active');
+    } else {
+        document.querySelector('[data-stage="noise"]').classList.add('active');
+    }
+}
+
+function updateStepInfo() {
+    const info = document.getElementById('stepInfo');
+    const pct = Math.round((currentStep / STEPS) * 100);
+
+    if (mode === 'denoise') {
+        if (currentStep < 10) {
+            info.innerHTML = `<h3>Step ${currentStep} — Coarse Structure</h3><p>Early denoising steps remove the most noise. Gross shapes and dominant colors emerge. The U-Net predicts large noise components and subtracts them.</p>`;
+        } else if (currentStep < 35) {
+            info.innerHTML = `<h3>Step ${currentStep} — Forming Details</h3><p>Mid-range steps refine shapes, add edges and color boundaries. The noise predictor becomes more precise as the signal-to-noise ratio improves.</p>`;
+        } else {
+            info.innerHTML = `<h3>Step ${currentStep} — Fine Refinement</h3><p>Final steps add subtle details, textures, and sharpness. Each step makes only tiny corrections — the image is already mostly formed.</p>`;
+        }
+    } else if (mode === 'forward') {
+        info.innerHTML = `<h3>Forward Diffusion (${pct}%)</h3><p>Gaussian noise is progressively added to the image. The forward process follows a fixed schedule β₁...β_T. By t=T, the image is indistinguishable from random noise.</p>`;
+    } else {
+        info.innerHTML = `<h3>Classifier-Free Guidance</h3><p>Run the U-Net twice: once with text conditioning, once without. The difference shows "what the text adds." Amplifying this difference by scale factor s makes the output more aligned with the prompt.</p>`;
+    }
+}
+
+// Event listeners
+document.querySelectorAll('.ctrl-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.ctrl-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        mode = btn.dataset.mode;
+        render();
+    });
+});
+
+document.getElementById('stepSlider').addEventListener('input', (e) => {
+    currentStep = parseInt(e.target.value);
+    document.getElementById('stepLabel').textContent = `${currentStep} / ${STEPS}`;
+    render();
+});
+
+// Init
+render();
+</script>
+</body>
+</html>

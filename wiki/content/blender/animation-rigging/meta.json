@@ -1,0 +1,17 @@
+{
+  "title": "Blender Animation and Rigging Systems",
+  "category": "blender",
+  "order": 3,
+  "tags": [
+    "blender",
+    "animation",
+    "rigging",
+    "armature",
+    "IK"
+  ],
+  "description": "Comprehensive guide to Blender's armature system, bone constraints, inverse kinematics, shape keys, NLA editor, animation principles, and automatic rigging with Rigify.",
+  "related": [
+    "concepts/animation-principles",
+    "game-engines/unity/architecture-workflow"
+  ]
+}

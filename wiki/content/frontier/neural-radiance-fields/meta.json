@@ -1,0 +1,17 @@
+{
+  "title": "Neural Radiance Fields (NeRF)",
+  "category": "frontier",
+  "order": 1,
+  "tags": [
+    "NeRF",
+    "neural-rendering",
+    "volumetric",
+    "novel-view-synthesis"
+  ],
+  "description": "Complete technical guide to neural radiance fields, volumetric rendering, positional encoding, MLP architectures, training pipelines, and practical variants like Instant-NGP and Mip-NeRF.",
+  "related": [
+    "frontier/gaussian-splatting",
+    "graphics-fundamentals/ray-tracing-fundamentals",
+    "graphics-fundamentals/global-illumination"
+  ]
+}

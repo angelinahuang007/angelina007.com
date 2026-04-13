@@ -1,0 +1,19 @@
+{
+  "title": "Physically Based Rendering (PBR) Pipeline",
+  "category": "graphics-fundamentals",
+  "tags": [
+    "pbr",
+    "ibl",
+    "environment-mapping",
+    "metallic-roughness",
+    "energy-conservation"
+  ],
+  "description": "PBR pipeline including metallic-roughness workflow, energy conservation, IBL, HDR environment maps, split-sum approximation, and material authoring principles.",
+  "related": [
+    "graphics-fundamentals/shading-models",
+    "graphics-fundamentals/global-illumination",
+    "blender/shader-nodes",
+    "photography/lighting-theory"
+  ],
+  "order": 11
+}

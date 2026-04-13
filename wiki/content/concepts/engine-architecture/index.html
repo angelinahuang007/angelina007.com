@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Engine Architecture</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        body {
+            background: var(--bg, #0f0f14);
+            color: var(--text, #e4e4e7);
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        h1 {
+            font-size: 2.2em;
+            margin-bottom: 10px;
+            color: var(--text);
+            font-weight: 700;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 1em;
+            margin-bottom: 30px;
+            font-family: 'Space Mono', monospace;
+        }
+
+        .main-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            min-height: 700px;
+        }
+
+        /* Diagram Section */
+        .diagram-section {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .diagram-title {
+            font-size: 1.1em;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: var(--text);
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        .diagram-container {
+            flex: 1;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-strong);
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        /* Layered Architecture Diagram */
+        .architecture-diagram {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            font-family: 'Space Mono', monospace;
+        }
+
+        .layer {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .layer-label {
+            font-size: 0.75em;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 5px;
+        }
+
+        .subsystems-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: flex-start;
+        }
+
+        .subsystem-box {
+            flex: 1;
+            min-width: 140px;
+            padding: 14px 12px;
+            border: 2px solid var(--bg-tertiary);
+            border-radius: 6px;
+            background: var(--bg-tertiary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.85em;
+            font-weight: 600;
+            text-align: center;
+            color: var(--text);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .subsystem-box::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: currentColor;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            pointer-events: none;
+        }
+
+        .subsystem-box:hover {
+            transform: translateY(-2px);
+            border-color: currentColor;
+        }
+
+        .subsystem-box:hover::before {
+            opacity: 0.08;
+        }
+
+        .subsystem-box.active {
+            border-color: var(--accent);
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--accent-light);
+        }
+
+        .subsystem-box.active::before {
+            opacity: 0.15;
+        }
+
+        /* Layer-specific colors */
+        .layer-platform .subsystem-box {
+            color: #14b8a6;
+            border-color: rgba(20, 184, 166, 0.3);
+        }
+
+        .layer-core .subsystem-box {
+            color: #f59e0b;
+            border-color: rgba(245, 158, 11, 0.3);
+        }
+
+        .layer-rendering .subsystem-box {
+            color: #ec4899;
+            border-color: rgba(236, 72, 153, 0.3);
+        }
+
+        .layer-physics .subsystem-box {
+            color: #8b5cf6;
+            border-color: rgba(139, 92, 246, 0.3);
+        }
+
+        .layer-audio .subsystem-box {
+            color: #06b6d4;
+            border-color: rgba(6, 182, 212, 0.3);
+        }
+
+        .layer-logic .subsystem-box {
+            color: #10b981;
+            border-color: rgba(16, 185, 129, 0.3);
+        }
+
+        .layer-tools .subsystem-box {
+            color: var(--accent);
+            border-color: rgba(99, 102, 241, 0.3);
+        }
+
+        /* Data flow arrows */
+        .data-flow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 20px;
+            color: var(--text-dim);
+            font-size: 0.8em;
+        }
+
+        .data-flow::before,
+        .data-flow::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: linear-gradient(to right, transparent, var(--bg-tertiary), transparent);
+        }
+
+        .data-flow span {
+            margin: 0 8px;
+        }
+
+        /* Info Panel */
+        .info-section {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .info-title {
+            font-size: 1.1em;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: var(--text);
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        .info-panel {
+            flex: 1;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-strong);
+            border-radius: 8px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .info-panel.empty {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-dim);
+            text-align: center;
+        }
+
+        .info-panel.empty span {
+            font-family: 'Space Mono', monospace;
+            font-size: 0.9em;
+        }
+
+        .subsystem-name {
+            font-size: 1.4em;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 12px;
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        .subsystem-description {
+            font-size: 0.95em;
+            color: var(--text);
+            line-height: 1.5;
+            margin-bottom: 20px;
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        .subsystem-section {
+            margin-bottom: 18px;
+        }
+
+        .subsystem-section-title {
+            font-size: 0.85em;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+            font-family: 'Space Mono', monospace;
+        }
+
+        .subsystem-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .subsystem-list li {
+            font-size: 0.9em;
+            color: var(--text);
+            padding: 6px 0 6px 24px;
+            position: relative;
+            font-family: 'Space Mono', monospace;
+        }
+
+        .subsystem-list li::before {
+            content: '▸';
+            position: absolute;
+            left: 8px;
+            opacity: 0.6;
+        }
+
+        .implementation-tag {
+            display: inline-block;
+            background: rgba(99, 102, 241, 0.15);
+            color: var(--accent-light);
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            margin-right: 6px;
+            margin-top: 3px;
+            font-family: 'Space Mono', monospace;
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+        }
+
+        /* Scrollbar styling */
+        .diagram-container::-webkit-scrollbar,
+        .info-panel::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .diagram-container::-webkit-scrollbar-track,
+        .info-panel::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .diagram-container::-webkit-scrollbar-thumb,
+        .info-panel::-webkit-scrollbar-thumb {
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+        }
+
+        .diagram-container::-webkit-scrollbar-thumb:hover,
+        .info-panel::-webkit-scrollbar-thumb:hover {
+            background: rgba(228, 228, 231, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Engine Architecture</h1>
+        <p class="subtitle">Interactive diagram showing major game engine subsystems and their responsibilities</p>
+
+        <div class="main-layout">
+            <!-- Diagram -->
+            <div class="diagram-section">
+                <div class="diagram-title">System Architecture Diagram</div>
+                <div class="diagram-container">
+                    <div class="architecture-diagram">
+                        <!-- Tools/Editor Layer -->
+                        <div class="layer layer-tools">
+                            <div class="layer-label">Tools & Editor</div>
+                            <div class="subsystems-row">
+                                <div class="subsystem-box" data-subsystem="editor">Level Editor</div>
+                                <div class="subsystem-box" data-subsystem="pipeline">Asset Pipeline</div>
+                                <div class="subsystem-box" data-subsystem="debugger">Debugger</div>
+                            </div>
+                        </div>
+
+                        <div class="data-flow"><span>↑ Development Tools ↓</span></div>
+
+                        <!-- Game Logic Layer -->
+                        <div class="layer layer-logic">
+                            <div class="layer-label">Game Logic</div>
+                            <div class="subsystems-row">
+                                <div class="subsystem-box" data-subsystem="entity">Entity System</div>
+                                <div class="subsystem-box" data-subsystem="scripting">Scripting</div>
+                                <div class="subsystem-box" data-subsystem="state">State Machine</div>
+                                <div class="subsystem-box" data-subsystem="ai">AI</div>
+                            </div>
+                        </div>
+
+                        <div class="data-flow"><span>↑ Game Updates ↓</span></div>
+
+                        <!-- Rendering Layer -->
+                        <div class="layer layer-rendering">
+                            <div class="layer-label">Rendering Engine</div>
+                            <div class="subsystems-row">
+                                <div class="subsystem-box" data-subsystem="scenegraph">Scene Graph</div>
+                                <div class="subsystem-box" data-subsystem="renderer">Renderer</div>
+                            </div>
+                            <div class="subsystems-row">
+                                <div class="subsystem-box" data-subsystem="shader">Shader System</div>
+                                <div class="subsystem-box" data-subsystem="postproc">Post-Processing</div>
+                            </div>
+                        </div>
+
+                        <div class="data-flow"><span>↑ Visual Output ↓</span></div>
+
+                        <!-- Physics & Audio Layers (side by side) -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <!-- Physics Layer -->
+                            <div class="layer layer-physics">
+                                <div class="layer-label">Physics Engine</div>
+                                <div class="subsystems-row" style="flex-direction: column;">
+                                    <div class="subsystem-box" data-subsystem="collision">Collision Detection</div>
+                                    <div class="subsystem-box" data-subsystem="rigidbody">Rigid Body</div>
+                                    <div class="subsystem-box" data-subsystem="constraints">Constraints</div>
+                                </div>
+                            </div>
+
+                            <!-- Audio Layer -->
+                            <div class="layer layer-audio">
+                                <div class="layer-label">Audio Engine</div>
+                                <div class="subsystems-row" style="flex-direction: column;">
+                                    <div class="subsystem-box" data-subsystem="mixer">Sound Mixer</div>
+                                    <div class="subsystem-box" data-subsystem="spatial">3D Spatialization</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="data-flow"><span>↑ Simulation & Audio ↓</span></div>
+
+                        <!-- Core Systems Layer -->
+                        <div class="layer layer-core">
+                            <div class="layer-label">Core Systems</div>
+                            <div class="subsystems-row">
+                                <div class="subsystem-box" data-subsystem="memory">Memory Manager</div>
+                                <div class="subsystem-box" data-subsystem="resources">Resource Manager</div>
+                                <div class="subsystem-box" data-subsystem="scheduler">Task Scheduler</div>
+                            </div>
+                        </div>
+
+                        <div class="data-flow"><span>↑ Core Infrastructure ↓</span></div>
+
+                        <!-- Platform Layer -->
+                        <div class="layer layer-platform">
+                            <div class="layer-label">Platform Layer</div>
+                            <div class="subsystems-row">
+                                <div class="subsystem-box" data-subsystem="window">Window/OS</div>
+                                <div class="subsystem-box" data-subsystem="input">Input</div>
+                                <div class="subsystem-box" data-subsystem="fileio">File I/O</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Info Panel -->
+            <div class="info-section">
+                <div class="info-title">Subsystem Details</div>
+                <div class="info-panel empty" id="infoPanel">
+                    <span>Select a subsystem to view details</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const subsystemData = {
+            // Platform Layer
+            window: {
+                name: 'Window / OS',
+                layer: 'Platform Layer',
+                description: 'Manages the application window and communicates with the operating system for display, events, and system resources.',
+                responsibilities: [
+                    'Window creation and management',
+                    'Display mode and resolution handling',
+                    'System event processing',
+                    'OS-specific abstraction'
+                ],
+                implementations: ['GLFW', 'SDL2', 'Win32 API', 'Cocoa']
+            },
+            input: {
+                name: 'Input',
+                layer: 'Platform Layer',
+                description: 'Captures and processes user input from keyboard, mouse, gamepad, and touch devices.',
+                responsibilities: [
+                    'Input device polling/events',
+                    'Keyboard/mouse/gamepad handling',
+                    'Touch and gesture detection',
+                    'Input mapping and buffering'
+                ],
+                implementations: ['GLFW Input', 'SDL2 Events', 'Win32 Input']
+            },
+            fileio: {
+                name: 'File I/O',
+                layer: 'Platform Layer',
+                description: 'Handles reading and writing files from disk with platform-specific optimizations.',
+                responsibilities: [
+                    'File reading/writing operations',
+                    'Path abstraction',
+                    'Async I/O operations',
+                    'Stream management'
+                ],
+                implementations: ['Standard C++ fstream', 'PhysFS', 'Custom VFS']
+            },
+
+            // Core Systems
+            memory: {
+                name: 'Memory Manager',
+                layer: 'Core Systems',
+                description: 'Manages memory allocation, deallocation, and optimization to prevent fragmentation and improve performance.',
+                responsibilities: [
+                    'Custom memory pools/allocators',
+                    'Garbage collection or manual management',
+                    'Memory defragmentation',
+                    'Memory leak detection'
+                ],
+                implementations: ['jemalloc', 'Custom Arena Allocators', 'TBB']
+            },
+            resources: {
+                name: 'Resource Manager',
+                layer: 'Core Systems',
+                description: 'Loads, caches, and manages game assets like textures, meshes, sounds, and scripts.',
+                responsibilities: [
+                    'Asset loading and caching',
+                    'Reference counting',
+                    'Streaming and unloading',
+                    'Format conversion'
+                ],
+                implementations: ['Custom resource cache', 'Addressables (Unity)']
+            },
+            scheduler: {
+                name: 'Task Scheduler',
+                layer: 'Core Systems',
+                description: 'Distributes tasks across CPU cores for parallel execution and efficient performance.',
+                responsibilities: [
+                    'Task queue management',
+                    'Work distribution',
+                    'Synchronization primitives',
+                    'Load balancing'
+                ],
+                implementations: ['Enki task scheduler', 'TBB', 'Custom thread pool']
+            },
+
+            // Rendering
+            scenegraph: {
+                name: 'Scene Graph',
+                layer: 'Rendering Engine',
+                description: 'Organizes game objects in a hierarchical tree for efficient spatial queries and transformation management.',
+                responsibilities: [
+                    'Spatial hierarchy management',
+                    'Transform calculations',
+                    'Visibility culling',
+                    'Node traversal'
+                ],
+                implementations: ['Binary Space Partitioning (BSP)', 'Octrees', 'Custom hierarchies']
+            },
+            renderer: {
+                name: 'Renderer',
+                layer: 'Rendering Engine',
+                description: 'Core rendering engine that converts scene data into GPU commands and handles draw calls.',
+                responsibilities: [
+                    'Draw call batching',
+                    'GPU command generation',
+                    'Frame buffer management',
+                    'Render pass scheduling'
+                ],
+                implementations: ['DirectX 12', 'Vulkan', 'OpenGL', 'Metal']
+            },
+            shader: {
+                name: 'Shader System',
+                layer: 'Rendering Engine',
+                description: 'Manages compilation and execution of GPU shaders for vertex, fragment, and compute operations.',
+                responsibilities: [
+                    'Shader compilation',
+                    'Uniform buffer management',
+                    'Pipeline state objects',
+                    'Shader caching'
+                ],
+                implementations: ['GLSL', 'HLSL', 'SPIR-V', 'Metal Shading Language']
+            },
+            postproc: {
+                name: 'Post-Processing',
+                layer: 'Rendering Engine',
+                description: 'Applies visual effects to the rendered image like bloom, tone mapping, and color grading.',
+                responsibilities: [
+                    'Effect pipeline execution',
+                    'Render target management',
+                    'Effect parameter handling',
+                    'Performance optimization'
+                ],
+                implementations: ['Custom effect framework', 'UE5 Pixel Streaming']
+            },
+
+            // Physics
+            collision: {
+                name: 'Collision Detection',
+                layer: 'Physics Engine',
+                description: 'Detects when objects collide and provides contact information for response.',
+                responsibilities: [
+                    'Broad phase queries',
+                    'Narrow phase collision tests',
+                    'Ray casting',
+                    'Contact generation'
+                ],
+                implementations: ['Bullet Physics', 'PhysX', 'Rapier']
+            },
+            rigidbody: {
+                name: 'Rigid Body',
+                layer: 'Physics Engine',
+                description: 'Simulates object motion using physics equations including gravity and forces.',
+                responsibilities: [
+                    'Physics state tracking',
+                    'Force integration',
+                    'Velocity calculation',
+                    'Sleep/wake states'
+                ],
+                implementations: ['Bullet Physics', 'NVIDIA PhysX']
+            },
+            constraints: {
+                name: 'Constraints',
+                layer: 'Physics Engine',
+                description: 'Enforces physical constraints between objects like joints, limits, and motors.',
+                responsibilities: [
+                    'Constraint solving',
+                    'Joint mathematics',
+                    'Motorized joints',
+                    'Iterative constraint relaxation'
+                ],
+                implementations: ['Bullet Physics', 'PhysX', 'Rapier']
+            },
+
+            // Audio
+            mixer: {
+                name: 'Sound Mixer',
+                layer: 'Audio Engine',
+                description: 'Mixes multiple audio sources, applies effects, and controls volume levels.',
+                responsibilities: [
+                    'Audio mixing',
+                    'Volume control',
+                    'Effect chains',
+                    'Output routing'
+                ],
+                implementations: ['FMOD Studio', 'Wwise', 'Web Audio API']
+            },
+            spatial: {
+                name: '3D Spatialization',
+                layer: 'Audio Engine',
+                description: 'Creates 3D audio positioning based on listener location and object position.',
+                responsibilities: [
+                    'HRTF processing',
+                    'Pan and distance attenuation',
+                    'Doppler effects',
+                    'Room reverb'
+                ],
+                implementations: ['FMOD', 'Wwise', 'Ambisonic audio']
+            },
+
+            // Game Logic
+            entity: {
+                name: 'Entity System',
+                layer: 'Game Logic',
+                description: 'Manages game objects and their components in an entity-component-system architecture.',
+                responsibilities: [
+                    'Entity creation/destruction',
+                    'Component attachment',
+                    'Query management',
+                    'Entity-entity relationships'
+                ],
+                implementations: ['EnTT', 'Flecs', 'Custom ECS']
+            },
+            scripting: {
+                name: 'Scripting',
+                layer: 'Game Logic',
+                description: 'Executes game logic through high-level scripts for game designers and programmers.',
+                responsibilities: [
+                    'Script compilation/execution',
+                    'API exposure',
+                    'Hot reloading',
+                    'Debugging support'
+                ],
+                implementations: ['Lua', 'C#', 'Python', 'Custom VM']
+            },
+            state: {
+                name: 'State Machine',
+                layer: 'Game Logic',
+                description: 'Manages game states and transitions between different game modes.',
+                responsibilities: [
+                    'State registration',
+                    'State transitions',
+                    'Entry/exit callbacks',
+                    'State history'
+                ],
+                implementations: ['Custom state machines', 'Behavior trees']
+            },
+            ai: {
+                name: 'AI',
+                layer: 'Game Logic',
+                description: 'Implements artificial intelligence for NPCs and autonomous entities.',
+                responsibilities: [
+                    'Behavior trees',
+                    'Pathfinding algorithms',
+                    'Decision making',
+                    'NPC behaviors'
+                ],
+                implementations: ['Behavior trees', 'A* pathfinding', 'FSMs']
+            },
+
+            // Tools
+            editor: {
+                name: 'Level Editor',
+                layer: 'Tools & Editor',
+                description: 'Visual tool for designers to create and edit game levels and scenes.',
+                responsibilities: [
+                    'Scene editing',
+                    'Entity placement',
+                    'Property editing',
+                    'Preview rendering'
+                ],
+                implementations: ['Custom Qt/ImGui UI', 'Unreal Editor', 'Unity Editor']
+            },
+            pipeline: {
+                name: 'Asset Pipeline',
+                layer: 'Tools & Editor',
+                description: 'Processes and converts raw art assets into optimized runtime formats.',
+                responsibilities: [
+                    'Asset importing',
+                    'Format conversion',
+                    'Compression',
+                    'Metadata generation'
+                ],
+                implementations: ['Assimp', 'FBX SDK', 'Custom converters']
+            },
+            debugger: {
+                name: 'Debugger',
+                layer: 'Tools & Editor',
+                description: 'Provides debugging tools for profiling, logging, and inspecting engine state.',
+                responsibilities: [
+                    'Performance profiling',
+                    'Memory inspection',
+                    'Entity inspection',
+                    'Frame debugging'
+                ],
+                implementations: ['ImGui overlays', 'RenderDoc', 'PIX']
+            }
+        };
+
+        const infoPanel = document.getElementById('infoPanel');
+        const subsystemBoxes = document.querySelectorAll('.subsystem-box');
+
+        subsystemBoxes.forEach(box => {
+            box.addEventListener('click', function() {
+                const subsystem = this.dataset.subsystem;
+                const data = subsystemData[subsystem];
+
+                // Update active state
+                subsystemBoxes.forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+
+                // Update info panel
+                infoPanel.classList.remove('empty');
+                infoPanel.innerHTML = `
+                    <div class="subsystem-name">${data.name}</div>
+                    <div class="subsystem-description">${data.description}</div>
+
+                    <div class="subsystem-section">
+                        <div class="subsystem-section-title">Responsibilities</div>
+                        <ul class="subsystem-list">
+                            ${data.responsibilities.map(r => `<li>${r}</li>`).join('')}
+                        </ul>
+                    </div>
+
+                    <div class="subsystem-section">
+                        <div class="subsystem-section-title">Common Implementations</div>
+                        <div>
+                            ${data.implementations.map(impl => `<span class="implementation-tag">${impl}</span>`).join('')}
+                        </div>
+                    </div>
+                `;
+            });
+        });
+    </script>
+</body>
+</html>

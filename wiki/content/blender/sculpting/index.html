@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blender Sculpting</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        .sculpting-container {
+            display: flex; flex-wrap: wrap;
+            gap: 20px;
+            height: 100%;
+        }
+        .canvas-wrapper {
+            flex: 1;
+            background: linear-gradient(135deg, var(--canvas-bg) 0%, var(--bg-secondary) 100%);
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+        .canvas-wrapper canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+        .control-panel {
+            width: 260px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 16px;
+            overflow-y: auto;
+            color: var(--text);
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 13px;
+        }
+        .control-group {
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        .control-group h4 {
+            margin: 0 0 8px 0;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: var(--accent);
+            letter-spacing: 0.5px;
+        }
+        .brush-button {
+            display: block;
+            width: 100%;
+            padding: 8px 12px;
+            margin-bottom: 6px;
+            background: var(--border);
+            border: 1px solid var(--border-strong);
+            color: var(--text);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-family: 'Space Grotesk', sans-serif;
+            transition: all 0.2s;
+        }
+        .brush-button:hover {
+            background: rgba(99, 102, 241, 0.2);
+            border-color: var(--accent);
+        }
+        .brush-button.active {
+            background: var(--accent);
+            color: var(--bg-secondary);
+            border-color: var(--accent);
+        }
+        .slider-row {
+            margin-bottom: 12px;
+        }
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+            font-size: 12px;
+        }
+        input[type="range"] {
+            width: 100%;
+            height: 4px;
+            border-radius: 2px;
+            background: var(--border-strong);
+            outline: none;
+            -webkit-appearance: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--accent);
+            border: none;
+            cursor: pointer;
+        }
+        .stats {
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 4px;
+            padding: 8px;
+            font-size: 11px;
+            font-family: 'JetBrains Mono', monospace;
+            line-height: 1.6;
+            color: var(--accent-light);
+        }
+        .btn-reset {
+            width: 100%;
+            padding: 8px 12px;
+            background: rgba(231, 76, 60, 0.2);
+            border: 1px solid rgba(231, 76, 60, 0.4);
+            color: #e74c3c;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-family: 'Space Grotesk', sans-serif;
+            transition: all 0.2s;
+        }
+        .btn-reset:hover {
+            background: rgba(231, 76, 60, 0.3);
+            border-color: #e74c3c;
+        }
+        .brush-preview {
+            width: 100%;
+            height: 60px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            margin-top: 8px;
+        }
+        .info-text {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 12px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="sculpting-container">
+        <div class="canvas-wrapper">
+            <canvas id="sculptCanvas"></canvas>
+        </div>
+        <div class="control-panel">
+            <div class="control-group">
+                <h4>Brush Type</h4>
+                <button class="brush-button active" data-brush="draw">Draw</button>
+                <button class="brush-button" data-brush="smooth">Smooth</button>
+                <button class="brush-button" data-brush="inflate">Inflate</button>
+                <button class="brush-button" data-brush="grab">Grab</button>
+            </div>
+
+            <div class="control-group">
+                <h4>Brush Settings</h4>
+                <div class="slider-row">
+                    <div class="slider-label">
+                        <span>Size</span>
+                        <span id="sizeValue">30</span>
+                    </div>
+                    <input type="range" id="sizeSlider" min="5" max="100" step="1" value="30">
+                </div>
+                <div class="slider-row">
+                    <div class="slider-label">
+                        <span>Strength</span>
+                        <span id="strengthValue">0.8</span>
+                    </div>
+                    <input type="range" id="strengthSlider" min="0" max="1" step="0.05" value="0.8">
+                </div>
+                <canvas class="brush-preview" id="brushPreview"></canvas>
+            </div>
+
+            <div class="control-group">
+                <h4>Topology</h4>
+                <div class="stats">
+                    <div>Vertices: <span id="vertexCount">201</span></div>
+                    <div>Subdivisions: <span id="subdLevel">0</span></div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <button class="btn-reset" data-action="reset">Reset Sculpture</button>
+            </div>
+
+            <div class="info-text">
+                Paint on the surface to sculpt. Different brushes have different effects. Size and strength control the intensity.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class SculptingDemo {
+            constructor(canvas, previewCanvas) {
+                this.canvas = canvas;
+                this.ctx = canvas.getContext('2d');
+                this.previewCanvas = previewCanvas;
+                this.previewCtx = previewCanvas.getContext('2d');
+
+                this.brushType = 'draw';
+                this.brushSize = 30;
+                this.brushStrength = 0.8;
+
+                // Create height map
+                const mapWidth = 300;
+                this.heightMap = new Float32Array(mapWidth);
+                for (let i = 0; i < mapWidth; i++) {
+                    this.heightMap[i] = Math.sin(i / 50) * 20 + 50;
+                }
+
+                this.isDrawing = false;
+                this.resizeCanvas();
+                window.addEventListener('resize', () => this.resizeCanvas());
+                this.setupEvents();
+                this.render();
+            }
+
+            resizeCanvas() {
+                const rect = this.canvas.parentElement.getBoundingClientRect();
+                this.canvas.width = rect.width;
+                this.canvas.height = rect.height;
+
+                const prevRect = this.previewCanvas.getBoundingClientRect();
+                this.previewCanvas.width = prevRect.width;
+                this.previewCanvas.height = prevRect.height;
+
+                this.render();
+            }
+
+            setupEvents() {
+                document.querySelectorAll('[data-brush]').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        document.querySelectorAll('[data-brush]').forEach(b => b.classList.remove('active'));
+                        e.target.classList.add('active');
+                        this.brushType = e.target.dataset.brush;
+                        this.render();
+                    });
+                });
+
+                document.getElementById('sizeSlider').addEventListener('input', (e) => {
+                    this.brushSize = parseFloat(e.target.value);
+                    document.getElementById('sizeValue').textContent = this.brushSize;
+                    this.render();
+                });
+
+                document.getElementById('strengthSlider').addEventListener('input', (e) => {
+                    this.brushStrength = parseFloat(e.target.value);
+                    document.getElementById('strengthValue').textContent = this.brushStrength.toFixed(2);
+                });
+
+                document.querySelector('[data-action="reset"]').addEventListener('click', () => {
+                    for (let i = 0; i < this.heightMap.length; i++) {
+                        this.heightMap[i] = Math.sin(i / 50) * 20 + 50;
+                    }
+                    this.render();
+                });
+
+                this.canvas.addEventListener('mousedown', (e) => this.onMouseDown(e));
+                this.canvas.addEventListener('mousemove', (e) => this.onMouseMove(e));
+                this.canvas.addEventListener('mouseup', (e) => this.onMouseUp(e));
+                this.canvas.addEventListener('mouseleave', (e) => this.onMouseUp(e));
+            }
+
+            onMouseDown(e) {
+                this.isDrawing = true;
+                this.sculpt(e);
+            }
+
+            onMouseMove(e) {
+                if (this.isDrawing) {
+                    this.sculpt(e);
+                }
+                this.render();
+            }
+
+            onMouseUp(e) {
+                this.isDrawing = false;
+            }
+
+            sculpt(e) {
+                const rect = this.canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+
+                const centerY = this.canvas.height * 0.6;
+                const scale = this.canvas.width / this.heightMap.length;
+
+                const mapX = mouseX / scale;
+                const radius = this.brushSize / scale;
+
+                const strength = this.brushStrength * 0.5;
+
+                for (let i = 0; i < this.heightMap.length; i++) {
+                    const dist = Math.abs(i - mapX);
+                    if (dist < radius) {
+                        const falloff = Math.cos((dist / radius) * Math.PI / 2);
+
+                        switch (this.brushType) {
+                            case 'draw':
+                                this.heightMap[i] += falloff * strength * 2;
+                                break;
+                            case 'smooth':
+                                const neighbors = (this.heightMap[i - 1] || this.heightMap[i]) +
+                                                (this.heightMap[i + 1] || this.heightMap[i]);
+                                this.heightMap[i] = this.heightMap[i] * (1 - falloff * strength * 0.5) +
+                                                   (neighbors / 2) * falloff * strength * 0.5;
+                                break;
+                            case 'inflate':
+                                this.heightMap[i] += falloff * strength * 1.5;
+                                break;
+                            case 'grab':
+                                const relY = mouseY - centerY;
+                                this.heightMap[i] += falloff * strength * (relY / 100);
+                                break;
+                        }
+                    }
+                }
+            }
+
+            render() {
+                const w = this.canvas.width;
+                const h = this.canvas.height;
+
+                // Background
+                const styles = getComputedStyle(document.documentElement);
+                const grad = this.ctx.createLinearGradient(0, 0, 0, h);
+                grad.addColorStop(0, styles.getPropertyValue('--canvas-bg').trim());
+                grad.addColorStop(1, styles.getPropertyValue('--bg-secondary').trim());
+                this.ctx.fillStyle = grad;
+                this.ctx.fillRect(0, 0, w, h);
+
+                // Grid
+                this.ctx.strokeStyle = 'rgba(228, 228, 231, 0.05)';
+                this.ctx.lineWidth = 0.5;
+                for (let i = 0; i <= 10; i++) {
+                    const x = (w / 10) * i;
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(x, 0);
+                    this.ctx.lineTo(x, h);
+                    this.ctx.stroke();
+                }
+
+                const centerY = h * 0.6;
+                const scale = w / this.heightMap.length;
+
+                // Draw mesh (using accent color for topology visualization)
+                this.ctx.strokeStyle = 'rgba(99, 102, 241, 0.4)';
+                this.ctx.lineWidth = 1;
+                this.ctx.beginPath();
+                this.ctx.moveTo(0, centerY);
+
+                for (let i = 0; i < this.heightMap.length; i++) {
+                    const x = i * scale;
+                    const y = centerY - this.heightMap[i];
+                    this.ctx.lineTo(x, y);
+                }
+
+                this.ctx.lineTo(w, centerY);
+                this.ctx.stroke();
+
+                // Fill mesh
+                this.ctx.fillStyle = 'rgba(99, 102, 241, 0.15)';
+                this.ctx.beginPath();
+                this.ctx.moveTo(0, centerY);
+
+                for (let i = 0; i < this.heightMap.length; i++) {
+                    const x = i * scale;
+                    const y = centerY - this.heightMap[i];
+                    this.ctx.lineTo(x, y);
+                }
+
+                this.ctx.lineTo(w, centerY);
+                this.ctx.closePath();
+                this.ctx.fill();
+
+                // Draw vertices
+                this.ctx.fillStyle = 'rgba(99, 102, 241, 0.6)';
+                for (let i = 0; i < this.heightMap.length; i += 5) {
+                    const x = i * scale;
+                    const y = centerY - this.heightMap[i];
+                    this.ctx.beginPath();
+                    this.ctx.arc(x, y, 2, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+
+                this.updateStats();
+                this.renderBrushPreview();
+            }
+
+            renderBrushPreview() {
+                const w = this.previewCanvas.width;
+                const h = this.previewCanvas.height;
+
+                this.previewCtx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+                this.previewCtx.fillRect(0, 0, w, h);
+
+                const centerX = w / 2;
+                const centerY = h / 2;
+                const radius = (this.brushSize / 100) * Math.min(w, h) * 0.25;
+
+                // Brush outline
+                this.previewCtx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+                this.previewCtx.lineWidth = 2;
+                this.previewCtx.beginPath();
+                this.previewCtx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+                this.previewCtx.stroke();
+
+                // Brush falloff
+                const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+                const gradient = this.previewCtx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
+                gradient.addColorStop(0, `rgba(99, 102, 241, ${this.brushStrength})`);
+                gradient.addColorStop(1, 'rgba(99, 102, 241, 0)');
+                this.previewCtx.fillStyle = gradient;
+                this.previewCtx.fillRect(0, 0, w, h);
+
+                // Type icon
+                this.previewCtx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+                this.previewCtx.font = 'bold 11px "Space Mono"';
+                this.previewCtx.textAlign = 'center';
+                this.previewCtx.fillText(this.brushType.toUpperCase(), centerX, centerY - radius - 10);
+            }
+
+            updateStats() {
+                document.getElementById('vertexCount').textContent = this.heightMap.length;
+                const subdLevel = Math.floor(this.heightMap.length / 50);
+                document.getElementById('subdLevel').textContent = subdLevel;
+            }
+        }
+
+        const canvas = document.getElementById('sculptCanvas');
+        const previewCanvas = document.getElementById('brushPreview');
+        const demo = new SculptingDemo(canvas, previewCanvas);
+    </script>
+</body>
+</html>

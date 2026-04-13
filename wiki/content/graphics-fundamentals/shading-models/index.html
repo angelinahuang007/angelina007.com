@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shading Models</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        body { padding: 20px; font-family: 'Space Grotesk', sans-serif; }
+        .article { max-width: 900px; margin: 0 auto; }
+
+        .viewport-container {
+            display: flex;
+            gap: 30px;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+
+        #threejsCanvas {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            width: 500px;
+            height: 400px;
+            flex-shrink: 0;
+        }
+
+        .sidebar {
+            flex: 1;
+            min-width: 300px;
+        }
+
+        .mode-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 15px 0;
+        }
+
+        button {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 6px;
+            background: var(--border-color);
+            color: var(--text);
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        button.active {
+            background: var(--accent);
+            color: white;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+        }
+
+        .controls {
+            background: var(--bg-secondary);
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .control-group {
+            margin: 15px 0;
+        }
+
+        .control-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+            background: var(--border-color);
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            border: none;
+        }
+
+        .description-box {
+            background: var(--bg-secondary);
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+            border-left: 4px solid var(--accent);
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .info-text {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 10px;
+        }
+
+        h3 {
+            margin-top: 25px;
+            margin-bottom: 10px;
+        }
+
+        .light-controls {
+            background: var(--bg-secondary);
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+        }
+
+        .light-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+        }
+
+        @media (max-width: 900px) {
+            .viewport-container {
+                flex-direction: column;
+            }
+
+            #threejsCanvas {
+                width: 100%;
+                max-width: 500px;
+            }
+
+            .sidebar {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <article class="article">
+        <h1>Shading Models</h1>
+        <p>Explore how different shading techniques create distinct visual effects on 3D objects. This interactive visualization demonstrates flat shading, Gouraud shading, Phong shading, and PBR rendering with real-time lighting.</p>
+
+        <div class="viewport-container">
+            <div id="threejsCanvas"></div>
+
+            <div class="sidebar">
+                <h3>Shading Model</h3>
+                <div class="mode-buttons">
+                    <button class="active" data-mode="flat">Flat Shading</button>
+                    <button data-mode="gouraud">Gouraud Shading</button>
+                    <button data-mode="phong">Phong Shading</button>
+                    <button data-mode="pbr">PBR (Physical)</button>
+                </div>
+
+                <div class="description-box" id="descriptionBox"></div>
+
+                <h3>Light Position</h3>
+                <div class="light-controls">
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>X</span>
+                            <span class="light-value" id="val-light-x">3.0</span>
+                        </div>
+                        <input type="range" id="light-x" min="-5" max="5" value="3" step="0.1">
+                    </div>
+
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>Y</span>
+                            <span class="light-value" id="val-light-y">4.0</span>
+                        </div>
+                        <input type="range" id="light-y" min="-5" max="5" value="4" step="0.1">
+                    </div>
+
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>Z</span>
+                            <span class="light-value" id="val-light-z">4.0</span>
+                        </div>
+                        <input type="range" id="light-z" min="0" max="8" value="4" step="0.1">
+                    </div>
+
+                    <div class="info-text">Drag in viewport to rotate • Adjust sliders to move light</div>
+                </div>
+
+                <h3>Material Properties</h3>
+                <div class="controls">
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>Ambient Light</span>
+                            <span id="val-ambient">0.30</span>
+                        </div>
+                        <input type="range" id="ambient" min="0" max="1" value="0.3" step="0.05">
+                    </div>
+
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>Roughness</span>
+                            <span id="val-roughness">0.50</span>
+                        </div>
+                        <input type="range" id="roughness" min="0.01" max="1" value="0.5" step="0.05">
+                    </div>
+
+                    <div class="control-group">
+                        <div class="control-label">
+                            <span>Metalness</span>
+                            <span id="val-metalness">0.00</span>
+                        </div>
+                        <input type="range" id="metalness" min="0" max="1" value="0" step="0.05">
+                    </div>
+
+                    <button onclick="resetParams()" style="width: 100%; margin-top: 20px;">Reset All</button>
+                </div>
+            </div>
+        </div>
+    </article>
+
+    <script>
+        let scene, camera, renderer, mesh;
+        let controls = {
+            lightX: 3,
+            lightY: 4,
+            lightZ: 4,
+            ambient: 0.3,
+            roughness: 0.5,
+            metalness: 0,
+            mode: 'flat'
+        };
+
+        let rotation = { x: 0.5, y: 0.5 };
+        let isDragging = false;
+        let dragStart = { x: 0, y: 0 };
+
+        function initThreeJS() {
+            const container = document.getElementById('threejsCanvas');
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+            camera.position.z = 2.5;
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(width, height);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            container.appendChild(renderer.domElement);
+
+            // Get theme colors for background
+            const colors = Wiki.colors();
+            renderer.setClearColor(colors.bg_secondary, 1);
+
+            // Create sphere geometry with more segments for better lighting
+            const geometry = new THREE.IcosahedronGeometry(1, 5);
+
+            // Create materials
+            createMaterials(geometry);
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(controls.lightX, controls.lightY, controls.lightZ);
+            scene.add(directionalLight);
+            window.directionalLight = directionalLight;
+
+            // Handle window resize
+            window.addEventListener('resize', () => {
+                const newWidth = container.clientWidth;
+                const newHeight = container.clientHeight;
+                camera.aspect = newWidth / newHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(newWidth, newHeight);
+            });
+
+            // Mouse controls for rotation
+            renderer.domElement.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                dragStart = { x: e.clientX, y: e.clientY };
+            });
+
+            renderer.domElement.addEventListener('mousemove', (e) => {
+                if (isDragging) {
+                    const deltaX = (e.clientX - dragStart.x) * 0.005;
+                    const deltaY = (e.clientY - dragStart.y) * 0.005;
+                    rotation.y += deltaX;
+                    rotation.x += deltaY;
+                    dragStart = { x: e.clientX, y: e.clientY };
+                }
+            });
+
+            renderer.domElement.addEventListener('mouseup', () => {
+                isDragging = false;
+            });
+
+            renderer.domElement.addEventListener('mouseleave', () => {
+                isDragging = false;
+            });
+
+            updateDescription();
+            animate();
+        }
+
+        function createMaterials(geometry) {
+            let material;
+
+            if (controls.mode === 'flat') {
+                material = new THREE.MeshPhongMaterial({
+                    color: 0xcccccc,
+                    flatShading: true,
+                    shininess: 100
+                });
+            } else if (controls.mode === 'gouraud') {
+                material = new THREE.MeshPhongMaterial({
+                    color: 0xcccccc,
+                    flatShading: false,
+                    shininess: 100
+                });
+            } else if (controls.mode === 'phong') {
+                material = new THREE.MeshPhongMaterial({
+                    color: 0xcccccc,
+                    shininess: Math.pow(2, 8 * (1 - controls.roughness))
+                });
+            } else if (controls.mode === 'pbr') {
+                material = new THREE.MeshStandardMaterial({
+                    color: 0xcccccc,
+                    metalness: controls.metalness,
+                    roughness: controls.roughness
+                });
+            }
+
+            // Remove old mesh if exists
+            if (mesh) {
+                scene.remove(mesh);
+            }
+
+            mesh = new THREE.Mesh(geometry, material);
+            scene.add(mesh);
+        }
+
+        function updateDescription() {
+            const descriptions = {
+                flat: 'Flat shading renders each face with a single color. Faces are not interpolated, creating a faceted, low-poly appearance. Often used for geometric or stylized looks.',
+                gouraud: 'Gouraud shading computes lighting at vertices and interpolates colors across each face. Faster than Phong but may show artifacts on large triangles.',
+                phong: 'Phong shading interpolates normals across the surface and computes lighting per-pixel. Produces smooth highlights and realistic lighting on curved surfaces.',
+                pbr: 'Physical-Based Rendering uses metalness and roughness parameters to simulate real-world material properties, providing physically accurate results across diverse materials.'
+            };
+            document.getElementById('descriptionBox').textContent = descriptions[controls.mode];
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (mesh) {
+                mesh.rotation.x += 0.001;
+                mesh.rotation.y += 0.002;
+                mesh.rotation.z = rotation.x;
+                mesh.rotation.y += rotation.y;
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        function setupControlListeners() {
+            // Mode buttons
+            document.querySelectorAll('.mode-buttons button').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    document.querySelectorAll('.mode-buttons button').forEach(b => b.classList.remove('active'));
+                    e.target.classList.add('active');
+                    controls.mode = e.target.dataset.mode;
+                    const geometry = mesh.geometry.clone();
+                    createMaterials(geometry);
+                    updateDescription();
+                });
+            });
+
+            // Light position sliders
+            document.getElementById('light-x').addEventListener('input', (e) => {
+                controls.lightX = parseFloat(e.target.value);
+                document.getElementById('val-light-x').textContent = controls.lightX.toFixed(1);
+                if (window.directionalLight) {
+                    window.directionalLight.position.set(controls.lightX, controls.lightY, controls.lightZ);
+                }
+            });
+
+            document.getElementById('light-y').addEventListener('input', (e) => {
+                controls.lightY = parseFloat(e.target.value);
+                document.getElementById('val-light-y').textContent = controls.lightY.toFixed(1);
+                if (window.directionalLight) {
+                    window.directionalLight.position.set(controls.lightX, controls.lightY, controls.lightZ);
+                }
+            });
+
+            document.getElementById('light-z').addEventListener('input', (e) => {
+                controls.lightZ = parseFloat(e.target.value);
+                document.getElementById('val-light-z').textContent = controls.lightZ.toFixed(1);
+                if (window.directionalLight) {
+                    window.directionalLight.position.set(controls.lightX, controls.lightY, controls.lightZ);
+                }
+            });
+
+            // Material sliders
+            document.getElementById('ambient').addEventListener('input', (e) => {
+                controls.ambient = parseFloat(e.target.value);
+                document.getElementById('val-ambient').textContent = controls.ambient.toFixed(2);
+                const ambientLights = scene.children.filter(c => c instanceof THREE.AmbientLight);
+                ambientLights.forEach(light => {
+                    light.intensity = controls.ambient;
+                });
+            });
+
+            document.getElementById('roughness').addEventListener('input', (e) => {
+                controls.roughness = parseFloat(e.target.value);
+                document.getElementById('val-roughness').textContent = controls.roughness.toFixed(2);
+                if (mesh.material.roughness !== undefined) {
+                    mesh.material.roughness = controls.roughness;
+                } else {
+                    mesh.material.shininess = Math.pow(2, 8 * (1 - controls.roughness));
+                }
+            });
+
+            document.getElementById('metalness').addEventListener('input', (e) => {
+                controls.metalness = parseFloat(e.target.value);
+                document.getElementById('val-metalness').textContent = controls.metalness.toFixed(2);
+                if (mesh.material.metalness !== undefined) {
+                    mesh.material.metalness = controls.metalness;
+                }
+            });
+        }
+
+        function resetParams() {
+            controls = {
+                lightX: 3,
+                lightY: 4,
+                lightZ: 4,
+                ambient: 0.3,
+                roughness: 0.5,
+                metalness: 0,
+                mode: 'flat'
+            };
+
+            document.getElementById('light-x').value = 3;
+            document.getElementById('light-y').value = 4;
+            document.getElementById('light-z').value = 4;
+            document.getElementById('val-light-x').textContent = '3.0';
+            document.getElementById('val-light-y').textContent = '4.0';
+            document.getElementById('val-light-z').textContent = '4.0';
+
+            document.getElementById('ambient').value = 0.3;
+            document.getElementById('roughness').value = 0.5;
+            document.getElementById('metalness').value = 0;
+            document.getElementById('val-ambient').textContent = '0.30';
+            document.getElementById('val-roughness').textContent = '0.50';
+            document.getElementById('val-metalness').textContent = '0.00';
+
+            if (window.directionalLight) {
+                window.directionalLight.position.set(3, 4, 4);
+            }
+            const ambientLights = scene.children.filter(c => c instanceof THREE.AmbientLight);
+            ambientLights.forEach(light => {
+                light.intensity = 0.3;
+            });
+
+            if (mesh.material.roughness !== undefined) {
+                mesh.material.roughness = 0.5;
+            } else {
+                mesh.material.shininess = Math.pow(2, 8 * 0.5);
+            }
+            if (mesh.material.metalness !== undefined) {
+                mesh.material.metalness = 0;
+            }
+
+            document.querySelectorAll('.mode-buttons button').forEach(b => b.classList.remove('active'));
+            document.querySelector('[data-mode="flat"]').classList.add('active');
+            updateDescription();
+        }
+
+        // Initialize when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            initThreeJS();
+            setupControlListeners();
+
+            // Handle theme changes
+            if (window.Wiki && typeof Wiki.onThemeChange === 'function') {
+                Wiki.onThemeChange(() => {
+                    const colors = Wiki.colors();
+                    renderer.setClearColor(colors.bg_secondary, 1);
+                });
+            }
+        });
+    </script>
+</body>
+</html>

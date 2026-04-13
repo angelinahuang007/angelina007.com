@@ -1,0 +1,10 @@
+{
+  "title": "Shortcuts & Tips",
+  "category": "game-engines/unity",
+  "tags": ["unity", "shortcuts", "keyboard", "tips", "workflow", "editor"],
+  "description": "Interactive keyboard reference for Unity Editor. Toggle modes, search shortcuts, and see animated workflow demos.",
+  "related": [
+    "game-engines/unreal/shortcuts-tips"
+  ],
+  "order": 5
+}

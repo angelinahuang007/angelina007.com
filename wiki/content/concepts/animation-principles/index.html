@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>12 Disney Animation Principles</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        body {
+            background-color: var(--bg, #0f0f14);
+            color: var(--text, #e5e7eb);
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        h1 {
+            margin-bottom: 12px;
+            font-size: 2.5em;
+            font-weight: 700;
+        }
+
+        .intro {
+            font-size: 1.05em;
+            color: var(--text-muted);
+            margin-bottom: 40px;
+            line-height: 1.6;
+        }
+
+        .principles-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 24px;
+            margin-bottom: 40px;
+        }
+
+        @media (min-width: 768px) {
+            .principles-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+
+        @media (max-width: 767px) {
+            .principles-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        .principle-box {
+            background-color: var(--bg-secondary, #1a1a24);
+            border: 1px solid var(--border-strong, #333);
+            border-radius: 8px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .principle-box:hover {
+            border-color: var(--accent, #6366f1);
+        }
+
+        .principle-title {
+            font-weight: 600;
+            font-size: 0.95em;
+            color: var(--accent, #6366f1);
+            margin: 0;
+        }
+
+        .principle-desc {
+            font-size: 0.85em;
+            color: var(--text-muted, #9ca3af);
+            line-height: 1.4;
+            margin: 0;
+        }
+
+        canvas {
+            border: 1px solid var(--border-strong, #333);
+            background-color: var(--canvas-bg, #16161e);
+            border-radius: 4px;
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>12 Disney Animation Principles</h1>
+        <p class="intro">
+            The twelve principles of animation form the foundation of character animation. Watch all principles animate simultaneously in the grid below to compare and understand how each creates believable motion.
+        </p>
+
+        <div class="principles-grid" id="principlesGrid"></div>
+    </div>
+
+    <script>
+        // Define all 12 principles with descriptions
+        const principles = [
+            {
+                id: 'squash-stretch',
+                name: 'Squash & Stretch',
+                desc: 'Deform shapes to show weight and impact, creating flexibility and life.'
+            },
+            {
+                id: 'anticipation',
+                name: 'Anticipation',
+                desc: 'Wind up before action to prepare the audience for what\'s coming next.'
+            },
+            {
+                id: 'staging',
+                name: 'Staging',
+                desc: 'Clearly present ideas through positioning and lighting to guide focus.'
+            },
+            {
+                id: 'straight-ahead',
+                name: 'Straight Ahead / Pose to Pose',
+                desc: 'Two animation techniques: frame-by-frame drawing vs. key frame planning.'
+            },
+            {
+                id: 'follow-through',
+                name: 'Follow Through & Overlapping',
+                desc: 'Different body parts finish moving at different times, creating flow.'
+            },
+            {
+                id: 'slow-in-out',
+                name: 'Slow In / Slow Out',
+                desc: 'Add easing to motion for natural acceleration and deceleration.'
+            },
+            {
+                id: 'arc',
+                name: 'Arc',
+                desc: 'Use curved paths instead of straight lines for appealing movement.'
+            },
+            {
+                id: 'secondary-action',
+                name: 'Secondary Action',
+                desc: 'Add supporting movements that enhance the primary action.'
+            },
+            {
+                id: 'timing',
+                name: 'Timing',
+                desc: 'Control speed and spacing of frames to convey weight and emotion.'
+            },
+            {
+                id: 'exaggeration',
+                name: 'Exaggeration',
+                desc: 'Push poses and movements beyond reality for impact and appeal.'
+            },
+            {
+                id: 'solid-drawing',
+                name: 'Solid Drawing',
+                desc: 'Maintain consistent proportions and three-dimensional form.'
+            },
+            {
+                id: 'appeal',
+                name: 'Appeal',
+                desc: 'Design characters with charm and appeal that engage the audience.'
+            }
+        ];
+
+        // Create grid and canvases
+        const grid = document.getElementById('principlesGrid');
+        const canvases = {};
+
+        principles.forEach((principle) => {
+            const box = document.createElement('div');
+            box.className = 'principle-box';
+            box.innerHTML = `
+                <h3 class="principle-title">${principle.name}</h3>
+                <p class="principle-desc">${principle.desc}</p>
+                <canvas id="canvas-${principle.id}" width="200" height="160"></canvas>
+            `;
+            grid.appendChild(box);
+            canvases[principle.id] = document.getElementById(`canvas-${principle.id}`);
+        });
+
+        // Global animation state
+        let time = 0;
+        const animationDuration = 4000; // 4 seconds per cycle, continuous loop (no pause)
+
+        function easeInOutCubic(t) {
+            return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+        }
+
+        function easeOutQuad(t) {
+            return 1 - (1 - t) * (1 - t);
+        }
+
+        function easeInQuad(t) {
+            return t * t;
+        }
+
+        // Draw individual principle animation
+        function drawPrinciple(canvasId, principleId, cyclePhase) {
+            const canvas = canvases[principleId];
+            if (!canvas) return;
+
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width;
+            const h = canvas.height;
+            const centerX = w / 2;
+            const centerY = h / 2;
+
+            // Clear canvas with theme-aware bg
+            const c = Wiki.colors();
+            ctx.fillStyle = c.canvasBg;
+            ctx.fillRect(0, 0, w, h);
+
+            // Continuous motion (0 to 1, loops)
+            const motionT = cyclePhase;
+
+            switch (principleId) {
+                case 'squash-stretch': {
+                    // Ball bouncing with squash and stretch
+                    const bounceT = easeOutQuad(motionT);
+                    const y = centerY + 30 - bounceT * 50;
+                    const squash = 1 + Math.sin(motionT * Math.PI) * 0.3;
+                    const stretch = 1 - Math.sin(motionT * Math.PI) * 0.3;
+
+                    ctx.save();
+                    ctx.translate(centerX, y);
+                    ctx.scale(stretch, squash);
+                    ctx.fillStyle = '#ef4444';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 12, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                    break;
+                }
+
+                case 'anticipation': {
+                    // Ball winds up then jumps
+                    let x = centerX;
+                    let y = centerY + 20;
+                    if (motionT < 0.3) {
+                        // Wind up phase
+                        x = centerX - (motionT / 0.3) * 15;
+                        y = centerY + 20 + (motionT / 0.3) * 8;
+                    } else {
+                        // Jump phase
+                        const jumpT = (motionT - 0.3) / 0.7;
+                        y = centerY + 20 - easeOutQuad(jumpT) * 45;
+                    }
+
+                    ctx.fillStyle = '#f97316';
+                    ctx.beginPath();
+                    ctx.arc(x, y, 12, 0, Math.PI * 2);
+                    ctx.fill();
+                    break;
+                }
+
+                case 'staging': {
+                    // Ball with spotlight effect
+                    const x = centerX + Math.sin(motionT * Math.PI) * 30;
+                    const y = centerY;
+
+                    // Spotlight/vignette
+                    const gradient = ctx.createRadialGradient(x, y, 5, x, y, 50);
+                    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.2)');
+                    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(0, 0, w, h);
+
+                    // Ball
+                    ctx.fillStyle = '#eab308';
+                    ctx.beginPath();
+                    ctx.arc(x, y, 12, 0, Math.PI * 2);
+                    ctx.fill();
+                    break;
+                }
+
+                case 'straight-ahead': {
+                    // Split screen: left=straight ahead, right=pose to pose
+                    const midX = w / 2;
+
+                    // Left side: straight ahead (smooth)
+                    const y1 = centerY + (Math.sin(motionT * Math.PI * 2) * 20);
+                    ctx.fillStyle = '#06b6d4';
+                    ctx.beginPath();
+                    ctx.arc(midX * 0.5, y1, 10, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Right side: pose to pose (stepped)
+                    let y2 = centerY + 20;
+                    if (motionT < 0.5) {
+                        y2 = centerY - 20;
+                    }
+                    ctx.fillStyle = '#8b5cf6';
+                    ctx.beginPath();
+                    ctx.arc(midX * 1.5, y2, 10, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Dividing line
+                    ctx.strokeStyle = '#444';
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([4, 4]);
+                    ctx.beginPath();
+                    ctx.moveTo(midX, 20);
+                    ctx.lineTo(midX, h - 20);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    break;
+                }
+
+                case 'follow-through': {
+                    // Character body with tail following
+                    const bodyX = centerX + Math.sin(motionT * Math.PI) * 30;
+                    const bodyY = centerY;
+                    const delay = 0.3;
+                    const tailPhase = Math.max(0, motionT - delay);
+                    const tailX = centerX + Math.sin(tailPhase * Math.PI) * 30;
+                    const tailY = centerY + 20;
+
+                    // Body
+                    ctx.fillStyle = '#10b981';
+                    ctx.beginPath();
+                    ctx.arc(bodyX, bodyY, 12, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Tail (follows behind)
+                    ctx.fillStyle = '#059669';
+                    ctx.beginPath();
+                    ctx.arc(tailX, tailY, 8, 0, Math.PI * 2);
+                    ctx.fill();
+                    break;
+                }
+
+                case 'slow-in-out': {
+                    // Compare eased vs linear
+                    const midX = w / 2;
+
+                    // Left: eased motion
+                    const easedX = centerX * 0.5 + easeInOutCubic(motionT) * 40;
+                    ctx.fillStyle = '#ec4899';
+                    ctx.beginPath();
+                    ctx.arc(easedX, centerY - 15, 10, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Right: linear motion
+                    const linearX = centerX * 1.5 + motionT * 40;
+                    ctx.fillStyle = '#a78bfa';
+                    ctx.beginPath();
+                    ctx.arc(linearX, centerY + 15, 10, 0, Math.PI * 2);
+                    ctx.fill();
+                    break;
+                }
+
+                case 'arc': {
+                    // Ball following curved arc path
+                    const x = centerX - 40 + motionT * 80;
+                    const arcHeight = Math.sin(motionT * Math.PI) * 40;
+                    const y = centerY + arcHeight;
+
+                    ctx.fillStyle = '#14b8a6';
+                    ctx.beginPath();
+                    ctx.arc(x, y, 12, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Draw arc path (faint)
+                    ctx.strokeStyle = 'rgba(20, 184, 166, 0.2)';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    for (let t = 0; t <= 1; t += 0.05) {
+                        const px = centerX - 40 + t * 80;
+                        const py = centerY + Math.sin(t * Math.PI) * 40;
+                        if (t === 0) ctx.moveTo(px, py);
+                        else ctx.lineTo(px, py);
+                    }
+                    ctx.stroke();
+                    break;
+                }
+
+                case 'secondary-action': {
+                    // Walking figure with arm swing
+                    const bodyX = centerX + (motionT - 0.5) * 60;
+                    const bodyY = centerY;
+                    const legPhase = motionT * 4;
+                    const legOffset = Math.sin(legPhase * Math.PI) * 10;
+                    const armOffset = Math.sin((legPhase + 0.5) * Math.PI) * 15;
+
+                    // Body
+                    ctx.fillStyle = '#3b82f6';
+                    ctx.beginPath();
+                    ctx.arc(bodyX, bodyY, 10, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Leg
+                    ctx.fillStyle = '#1e40af';
+                    ctx.beginPath();
+                    ctx.arc(bodyX - 5, bodyY + 16 + legOffset, 6, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Arm (secondary action)
+                    ctx.fillStyle = '#60a5fa';
+                    ctx.beginPath();
+                    ctx.arc(bodyX + 12, bodyY - 5 + armOffset, 6, 0, Math.PI * 2);
+                    ctx.fill();
+                    break;
+                }
+
+                case 'timing': {
+                    // Fast vs slow balls
+                    const midX = w / 2;
+
+                    // Left: fast ball
+                    const fastX = centerX * 0.5 + motionT * 60;
+                    ctx.fillStyle = '#f59e0b';
+                    ctx.beginPath();
+                    ctx.arc(fastX, centerY - 15, 10, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Right: slow ball
+                    const slowT = motionT * 0.4;
+                    const slowX = centerX * 1.5 + slowT * 60;
+                    ctx.fillStyle = '#f59e0b';
+                    ctx.fillStyle = '#fbbf24';
+                    ctx.beginPath();
+                    ctx.arc(slowX, centerY + 15, 10, 0, Math.PI * 2);
+                    ctx.fill();
+                    break;
+                }
+
+                case 'exaggeration': {
+                    // Ball with exaggerated squash on impact
+                    const baseY = centerY + 30;
+                    const impactStart = 0.7;
+                    let y = baseY;
+                    let scale = 1;
+
+                    if (motionT < impactStart) {
+                        y = baseY - easeOutQuad(motionT / impactStart) * 50;
+                    } else {
+                        // Extreme squash on impact
+                        const impactT = (motionT - impactStart) / (1 - impactStart);
+                        scale = 1 - easeOutQuad(impactT) * 0.5;
+                    }
+
+                    ctx.save();
+                    ctx.translate(centerX, y);
+                    ctx.scale(1 + (1 - scale) * 0.3, scale);
+                    ctx.fillStyle = '#dc2626';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 12, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                    break;
+                }
+
+                case 'solid-drawing': {
+                    // 3D sphere with highlight
+                    ctx.fillStyle = '#6366f1';
+                    ctx.beginPath();
+                    ctx.arc(centerX, centerY + Math.sin(motionT * Math.PI * 2) * 5, 14, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Shading
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                    ctx.beginPath();
+                    ctx.arc(centerX + 5, centerY + 5 + Math.sin(motionT * Math.PI * 2) * 5, 8, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Highlight
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+                    ctx.beginPath();
+                    ctx.arc(centerX - 5, centerY - 5 + Math.sin(motionT * Math.PI * 2) * 5, 5, 0, Math.PI * 2);
+                    ctx.fill();
+                    break;
+                }
+
+                case 'appeal': {
+                    // Cute bouncy character vs rigid one
+                    const midX = w / 2;
+
+                    // Left: appealing (bouncy, round)
+                    const appealing_y = centerY - easeOutQuad(motionT) * 30;
+                    ctx.fillStyle = '#ec4899';
+                    ctx.beginPath();
+                    ctx.arc(centerX * 0.5, appealing_y, 14, 0, Math.PI * 2);
+                    ctx.fill();
+                    // Eyes
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(centerX * 0.5 - 5, appealing_y - 3, 2, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(centerX * 0.5 + 5, appealing_y - 3, 2, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Right: rigid (blocky, stiff)
+                    const rigid_y = centerY - easeInQuad(motionT) * 30;
+                    ctx.fillStyle = '#9ca3af';
+                    ctx.fillRect(centerX * 1.5 - 10, rigid_y - 10, 20, 20);
+                    break;
+                }
+            }
+        }
+
+        // Main animation loop
+        function animate() {
+            time += 16; // ~60fps
+            const cycleTime = time % animationDuration;
+            const cyclePhase = cycleTime / animationDuration;
+
+            principles.forEach((principle) => {
+                drawPrinciple(principle.id, principle.id, cyclePhase);
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+    </script>
+</body>
+</html>

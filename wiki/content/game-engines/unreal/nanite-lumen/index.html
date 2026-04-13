@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unreal Nanite & Lumen</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        body { background: var(--bg-primary); color: var(--text-primary); font-family: 'Space+Grotesk', sans-serif; }
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        .controls { display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap; }
+        button { padding: 0.5rem 1rem; border: 2px solid var(--accent-primary); background: var(--bg-secondary); color: var(--text-primary); cursor: pointer; border-radius: 4px; font-weight: 600; transition: all 0.3s; }
+        button.active { background: var(--accent-primary); color: var(--bg-primary); }
+        button:hover { transform: translateY(-2px); }
+        .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+        #lumenCanvas { border: 2px solid var(--accent-primary); border-radius: 8px; background: var(--bg-secondary); cursor: move; }
+        .info-panel { background: var(--bg-secondary); padding: 1.5rem; border-radius: 8px; border: 1px solid var(--accent-secondary); }
+        .info-panel h3 { margin-top: 0; color: var(--accent-primary); }
+        .control-group { margin-bottom: 1.5rem; }
+        .control-group label { display: block; margin-bottom: 0.5rem; font-weight: 600; }
+        input[type="range"] { width: 100%; cursor: pointer; }
+        .stat-item { padding: 0.75rem; margin: 0.5rem 0; background: var(--bg-primary); border-left: 4px solid var(--accent-primary); border-radius: 4px; font-size: 0.9rem; }
+        @media (max-width: 768px) { .layout { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Lumen Global Illumination</h1>
+        <p>Interactive visualization of light bouncing and global illumination modes in Lumen.</p>
+
+        <div class="controls">
+            <button id="screenTracesBtn" class="active">Screen Traces</button>
+            <button id="meshSDFBtn">Mesh SDF</button>
+            <button id="hardwareRTBtn">Hardware RT</button>
+        </div>
+
+        <div class="layout">
+            <div>
+                <canvas id="lumenCanvas" width="550" height="500"></canvas>
+                <p style="font-size: 0.85rem; color: var(--text-secondary); text-align: center; margin-top: 0.5rem;">Drag light source to move</p>
+            </div>
+
+            <div class="info-panel">
+                <h3>Lumen Settings</h3>
+                <div class="control-group">
+                    <label>Light Intensity</label>
+                    <input type="range" id="lightIntensity" min="0.5" max="2" step="0.1" value="1">
+                    <span id="lightIntensityVal">1.0</span>
+                </div>
+                <div class="control-group">
+                    <label>GI Bounces</label>
+                    <input type="range" id="bounces" min="1" max="5" step="1" value="3">
+                    <span id="bouncesVal">3</span>
+                </div>
+                <div class="control-group">
+                    <label>Distance Field Resolution</label>
+                    <input type="range" id="dfResolution" min="1" max="10" step="1" value="5">
+                    <span id="dfResVal">5</span>
+                </div>
+
+                <h3 style="margin-top: 2rem;">Mode Information</h3>
+                <div class="stat-item" id="modeInfo">Screen Traces: Fast but limited range</div>
+
+                <h3 style="margin-top: 1.5rem;">Performance</h3>
+                <div class="stat-item">GI Update: <span id="giUpdate">8.5ms</span></div>
+                <div class="stat-item">Quality: <span id="giQuality">High</span></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { colors, onThemeChange } = Wiki;
+        const canvas = document.getElementById('lumenCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let lightX = 450;
+        let lightY = 150;
+        let draggingLight = false;
+        let traceMode = 'screenTraces';
+        let giIntensity = 1.0;
+        let maxBounces = 3;
+        let dfResolution = 5;
+        let animationTime = 0;
+
+        // Room geometry
+        const walls = [
+            { x: 50, y: 50, w: 500, h: 20, color: '#4a4a6a' },      // Top
+            { x: 50, y: 430, w: 500, h: 20, color: '#3a3a5a' },     // Bottom
+            { x: 50, y: 70, w: 20, h: 360, color: '#3a5a6a' },      // Left
+            { x: 530, y: 70, w: 20, h: 360, color: '#6a5a3a' }      // Right
+        ];
+
+        const objects = [
+            { x: 150, y: 200, w: 80, h: 80, color: '#6a4a4a' },
+            { x: 350, y: 250, w: 100, h: 60, color: '#4a6a4a' }
+        ];
+
+        function getThemeColors() {
+            const theme = colors();
+            return {
+                bg: theme['bg-primary'],
+                text: theme['text-primary'],
+                accent: theme['accent-primary'],
+                secondary: theme['accent-secondary']
+            };
+        }
+
+        function drawLumen() {
+            const theme = getThemeColors();
+            ctx.fillStyle = '#0a0a1a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw walls
+            walls.forEach(wall => {
+                ctx.fillStyle = wall.color;
+                ctx.fillRect(wall.x, wall.y, wall.w, wall.h);
+            });
+
+            // Draw objects
+            objects.forEach(obj => {
+                ctx.fillStyle = obj.color;
+                ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
+            });
+
+            // Direct light
+            const directGradient = ctx.createRadialGradient(lightX, lightY, 0, lightX, lightY, 200);
+            directGradient.addColorStop(0, `rgba(255, 255, 200, ${giIntensity * 0.6})`);
+            directGradient.addColorStop(1, `rgba(255, 200, 100, 0)`);
+            ctx.fillStyle = directGradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw traces based on mode
+            if (traceMode === 'screenTraces') {
+                ctx.strokeStyle = theme.accent + '66';
+                ctx.lineWidth = 1;
+                for (let i = 0; i < 8; i++) {
+                    const angle = (i / 8) * Math.PI * 2 + animationTime * 0.02;
+                    ctx.beginPath();
+                    ctx.moveTo(lightX, lightY);
+                    ctx.lineTo(lightX + Math.cos(angle) * 150, lightY + Math.sin(angle) * 150);
+                    ctx.stroke();
+                }
+            }
+
+            // Global illumination bounces
+            for (let bounce = 1; bounce <= maxBounces; bounce++) {
+                const bounceIntensity = giIntensity * Math.pow(0.7, bounce);
+                if (bounceIntensity < 0.05) break;
+
+                const bounceGradient = ctx.createRadialGradient(lightX, lightY, 0, lightX, lightY, 250 - bounce * 30);
+                const baseHue = 60 - bounce * 15;
+                bounceGradient.addColorStop(0, `hsla(${baseHue}, 70%, 50%, ${bounceIntensity * 0.3})`);
+                bounceGradient.addColorStop(1, `hsla(${baseHue}, 70%, 30%, 0)`);
+                ctx.fillStyle = bounceGradient;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+
+            // Mesh SDF visualization
+            if (traceMode === 'meshSDF') {
+                ctx.strokeStyle = theme.accent + '33';
+                ctx.lineWidth = 1;
+                for (let x = 50; x < 550; x += 40) {
+                    for (let y = 50; y < 430; y += 40) {
+                        let minDist = 300;
+                        walls.forEach(wall => {
+                            const dx = Math.max(wall.x - x, 0, x - (wall.x + wall.w));
+                            const dy = Math.max(wall.y - y, 0, y - (wall.y + wall.h));
+                            const dist = Math.sqrt(dx*dx + dy*dy);
+                            minDist = Math.min(minDist, dist);
+                        });
+                        objects.forEach(obj => {
+                            const dx = Math.max(obj.x - x, 0, x - (obj.x + obj.w));
+                            const dy = Math.max(obj.y - y, 0, y - (obj.y + obj.h));
+                            const dist = Math.sqrt(dx*dx + dy*dy);
+                            minDist = Math.min(minDist, dist);
+                        });
+                        const intensity = Math.max(0, 1 - minDist / 100);
+                        if (intensity > 0.1) {
+                            ctx.fillStyle = `rgba(100, 200, 255, ${intensity * 0.2})`;
+                            ctx.fillRect(x - 5, y - 5, 10, 10);
+                        }
+                    }
+                }
+            }
+
+            // Hardware RT mode
+            if (traceMode === 'hardwareRT') {
+                ctx.strokeStyle = theme.accent;
+                ctx.lineWidth = 1.5;
+                const rayCount = 16;
+                for (let i = 0; i < rayCount; i++) {
+                    const angle = (i / rayCount) * Math.PI * 2;
+                    const rayDist = 180;
+                    const endX = lightX + Math.cos(angle) * rayDist;
+                    const endY = lightY + Math.sin(angle) * rayDist;
+
+                    ctx.beginPath();
+                    ctx.moveTo(lightX, lightY);
+                    ctx.lineTo(endX, endY);
+                    ctx.stroke();
+                }
+            }
+
+            // Light source
+            ctx.fillStyle = '#FFFFC8';
+            ctx.beginPath();
+            ctx.arc(lightX, lightY, 8, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = theme.accent;
+            ctx.font = '10px Space+Mono';
+            ctx.textAlign = 'center';
+            ctx.fillText('Light', lightX, lightY + 20);
+
+            animationTime++;
+            requestAnimationFrame(drawLumen);
+        }
+
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            if (Math.sqrt((x - lightX)**2 + (y - lightY)**2) < 15) {
+                draggingLight = true;
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (draggingLight) {
+                const rect = canvas.getBoundingClientRect();
+                lightX = Math.max(60, Math.min(540, e.clientX - rect.left));
+                lightY = Math.max(70, Math.min(420, e.clientY - rect.top));
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            draggingLight = false;
+        });
+
+        document.getElementById('screenTracesBtn').addEventListener('click', () => {
+            traceMode = 'screenTraces';
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('screenTracesBtn').classList.add('active');
+            document.getElementById('modeInfo').textContent = 'Screen Traces: Fast but limited to visible surfaces';
+            document.getElementById('giUpdate').textContent = '4.2ms';
+            document.getElementById('giQuality').textContent = 'Medium';
+        });
+
+        document.getElementById('meshSDFBtn').addEventListener('click', () => {
+            traceMode = 'meshSDF';
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('meshSDFBtn').classList.add('active');
+            document.getElementById('modeInfo').textContent = 'Mesh SDF: Medium range, good for interiors';
+            document.getElementById('giUpdate').textContent = '6.8ms';
+            document.getElementById('giQuality').textContent = 'High';
+        });
+
+        document.getElementById('hardwareRTBtn').addEventListener('click', () => {
+            traceMode = 'hardwareRT';
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('hardwareRTBtn').classList.add('active');
+            document.getElementById('modeInfo').textContent = 'Hardware RT: Full accuracy, best quality';
+            document.getElementById('giUpdate').textContent = '8.5ms';
+            document.getElementById('giQuality').textContent = 'Ultra';
+        });
+
+        document.getElementById('lightIntensity').addEventListener('input', (e) => {
+            giIntensity = parseFloat(e.target.value);
+            document.getElementById('lightIntensityVal').textContent = giIntensity.toFixed(1);
+        });
+
+        document.getElementById('bounces').addEventListener('input', (e) => {
+            maxBounces = parseInt(e.target.value);
+            document.getElementById('bouncesVal').textContent = maxBounces;
+        });
+
+        document.getElementById('dfResolution').addEventListener('input', (e) => {
+            dfResolution = parseInt(e.target.value);
+            document.getElementById('dfResVal').textContent = dfResolution;
+        });
+
+        onThemeChange(() => {
+            drawLumen();
+        });
+
+        drawLumen();
+    </script>
+</body>
+</html>

@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Building Visualization</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        body { background: var(--bg-dark); color: var(--fg-light); }
+        .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+        .controls { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; align-items: center; }
+        button { padding: 8px 16px; background: var(--accent); color: var(--bg-dark); border: none; border-radius: 4px; cursor: pointer; font-family: 'Space Mono'; font-weight: 700; }
+        button.active { background: var(--accent-alt); }
+        button:hover { opacity: 0.8; }
+        #canvas { border: 1px solid var(--fg-dark); background: var(--bg-darker); display: block; margin: 0 auto; }
+        .info { font-size: 0.9em; color: var(--fg-muted); margin-top: 10px; font-family: 'Space Mono'; }
+        .slider-group { display: flex; gap: 10px; align-items: center; }
+        input[type="range"] { min-width: 200px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>3D Building Visualization</h1>
+        <p>Interactive isometric view of building with real-time heatmap overlays and 24-hour timeline.</p>
+
+        <div class="controls">
+            <button id="tempBtn" class="active">Temperature</button>
+            <button id="occupancyBtn">Occupancy</button>
+            <button id="energyBtn">Energy</button>
+            <div class="slider-group">
+                <label>Time:</label>
+                <input type="range" id="timeSlider" min="0" max="23" value="12">
+                <span id="timeLabel">12:00</span>
+            </div>
+        </div>
+
+        <canvas id="canvas" width="800" height="500"></canvas>
+        <div class="info" id="info">Click floors to highlight. Drag time slider to see 24-hour patterns.</div>
+    </div>
+
+    <script>
+        const canvas = Wiki.createCanvas('canvas', 800, 500);
+        const ctx = canvas.getContext('2d');
+        let currentDataLayer = 'temperature';
+        let selectedFloor = null;
+        let timeOfDay = 12;
+
+        const floors = [
+            { name: 'Ground Floor', level: 0, rooms: ['Lobby', 'Cafeteria', 'Restrooms'] },
+            { name: 'Floor 1', level: 1, rooms: ['Office A', 'Office B', 'Meeting'] },
+            { name: 'Floor 2', level: 2, rooms: ['Lab', 'Storage', 'Office C'] },
+            { name: 'Roof', level: 3, rooms: ['HVAC', 'Solar Panels'] }
+        ];
+
+        function getDataValue(floor, dataType, time) {
+            const baseValues = {
+                temperature: { 0: 22, 1: 21, 2: 20, 3: 15 },
+                occupancy: { 0: 50, 1: 80, 2: 60, 3: 0 },
+                energy: { 0: 400, 1: 350, 2: 300, 3: 200 }
+            };
+
+            const base = baseValues[dataType][floor.level];
+            const hourVariation = Math.sin((time - 6) / 18 * Math.PI) * 10;
+            const variance = (floor.level + 1) * Math.sin(time / 12) * 5;
+            return Math.max(0, base + hourVariation + variance);
+        }
+
+        function valueToColor(value, dataType) {
+            let normalized = 0;
+            if (dataType === 'temperature') {
+                normalized = (value - 15) / 15; // 15-30C
+            } else if (dataType === 'occupancy') {
+                normalized = value / 100;
+            } else if (dataType === 'energy') {
+                normalized = value / 500;
+            }
+            normalized = Math.max(0, Math.min(1, normalized));
+            const hue = (1 - normalized) * 240; // Red to Blue
+            return `hsl(${hue}, 100%, 50%)`;
+        }
+
+        function drawIsometricBuilding() {
+            const baseX = 200;
+            const baseY = 400;
+            const floorWidth = 120;
+            const floorHeight = 80;
+            const isometricSlant = 0.5;
+
+            floors.forEach((floor, idx) => {
+                const y = baseY - idx * 100;
+                const x = baseX;
+
+                // Draw floor box (isometric)
+                const topLeftX = x;
+                const topLeftY = y - floorHeight;
+                const topRightX = x + floorWidth;
+                const topRightY = y - floorHeight;
+                const bottomRightX = x + floorWidth + floorWidth * isometricSlant;
+                const bottomRightY = y + floorHeight * isometricSlant;
+                const bottomLeftX = x + floorWidth * isometricSlant;
+                const bottomLeftY = y + floorHeight * isometricSlant;
+
+                // Get average value for this floor
+                let avgValue = 0;
+                floor.rooms.forEach(room => {
+                    avgValue += getDataValue(floor, currentDataLayer, timeOfDay);
+                });
+                avgValue /= floor.rooms.length;
+                const floorColor = valueToColor(avgValue, currentDataLayer);
+
+                // Draw top face
+                ctx.fillStyle = floorColor;
+                ctx.globalAlpha = 0.6;
+                ctx.beginPath();
+                ctx.moveTo(topLeftX, topLeftY);
+                ctx.lineTo(topRightX, topRightY);
+                ctx.lineTo(bottomRightX, bottomRightY);
+                ctx.lineTo(bottomLeftX, bottomLeftY);
+                ctx.closePath();
+                ctx.fill();
+                ctx.globalAlpha = 1;
+
+                // Draw outline
+                ctx.strokeStyle = selectedFloor === idx ? '#ffe66d' : floorColor;
+                ctx.lineWidth = selectedFloor === idx ? 3 : 2;
+                ctx.beginPath();
+                ctx.moveTo(topLeftX, topLeftY);
+                ctx.lineTo(topRightX, topRightY);
+                ctx.lineTo(bottomRightX, bottomRightY);
+                ctx.lineTo(bottomLeftX, bottomLeftY);
+                ctx.closePath();
+                ctx.stroke();
+
+                // Draw right face
+                ctx.fillStyle = floorColor;
+                ctx.globalAlpha = 0.4;
+                ctx.beginPath();
+                ctx.moveTo(topRightX, topRightY);
+                ctx.lineTo(bottomRightX, bottomRightY);
+                ctx.lineTo(bottomRightX, bottomRightY + 50);
+                ctx.lineTo(topRightX, topRightY + 50);
+                ctx.closePath();
+                ctx.fill();
+                ctx.globalAlpha = 1;
+
+                // Floor label
+                ctx.fillStyle = floorColor;
+                ctx.font = 'bold 11px Space Mono';
+                ctx.textAlign = 'center';
+                ctx.fillText(floor.name, x + floorWidth / 2, y - 10);
+                ctx.font = '9px Space Mono';
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                ctx.fillText(Math.round(avgValue) + (currentDataLayer === 'temperature' ? '°C' : '%'), x + floorWidth / 2, y + 10);
+            });
+        }
+
+        function draw() {
+            ctx.fillStyle = Wiki.colors().bg;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = Wiki.colors().fg;
+            ctx.font = 'bold 18px Space Grotesk';
+            ctx.fillText('Building Visualization', 20, 30);
+
+            ctx.font = '12px Space Mono';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.fillText(`Layer: ${currentDataLayer.charAt(0).toUpperCase() + currentDataLayer.slice(1)} | Time: ${String(timeOfDay).padStart(2, '0')}:00`, 20, 55);
+
+            drawIsometricBuilding();
+
+            // Legend
+            const legendX = 550;
+            const legendY = 150;
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.fillRect(legendX, legendY, 300, 200);
+            ctx.strokeStyle = '#888';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(legendX, legendY, 300, 200);
+
+            ctx.fillStyle = Wiki.colors().text;
+            ctx.font = 'bold 12px Space Grotesk';
+            ctx.fillText('Data Range', legendX + 10, legendY + 20);
+
+            let rangeLabel = '';
+            if (currentDataLayer === 'temperature') {
+                rangeLabel = '15°C ← → 30°C';
+            } else if (currentDataLayer === 'occupancy') {
+                rangeLabel = '0% ← → 100%';
+            } else if (currentDataLayer === 'energy') {
+                rangeLabel = '0W ← → 500W';
+            }
+
+            ctx.font = '11px Space Mono';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+
+            // Color gradient
+            for (let i = 0; i < 10; i++) {
+                const normVal = i / 10;
+                const hue = (1 - normVal) * 240;
+                ctx.fillStyle = `hsl(${hue}, 100%, 50%)`;
+                ctx.fillRect(legendX + 10 + i * 28, legendY + 40, 28, 20);
+            }
+
+            ctx.fillStyle = Wiki.colors().text;
+            ctx.font = '10px Space Mono';
+            ctx.fillText('Cold', legendX + 10, legendY + 70);
+            ctx.textAlign = 'right';
+            ctx.fillText('Hot', legendX + 290, legendY + 70);
+
+            ctx.textAlign = 'left';
+            ctx.fillText(rangeLabel, legendX + 10, legendY + 90);
+
+            ctx.strokeStyle = Wiki.colors().fg;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(0, 0, canvas.width, canvas.height);
+        }
+
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+
+            floors.forEach((floor, idx) => {
+                const y = 400 - idx * 100;
+                const x = 200;
+                const floorWidth = 120;
+                const floorHeight = 80;
+
+                if (clickX >= x && clickX <= x + floorWidth &&
+                    clickY >= y - floorHeight && clickY <= y + floorHeight) {
+                    selectedFloor = selectedFloor === idx ? null : idx;
+                }
+            });
+            draw();
+        });
+
+        document.getElementById('tempBtn').addEventListener('click', () => {
+            currentDataLayer = 'temperature';
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('tempBtn').classList.add('active');
+            draw();
+        });
+
+        document.getElementById('occupancyBtn').addEventListener('click', () => {
+            currentDataLayer = 'occupancy';
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('occupancyBtn').classList.add('active');
+            draw();
+        });
+
+        document.getElementById('energyBtn').addEventListener('click', () => {
+            currentDataLayer = 'energy';
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('energyBtn').classList.add('active');
+            draw();
+        });
+
+        document.getElementById('timeSlider').addEventListener('input', (e) => {
+            timeOfDay = parseInt(e.target.value);
+            document.getElementById('timeLabel').textContent = String(timeOfDay).padStart(2, '0') + ':00';
+            draw();
+        });
+
+        draw();
+    </script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+{
+  "title": "Real-Time Rendering Pipeline Architecture",
+  "category": "graphics-fundamentals",
+  "tags": [
+    "rendering-pipeline",
+    "deferred-rendering",
+    "forward-rendering",
+    "tiled-rendering",
+    "post-processing",
+    "render-graph"
+  ],
+  "description": "Modern GPU rendering architectures including deferred vs forward rendering, tiled/clustered approaches, G-buffer, screen-space effects, HDR, tonemapping, bloom, and render graph patterns.",
+  "related": [
+    "graphics-fundamentals/rasterization-pipeline",
+    "game-engines/unreal/nanite-lumen",
+    "frontier/realtime-gi"
+  ],
+  "order": 12
+}

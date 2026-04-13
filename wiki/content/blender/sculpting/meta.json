@@ -1,0 +1,18 @@
+{
+  "title": "Blender Sculpting and Retopology",
+  "category": "blender",
+  "order": 4,
+  "tags": [
+    "blender",
+    "sculpting",
+    "multires",
+    "dyntopo",
+    "baking"
+  ],
+  "description": "Comprehensive guide to Blender's sculpting tools, multires and dynamic topology workflows, masking and face sets, texture baking, and comparison with ZBrush approaches.",
+  "related": [
+    "blender/modeling-workflow",
+    "graphics-fundamentals/mesh-operations",
+    "graphics-fundamentals/texture-mapping"
+  ]
+}

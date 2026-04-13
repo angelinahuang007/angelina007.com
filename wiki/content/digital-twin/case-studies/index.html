@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Twin Case Studies</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        body { background: var(--bg-dark); color: var(--fg-light); }
+        .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+        .controls { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+        button { padding: 8px 16px; background: var(--accent); color: var(--bg-dark); border: none; border-radius: 4px; cursor: pointer; font-family: 'Space Mono'; font-weight: 700; }
+        button.active { background: var(--accent-alt); }
+        button:hover { opacity: 0.8; }
+        #canvas { border: 1px solid var(--fg-dark); background: var(--bg-darker); display: block; margin: 0 auto; }
+        .info { font-size: 0.9em; color: var(--fg-muted); margin-top: 10px; font-family: 'Space Mono'; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Digital Twin Case Studies</h1>
+        <p>Real-world examples with before/after metrics and lessons learned.</p>
+
+        <div class="controls">
+            <button id="buildingBtn" class="active">Smart Building</button>
+            <button id="factoryBtn">Manufacturing</button>
+            <button id="cityBtn">Urban Planning</button>
+            <button id="beforeAfterBtn">Before/After</button>
+        </div>
+
+        <canvas id="canvas" width="800" height="500"></canvas>
+        <div class="info" id="info">Click on metrics or sections for details. Toggle before/after comparison.</div>
+    </div>
+
+    <script>
+        const canvas = Wiki.createCanvas('canvas', 800, 500);
+        const ctx = canvas.getContext('2d');
+        let currentCase = 'building';
+        let showBefore = true;
+        let expandedSection = null;
+        let animTime = 0;
+
+        const caseStudies = {
+            building: {
+                title: 'Smart Building - Energy Management',
+                metrics: [
+                    { label: 'Energy Savings', before: 0, after: 23, unit: '%' },
+                    { label: 'Maintenance Cost', before: 0, after: 34, unit: '%' },
+                    { label: 'Occupant Comfort', before: 0, after: 42, unit: '%' },
+                    { label: 'CO2 Reduction', before: 0, after: 18, unit: '%' }
+                ],
+                lessons: [
+                    'Real-time sensor data enables predictive maintenance',
+                    'HVAC optimization saves 20% without comfort loss',
+                    'Occupancy patterns revealed unused spaces',
+                    'Integration with BMS critical for success'
+                ]
+            },
+            factory: {
+                title: 'Manufacturing - Predictive Maintenance',
+                metrics: [
+                    { label: 'Downtime Reduction', before: 0, after: 45, unit: '%' },
+                    { label: 'Equipment Lifespan', before: 0, after: 28, unit: '%' },
+                    { label: 'Productivity', before: 0, after: 19, unit: '%' },
+                    { label: 'Safety Incidents', before: 0, after: 31, unit: '%' }
+                ],
+                lessons: [
+                    'Predictive maintenance prevents 60% of failures',
+                    'Vibration & temperature monitoring is key metric',
+                    'Digital twin reduced commissioning time by 40%',
+                    'Staff training crucial for adoption'
+                ]
+            },
+            city: {
+                title: 'Urban - Smart Traffic Management',
+                metrics: [
+                    { label: 'Traffic Flow', before: 0, after: 22, unit: '%' },
+                    { label: 'Emissions', before: 0, after: 15, unit: '%' },
+                    { label: 'Pedestrian Safety', before: 0, after: 38, unit: '%' },
+                    { label: 'Public Satisfaction', before: 0, after: 51, unit: '%' }
+                ],
+                lessons: [
+                    'Real-time traffic analysis enables dynamic routing',
+                    'Integration with public transit improved ridership',
+                    'Incident detection speeds emergency response',
+                    'Data privacy critical for public systems'
+                ]
+            }
+        };
+
+        function animateCounter(current, target, max = 100) {
+            if (showBefore) return 0;
+            return Math.round((animTime / 60) * target);
+        }
+
+        function draw() {
+            ctx.fillStyle = Wiki.colors().bg;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const study = caseStudies[currentCase];
+            animTime = (animTime + 1) % 120;
+
+            // Title
+            ctx.fillStyle = Wiki.colors().fg;
+            ctx.font = 'bold 18px Space Grotesk';
+            ctx.fillText(study.title, 20, 35);
+
+            // Before/After toggle indicator
+            ctx.fillStyle = showBefore ? '#ffe66d' : '#4ecdc4';
+            ctx.font = 'bold 12px Space Mono';
+            ctx.textAlign = 'right';
+            ctx.fillText(showBefore ? 'BEFORE' : 'AFTER', 880, 35);
+
+            // Draw metrics
+            const metricsPerRow = 2;
+            const metricWidth = 410;
+            const metricHeight = 90;
+            const startX = 20;
+            const startY = 70;
+
+            study.metrics.forEach((metric, idx) => {
+                const row = Math.floor(idx / metricsPerRow);
+                const col = idx % metricsPerRow;
+                const x = startX + col * (metricWidth + 20);
+                const y = startY + row * (metricHeight + 20);
+
+                // Background
+                ctx.fillStyle = 'rgba(100, 200, 200, 0.1)';
+                ctx.fillRect(x, y, metricWidth, metricHeight);
+
+                // Border
+                ctx.strokeStyle = '#4ecdc4';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(x, y, metricWidth, metricHeight);
+
+                // Label
+                ctx.fillStyle = '#4ecdc4';
+                ctx.font = 'bold 12px Space Grotesk';
+                ctx.textAlign = 'left';
+                ctx.fillText(metric.label, x + 12, y + 22);
+
+                // Value
+                const displayValue = showBefore ? 0 : metric.after;
+                ctx.fillStyle = '#ffe66d';
+                ctx.font = 'bold 32px Space Grotesk';
+                ctx.fillText(displayValue + metric.unit, x + 12, y + 58);
+
+                // Change arrow
+                if (!showBefore && metric.after > 0) {
+                    ctx.fillStyle = '#4ecdc4';
+                    ctx.font = '18px Space Mono';
+                    ctx.textAlign = 'right';
+                    ctx.fillText('→', x + metricWidth - 15, y + 50);
+                }
+
+                // Progress bar
+                ctx.fillStyle = 'rgba(50, 100, 100, 0.5)';
+                ctx.fillRect(x + 12, y + 70, metricWidth - 24, 8);
+                const progressWidth = (displayValue / 100) * (metricWidth - 24);
+                ctx.fillStyle = '#4ecdc4';
+                ctx.fillRect(x + 12, y + 70, progressWidth, 8);
+            });
+
+            // Lessons learned section
+            const lessonsY = 320;
+            ctx.fillStyle = 'rgba(100, 150, 200, 0.1)';
+            ctx.fillRect(20, lessonsY, 860, 260);
+            ctx.strokeStyle = '#00d4ff';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(20, lessonsY, 860, 260);
+
+            ctx.fillStyle = '#00d4ff';
+            ctx.font = 'bold 13px Space Grotesk';
+            ctx.textAlign = 'left';
+            ctx.fillText('Key Lessons Learned', 30, lessonsY + 22);
+
+            ctx.font = '11px Space Mono';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            study.lessons.forEach((lesson, idx) => {
+                const bulletY = lessonsY + 45 + idx * 50;
+                ctx.fillText('• ' + lesson, 40, bulletY);
+
+                // Expand indicator
+                ctx.fillStyle = 'rgba(200, 200, 200, 0.5)';
+                ctx.font = '10px Space Mono';
+                ctx.fillText('(Click for details)', 45 + ctx.measureText('• ' + lesson).width, bulletY);
+            });
+
+            ctx.fillStyle = Wiki.colors().fg;
+            ctx.font = '10px Space Mono';
+            ctx.textAlign = 'center';
+            ctx.fillText('▼ Scroll or click sections to expand ▼', 450, 590);
+
+            ctx.strokeStyle = Wiki.colors().fg;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(0, 0, canvas.width, canvas.height);
+        }
+
+        document.getElementById('buildingBtn').addEventListener('click', () => {
+            currentCase = 'building';
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('buildingBtn').classList.add('active');
+            animTime = 0;
+            draw();
+        });
+
+        document.getElementById('factoryBtn').addEventListener('click', () => {
+            currentCase = 'factory';
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('factoryBtn').classList.add('active');
+            animTime = 0;
+            draw();
+        });
+
+        document.getElementById('cityBtn').addEventListener('click', () => {
+            currentCase = 'city';
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('cityBtn').classList.add('active');
+            animTime = 0;
+            draw();
+        });
+
+        document.getElementById('beforeAfterBtn').addEventListener('click', () => {
+            showBefore = !showBefore;
+            animTime = 0;
+            document.getElementById('beforeAfterBtn').classList.toggle('active');
+            document.getElementById('info').textContent = 'Showing ' + (showBefore ? 'BEFORE' : 'AFTER') + ' metrics. Smooth animation shows improvement.';
+        });
+
+        Wiki.animate(draw);
+    </script>
+</body>
+</html>

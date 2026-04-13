@@ -1,0 +1,395 @@
+/* ==========================================================
+   Shared base CSS for all interactive wiki articles
+   Injected via <link> in each index.html
+   Reads theme from URL param ?theme=dark|light
+   ========================================================== */
+
+/* Hide redundant title/subtitle when embedded in parent wiki shell */
+body.in-iframe h1:first-of-type { display: none !important; }
+body.in-iframe h1:first-of-type + p { display: none !important; }
+body.in-iframe h1:first-of-type + .subtitle { display: none !important; }
+body.in-iframe h1:first-of-type + .intro { display: none !important; }
+body.in-iframe .subtitle { display: none !important; }
+body.in-iframe .container > h1:first-of-type { display: none !important; }
+body.in-iframe .container > h1:first-of-type + p { display: none !important; }
+body.in-iframe .page > h1:first-of-type { display: none !important; }
+body.in-iframe .page > h1:first-of-type + p { display: none !important; }
+
+:root {
+  --bg: #0f0f14;
+  --bg-secondary: #1a1b27;
+  --bg-tertiary: #22243a;
+  --text: #e4e4e7;
+  --text-muted: #a1a1aa;
+  --text-dim: #71717a;
+  --accent: #6366f1;
+  --accent-light: #818cf8;
+  --sky: #38bdf8;
+  --border: rgba(228, 228, 231, 0.1);
+  --border-strong: rgba(228, 228, 231, 0.2);
+  --code-bg: #1e1e2e;
+  --canvas-bg: #0a0a10;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --slider-track: #333;
+  --slider-thumb: #6366f1;
+}
+
+html.light {
+  --bg: #ffffff;
+  --bg-secondary: #f4f4f5;
+  --bg-tertiary: #e4e4e7;
+  --text: #18181b;
+  --text-muted: #52525b;
+  --text-dim: #a1a1aa;
+  --accent: #b45309;
+  --accent-light: #d97706;
+  --sky: #d97706;
+  --border: rgba(24, 24, 27, 0.08);
+  --border-strong: rgba(24, 24, 27, 0.15);
+  --code-bg: #f8f8f8;
+  --canvas-bg: #fafafa;
+  --slider-track: #d4d4d8;
+  --slider-thumb: #b45309;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.7;
+  overflow-x: hidden;
+}
+
+/* Prevent canvas and containers from exceeding viewport */
+canvas {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+.container, .page {
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+/* Responsive: collapse grids on narrow viewports */
+@media (max-width: 760px) {
+  .layout, .main-layout, .viz-layout, .split {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* --- Typography --- */
+h1, h2, h3, h4 { font-family: 'Space Mono', monospace; font-weight: 700; letter-spacing: 0.02em; }
+h1 { font-size: 1.6rem; margin-bottom: 0.5rem; }
+h2 { font-size: 1.2rem; color: var(--accent-light); margin: 2rem 0 0.75rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--border); }
+h3 { font-size: 1rem; margin: 1.5rem 0 0.5rem; }
+p { margin-bottom: 1rem; font-weight: 300; }
+a { color: var(--accent-light); text-decoration: none; }
+strong { font-weight: 600; color: var(--text); }
+
+/* --- Article Layout --- */
+.article {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+.article-header {
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.article-header p {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+/* --- Interactive Demo Containers --- */
+.demo-container {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin: 1.5rem 0;
+  overflow: hidden;
+}
+
+.demo-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 1rem;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border);
+  font-family: 'Space Mono', monospace;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.demo-header .demo-tag {
+  background: var(--accent);
+  color: white;
+  padding: 0.15rem 0.5rem;
+  border-radius: 3px;
+  font-size: 0.6rem;
+}
+
+.demo-body {
+  padding: 1rem;
+}
+
+.demo-canvas-wrap {
+  position: relative;
+  width: 100%;
+  background: var(--canvas-bg);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.demo-canvas-wrap canvas {
+  display: block;
+  width: 100%;
+  cursor: crosshair;
+}
+
+/* --- Controls --- */
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--bg-tertiary);
+  border-top: 1px solid var(--border);
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 140px;
+}
+
+.control-label {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+
+.control-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--accent-light);
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 4px;
+  background: var(--slider-track);
+  border-radius: 2px;
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  background: var(--slider-thumb);
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid var(--bg);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  background: var(--slider-thumb);
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid var(--bg);
+}
+
+select, button.ctrl-btn {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.72rem;
+  background: var(--bg-secondary);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.35rem 0.6rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+select:hover, button.ctrl-btn:hover {
+  border-color: var(--accent);
+}
+
+button.ctrl-btn.active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+/* --- Toggle Buttons Row --- */
+.toggle-row {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.toggle-btn {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.68rem;
+  padding: 0.3rem 0.6rem;
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.toggle-btn:hover { border-color: var(--accent); color: var(--text); }
+.toggle-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+
+/* --- Info Callouts --- */
+.callout {
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  margin: 1rem 0;
+  font-size: 0.85rem;
+  border-left: 3px solid;
+}
+
+.callout.info { background: rgba(99, 102, 241, 0.08); border-color: var(--accent); }
+.callout.tip { background: rgba(16, 185, 129, 0.08); border-color: var(--success); }
+.callout.warn { background: rgba(245, 158, 11, 0.08); border-color: var(--warning); }
+
+.callout strong { display: block; margin-bottom: 0.25rem; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; }
+
+/* --- Code Blocks --- */
+pre {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1rem;
+  overflow-x: auto;
+  margin: 1rem 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.83em;
+  background: var(--code-bg);
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+  color: var(--accent-light);
+}
+
+pre code { background: none; padding: 0; color: var(--text); }
+
+/* --- Tables --- */
+table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.85rem; }
+th, td { padding: 0.5rem 0.75rem; border: 1px solid var(--border); text-align: left; }
+th { background: var(--bg-tertiary); font-family: 'Space Mono', monospace; font-weight: 600; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; }
+
+/* --- Split View (side-by-side comparison) --- */
+.split-view {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.split-pane {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.split-pane-header {
+  padding: 0.4rem 0.75rem;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border);
+  font-family: 'Space Mono', monospace;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+}
+
+/* --- Kbd (keyboard shortcuts) --- */
+kbd {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75em;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  padding: 0.1rem 0.35rem;
+  box-shadow: 0 1px 0 var(--border-strong);
+}
+
+/* --- Color Swatch --- */
+.color-swatch {
+  display: inline-block;
+  width: 1.2em;
+  height: 1.2em;
+  border-radius: 3px;
+  border: 1px solid var(--border-strong);
+  vertical-align: middle;
+  margin-right: 0.3rem;
+}
+
+/* --- Grid for visual items --- */
+.visual-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.visual-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.visual-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+/* --- Responsive --- */
+@media (max-width: 640px) {
+  .article { padding: 1rem; }
+  .split-view { grid-template-columns: 1fr; }
+  .controls { flex-direction: column; }
+}
+
+/* --- Scrollbar --- */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-secondary); }
+::-webkit-scrollbar-thumb { background: var(--text-dim); border-radius: 99px; }
+
+/* --- List styles --- */
+ul, ol { margin-bottom: 1rem; padding-left: 1.5rem; }
+li { margin-bottom: 0.3rem; }

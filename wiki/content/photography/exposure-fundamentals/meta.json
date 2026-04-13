@@ -1,0 +1,17 @@
+{
+  "title": "Photography Exposure Fundamentals",
+  "category": "photography",
+  "order": 1,
+  "tags": [
+    "photography",
+    "exposure",
+    "aperture",
+    "ISO",
+    "shutter-speed"
+  ],
+  "description": "In-depth exploration of the exposure triangle, stops, EV values, sensor size effects, dynamic range, and camera metering systems with practical histogram reading techniques.",
+  "related": [
+    "photography/lens-optics",
+    "photography/lighting-theory"
+  ]
+}

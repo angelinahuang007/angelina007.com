@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Graph Algorithms & Pathfinding</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        body { background: var(--bg-dark); color: var(--fg-light); }
+        .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+        .controls { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+        button { padding: 8px 16px; background: var(--accent); color: var(--bg-dark); border: none; border-radius: 4px; cursor: pointer; font-family: 'Space Mono'; font-weight: 700; }
+        button.active { background: var(--accent-alt); }
+        button:hover { opacity: 0.8; }
+        #canvas { border: 1px solid var(--fg-dark); background: var(--bg-darker); display: block; margin: 0 auto; cursor: crosshair; }
+        .info { font-size: 0.9em; color: var(--fg-muted); margin-top: 10px; font-family: 'Space Mono'; }
+        .legend { display: flex; gap: 20px; flex-wrap: wrap; margin: 10px 0; font-size: 0.85em; }
+        .legend-item { display: flex; align-items: center; gap: 5px; }
+        .legend-color { width: 20px; height: 20px; border-radius: 2px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Graph Algorithms & Pathfinding</h1>
+        <p>Interactive A* and Dijkstra pathfinding with maze generation and NavMesh visualization.</p>
+
+        <div class="controls">
+            <button id="astarBtn" class="active">A* Search</button>
+            <button id="dijkstraBtn">Dijkstra</button>
+            <button id="mazeBtn">Generate Maze</button>
+            <button id="navmeshBtn">NavMesh</button>
+            <button id="clearBtn">Clear</button>
+        </div>
+
+        <div class="legend">
+            <div class="legend-item"><div class="legend-color" style="background: #2b2d42;"></div>Wall</div>
+            <div class="legend-item"><div class="legend-color" style="background: #4ecdc4;"></div>Open</div>
+            <div class="legend-item"><div class="legend-color" style="background: #ffe66d;"></div>Explored</div>
+            <div class="legend-item"><div class="legend-color" style="background: #ff6b6b;"></div>Path</div>
+        </div>
+
+        <canvas id="canvas" width="800" height="500"></canvas>
+        <div class="info" id="info">Click for start (red), then click for goal (blue). Click walls to toggle.</div>
+    </div>
+
+    <script>
+        const canvas = Wiki.createCanvas('canvas', 800, 500);
+        const ctx = canvas.getContext('2d');
+        const gridSize = 30;
+        const cols = Math.floor(900 / gridSize);
+        const rows = Math.floor(600 / gridSize);
+        let grid = Array(rows).fill().map(() => Array(cols).fill(0));
+        let start = null, goal = null;
+        let explored = new Set();
+        let path = [];
+        let algorithm = 'astar';
+        let showNavMesh = false;
+
+        function heuristic(a, b) {
+            return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+        }
+
+        function getNeighbors(cell) {
+            const neighbors = [];
+            const directions = [
+                { x: 0, y: -1 }, { x: 1, y: 0 },
+                { x: 0, y: 1 }, { x: -1, y: 0 }
+            ];
+            for (let dir of directions) {
+                const nx = cell.x + dir.x;
+                const ny = cell.y + dir.y;
+                if (nx >= 0 && nx < cols && ny >= 0 && ny < rows && grid[ny][nx] === 0) {
+                    neighbors.push({ x: nx, y: ny });
+                }
+            }
+            return neighbors;
+        }
+
+        function aStar() {
+            if (!start || !goal) return;
+            explored.clear();
+            path = [];
+
+            const openSet = [start];
+            const cameFrom = new Map();
+            const gScore = new Map();
+            const fScore = new Map();
+            const key = (p) => `${p.x},${p.y}`;
+
+            gScore.set(key(start), 0);
+            fScore.set(key(start), heuristic(start, goal));
+
+            while (openSet.length > 0) {
+                let current = openSet[0];
+                let currentIdx = 0;
+                for (let i = 1; i < openSet.length; i++) {
+                    if (fScore.get(key(openSet[i])) < fScore.get(key(current))) {
+                        current = openSet[i];
+                        currentIdx = i;
+                    }
+                }
+
+                if (current.x === goal.x && current.y === goal.y) {
+                    path = [current];
+                    while (cameFrom.has(key(current))) {
+                        current = cameFrom.get(key(current));
+                        path.unshift(current);
+                    }
+                    return;
+                }
+
+                openSet.splice(currentIdx, 1);
+                explored.add(key(current));
+
+                for (let neighbor of getNeighbors(current)) {
+                    const tentativeGScore = gScore.get(key(current)) + 1;
+                    if (!gScore.has(key(neighbor)) || tentativeGScore < gScore.get(key(neighbor))) {
+                        cameFrom.set(key(neighbor), current);
+                        gScore.set(key(neighbor), tentativeGScore);
+                        fScore.set(key(neighbor), tentativeGScore + heuristic(neighbor, goal));
+                        if (!openSet.find(p => p.x === neighbor.x && p.y === neighbor.y)) {
+                            openSet.push(neighbor);
+                        }
+                    }
+                }
+            }
+        }
+
+        function dijkstra() {
+            if (!start || !goal) return;
+            explored.clear();
+            path = [];
+
+            const distances = new Map();
+            const previous = new Map();
+            const unvisited = new Set();
+            const key = (p) => `${p.x},${p.y}`;
+
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    if (grid[y][x] === 0) {
+                        distances.set(`${x},${y}`, Infinity);
+                        unvisited.add(`${x},${y}`);
+                    }
+                }
+            }
+            distances.set(key(start), 0);
+
+            while (unvisited.size > 0) {
+                let current = null;
+                let minDist = Infinity;
+                for (let k of unvisited) {
+                    if (distances.get(k) < minDist) {
+                        minDist = distances.get(k);
+                        current = k;
+                    }
+                }
+
+                if (current === null) break;
+                unvisited.delete(current);
+                explored.add(current);
+
+                const [cx, cy] = current.split(',').map(Number);
+                const currentCell = { x: cx, y: cy };
+
+                if (cx === goal.x && cy === goal.y) {
+                    let node = current;
+                    while (previous.has(node)) {
+                        const [x, y] = node.split(',').map(Number);
+                        path.unshift({ x, y });
+                        node = previous.get(node);
+                    }
+                    path.unshift(start);
+                    return;
+                }
+
+                for (let neighbor of getNeighbors(currentCell)) {
+                    const nKey = key(neighbor);
+                    const alt = distances.get(current) + 1;
+                    if (alt < distances.get(nKey)) {
+                        distances.set(nKey, alt);
+                        previous.set(nKey, current);
+                    }
+                }
+            }
+        }
+
+        function generateMaze() {
+            grid = Array(rows).fill().map(() => Array(cols).fill(1));
+
+            function carve(x, y) {
+                grid[y][x] = 0;
+                const directions = [
+                    { x: 0, y: -2 }, { x: 2, y: 0 },
+                    { x: 0, y: 2 }, { x: -2, y: 0 }
+                ].sort(() => Math.random() - 0.5);
+
+                for (let dir of directions) {
+                    const nx = x + dir.x, ny = y + dir.y;
+                    if (nx > 0 && nx < cols - 1 && ny > 0 && ny < rows - 1 && grid[ny][nx] === 1) {
+                        grid[y + dir.y / 2][x + dir.x / 2] = 0;
+                        carve(nx, ny);
+                    }
+                }
+            }
+
+            carve(1, 1);
+            start = { x: 1, y: 1 };
+            goal = { x: cols - 2, y: rows - 2 };
+            explored.clear();
+            path = [];
+            draw();
+        }
+
+        function draw() {
+            ctx.fillStyle = Wiki.colors().bg;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw grid
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    const px = x * gridSize;
+                    const py = y * gridSize;
+
+                    if (grid[y][x] === 1) {
+                        ctx.fillStyle = '#2b2d42';
+                    } else if (explored.has(`${x},${y}`)) {
+                        ctx.fillStyle = '#ffe66d';
+                    } else {
+                        ctx.fillStyle = '#4ecdc4';
+                    }
+                    ctx.fillRect(px, py, gridSize, gridSize);
+                }
+            }
+
+            // Draw path
+            if (path.length > 0) {
+                ctx.strokeStyle = '#ff6b6b';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(path[0].x * gridSize + gridSize / 2, path[0].y * gridSize + gridSize / 2);
+                for (let i = 1; i < path.length; i++) {
+                    ctx.lineTo(path[i].x * gridSize + gridSize / 2, path[i].y * gridSize + gridSize / 2);
+                }
+                ctx.stroke();
+            }
+
+            // Draw start and goal
+            if (start) {
+                ctx.fillStyle = '#00d4ff';
+                ctx.fillRect(start.x * gridSize + 2, start.y * gridSize + 2, gridSize - 4, gridSize - 4);
+            }
+            if (goal) {
+                ctx.fillStyle = '#ff006e';
+                ctx.fillRect(goal.x * gridSize + 2, goal.y * gridSize + 2, gridSize - 4, gridSize - 4);
+            }
+
+            ctx.strokeStyle = Wiki.colors().fg;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(0, 0, canvas.width, canvas.height);
+        }
+
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = Math.floor((e.clientX - rect.left) / gridSize);
+            const y = Math.floor((e.clientY - rect.top) / gridSize);
+
+            if (x < 0 || x >= cols || y < 0 || y >= rows) return;
+
+            if (e.ctrlKey) {
+                grid[y][x] = grid[y][x] === 0 ? 1 : 0;
+            } else if (!start) {
+                start = { x, y };
+            } else if (!goal) {
+                goal = { x, y };
+                if (algorithm === 'astar') aStar();
+                else dijkstra();
+            }
+
+            draw();
+        });
+
+        document.getElementById('astarBtn').addEventListener('click', () => {
+            algorithm = 'astar';
+            if (start && goal) aStar();
+            draw();
+        });
+
+        document.getElementById('dijkstraBtn').addEventListener('click', () => {
+            algorithm = 'dijkstra';
+            if (start && goal) dijkstra();
+            draw();
+        });
+
+        document.getElementById('mazeBtn').addEventListener('click', generateMaze);
+        document.getElementById('navmeshBtn').addEventListener('click', () => {
+            showNavMesh = !showNavMesh;
+            draw();
+        });
+
+        document.getElementById('clearBtn').addEventListener('click', () => {
+            grid = Array(rows).fill().map(() => Array(cols).fill(0));
+            start = null;
+            goal = null;
+            explored.clear();
+            path = [];
+            draw();
+        });
+
+        generateMaze();
+    </script>
+</body>
+</html>

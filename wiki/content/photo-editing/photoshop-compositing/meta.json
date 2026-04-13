@@ -1,0 +1,17 @@
+{
+  "title": "Photoshop Compositing for Photographers",
+  "category": "photo-editing",
+  "tags": [
+    "photoshop",
+    "compositing",
+    "layers",
+    "masks",
+    "retouching"
+  ],
+  "description": "Advanced Photoshop techniques for photographers including frequency separation, sky replacement, smart objects, and AI-powered Neural Filters for professional compositing.",
+  "related": [
+    "photo-editing/lightroom-workflow",
+    "photo-editing/color-grading"
+  ],
+  "order": 2
+}

@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Color Theory & Visual Design</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--bg-dark); color: var(--fg-light); font-family: 'Space Grotesk', sans-serif; }
+
+        .page { max-width: 900px; margin: 0 auto; padding: 24px; }
+        h1 { font-family: 'Space Grotesk'; font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+        .subtitle { color: var(--fg-muted); font-size: 13px; margin-bottom: 24px; }
+
+        .main-layout { display: grid; grid-template-columns: 1fr 320px; gap: 24px; }
+
+        /* Color Wheel */
+        .wheel-area { position: relative; display: flex; align-items: center; justify-content: center; }
+        .wheel-wrapper { position: relative; width: 360px; height: 360px; }
+
+        .color-wheel {
+            width: 360px; height: 360px;
+            border-radius: 50%;
+            background: conic-gradient(
+                hsl(0,100%,50%), hsl(30,100%,50%), hsl(60,100%,50%), hsl(90,100%,50%),
+                hsl(120,100%,50%), hsl(150,100%,50%), hsl(180,100%,50%), hsl(210,100%,50%),
+                hsl(240,100%,50%), hsl(270,100%,50%), hsl(300,100%,50%), hsl(330,100%,50%),
+                hsl(360,100%,50%)
+            );
+            cursor: crosshair;
+            position: relative;
+        }
+        /* Saturation overlay: white center fading out */
+        .color-wheel::before {
+            content: '';
+            position: absolute; inset: 0;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0) 65%);
+            pointer-events: none;
+        }
+
+        .wheel-marker {
+            position: absolute;
+            width: 22px; height: 22px;
+            border: 3px solid #fff;
+            border-radius: 50%;
+            box-shadow: 0 0 0 1px rgba(0,0,0,0.3), 0 2px 8px rgba(0,0,0,0.4);
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            transition: left 0.1s, top 0.1s;
+            z-index: 10;
+        }
+        .harmony-marker {
+            position: absolute;
+            width: 16px; height: 16px;
+            border: 2px solid rgba(255,255,255,0.8);
+            border-radius: 50%;
+            box-shadow: 0 0 0 1px rgba(0,0,0,0.2), 0 1px 4px rgba(0,0,0,0.3);
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            transition: left 0.15s, top 0.15s;
+            z-index: 9;
+        }
+
+        /* Harmony lines SVG overlay */
+        .harmony-lines {
+            position: absolute; inset: 0;
+            pointer-events: none;
+            z-index: 8;
+        }
+
+        /* Right panel */
+        .panel { display: flex; flex-direction: column; gap: 16px; }
+
+        .mode-selector {
+            display: flex; flex-wrap: wrap; gap: 6px;
+        }
+        .mode-btn {
+            padding: 6px 12px;
+            font-family: 'Space Mono'; font-size: 11px; font-weight: 700;
+            border: 1px solid var(--fg-dark);
+            background: transparent; color: var(--fg-muted);
+            border-radius: 4px; cursor: pointer;
+            transition: all 0.15s;
+        }
+        .mode-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .mode-btn.active {
+            background: var(--accent); color: var(--bg-dark); border-color: var(--accent);
+        }
+
+        /* Swatches */
+        .swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+        .swatch {
+            display: flex; flex-direction: column; align-items: center; gap: 4px;
+        }
+        .swatch-color {
+            width: 52px; height: 52px;
+            border-radius: 8px;
+            border: 2px solid rgba(255,255,255,0.15);
+            transition: background-color 0.15s;
+        }
+        .swatch-label {
+            font-family: 'Space Mono'; font-size: 9px; color: var(--fg-muted);
+        }
+        .swatch-hex {
+            font-family: 'JetBrains Mono'; font-size: 10px; color: var(--fg-light);
+            cursor: pointer;
+        }
+        .swatch-hex:hover { color: var(--accent); }
+
+        /* Info cards */
+        .info-card {
+            background: var(--bg-darker);
+            border: 1px solid var(--fg-dark);
+            border-radius: 8px;
+            padding: 14px;
+        }
+        .info-card h3 {
+            font-family: 'Space Mono'; font-size: 11px; font-weight: 700;
+            color: var(--accent); text-transform: uppercase;
+            letter-spacing: 0.5px; margin-bottom: 8px;
+        }
+        .info-card p {
+            font-size: 12px; color: var(--fg-muted); line-height: 1.6;
+        }
+
+        /* Color blindness section */
+        .blindness-row { display: flex; gap: 8px; margin-top: 8px; }
+        .blind-btn {
+            flex: 1;
+            padding: 5px 8px;
+            font-family: 'Space Mono'; font-size: 10px;
+            border: 1px solid var(--fg-dark);
+            background: transparent; color: var(--fg-muted);
+            border-radius: 3px; cursor: pointer;
+            transition: all 0.15s;
+        }
+        .blind-btn:hover { border-color: var(--accent); }
+        .blind-btn.active { background: var(--accent); color: var(--bg-dark); border-color: var(--accent); }
+
+        /* Contrast demo */
+        .contrast-demo {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+            margin-top: 8px;
+        }
+        .contrast-box {
+            height: 56px; border-radius: 6px;
+            display: flex; align-items: center; justify-content: center;
+            font-family: 'Space Mono'; font-size: 11px; font-weight: 700;
+            transition: background-color 0.15s;
+        }
+
+        /* Section label */
+        .section-label {
+            font-family: 'Space Mono'; font-size: 10px; font-weight: 700;
+            color: var(--fg-dark); text-transform: uppercase; letter-spacing: 1px;
+            margin-bottom: 6px;
+        }
+    </style>
+</head>
+<body>
+<!-- SVG color blindness filters (Brettel/Viénot simulation matrices) -->
+<svg style="position:absolute;width:0;height:0;overflow:hidden">
+  <defs>
+    <filter id="protanopia-filter">
+      <feColorMatrix type="matrix" values="0.567 0.433 0 0 0  0.558 0.442 0 0 0  0 0.242 0.758 0 0  0 0 0 1 0"/>
+    </filter>
+    <filter id="deuteranopia-filter">
+      <feColorMatrix type="matrix" values="0.625 0.375 0 0 0  0.7 0.3 0 0 0  0 0.3 0.7 0 0  0 0 0 1 0"/>
+    </filter>
+    <filter id="tritanopia-filter">
+      <feColorMatrix type="matrix" values="0.95 0.05 0 0 0  0 0.433 0.567 0 0  0 0.475 0.525 0 0  0 0 0 1 0"/>
+    </filter>
+  </defs>
+</svg>
+<div class="page">
+    <h1>Color Theory & Visual Design</h1>
+    <p class="subtitle">Click the wheel to select a hue. Harmony colors update automatically.</p>
+
+    <div class="main-layout">
+        <!-- Left: Color Wheel -->
+        <div class="wheel-area">
+            <div class="wheel-wrapper">
+                <div class="color-wheel" id="colorWheel"></div>
+                <svg class="harmony-lines" id="harmonyLines" viewBox="0 0 360 360"></svg>
+                <div class="wheel-marker" id="mainMarker"></div>
+                <!-- Harmony markers injected by JS -->
+            </div>
+        </div>
+
+        <!-- Right: Controls & Info -->
+        <div class="panel">
+            <div>
+                <div class="section-label">Harmony Mode</div>
+                <div class="mode-selector" id="modeSelector">
+                    <button class="mode-btn active" data-mode="complementary">Complementary</button>
+                    <button class="mode-btn" data-mode="analogous">Analogous</button>
+                    <button class="mode-btn" data-mode="triadic">Triadic</button>
+                    <button class="mode-btn" data-mode="split">Split-Comp</button>
+                    <button class="mode-btn" data-mode="tetradic">Tetradic</button>
+                </div>
+            </div>
+
+            <div>
+                <div class="section-label">Palette</div>
+                <div class="swatches" id="swatches"></div>
+            </div>
+
+            <div class="info-card" id="harmonyInfo">
+                <h3>Complementary</h3>
+                <p>Colors opposite on the wheel. Maximum contrast and visual tension — great for accent colors and call-to-action elements.</p>
+            </div>
+
+            <div>
+                <div class="section-label">Simultaneous Contrast</div>
+                <div class="contrast-demo" id="contrastDemo">
+                    <div class="contrast-box" id="contrastA">Text</div>
+                    <div class="contrast-box" id="contrastB">Text</div>
+                </div>
+            </div>
+
+            <div>
+                <div class="section-label">Color Blindness Sim</div>
+                <div class="blindness-row">
+                    <button class="blind-btn" data-type="none">Normal</button>
+                    <button class="blind-btn" data-type="protanopia">Protan</button>
+                    <button class="blind-btn" data-type="deuteranopia">Deuter</button>
+                    <button class="blind-btn" data-type="tritanopia">Tritan</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // State
+    let selectedHue = 0;
+    let harmonyMode = 'complementary';
+    let blindnessType = 'none';
+
+    const cx = 180, cy = 180, radius = 150;
+
+    const harmonyDescriptions = {
+        complementary: { title: 'Complementary', desc: 'Colors opposite on the wheel. Maximum contrast and visual tension — great for accent colors and call-to-action elements.' },
+        analogous: { title: 'Analogous', desc: 'Adjacent colors (±30°). Naturally harmonious and soothing — common in nature, landscapes, and gradients.' },
+        triadic: { title: 'Triadic', desc: 'Three colors equally spaced (120° apart). Vibrant and balanced — popular in illustration, branding, and UI design.' },
+        split: { title: 'Split-Complementary', desc: 'Base + two colors adjacent to its complement. Strong contrast with less tension than straight complementary.' },
+        tetradic: { title: 'Tetradic (Rectangle)', desc: 'Four colors in two complementary pairs. Rich palette — works best when one color dominates and others accent.' }
+    };
+
+    // --- Harmony math ---
+    function getHarmonyHues(base, mode) {
+        const hues = [base];
+        switch(mode) {
+            case 'complementary': hues.push((base + 180) % 360); break;
+            case 'analogous': hues.push((base + 30) % 360, (base + 330) % 360); break;
+            case 'triadic': hues.push((base + 120) % 360, (base + 240) % 360); break;
+            case 'split': hues.push((base + 150) % 360, (base + 210) % 360); break;
+            case 'tetradic': hues.push((base + 90) % 360, (base + 180) % 360, (base + 270) % 360); break;
+        }
+        return hues;
+    }
+
+    // --- Color blindness simulation (Brettel) ---
+    function simulateBlindness(r, g, b, type) {
+        if (type === 'none') return [r, g, b];
+        // Simplified LMS simulation matrices
+        const rn = r/255, gn = g/255, bn = b/255;
+        if (type === 'protanopia') {
+            return [Math.round((0.567*rn + 0.433*gn)*255), Math.round((0.558*rn + 0.442*gn)*255), Math.round((0.242*gn + 0.758*bn)*255)];
+        } else if (type === 'deuteranopia') {
+            return [Math.round((0.625*rn + 0.375*gn)*255), Math.round((0.7*rn + 0.3*gn)*255), Math.round((0.3*gn + 0.7*bn)*255)];
+        } else if (type === 'tritanopia') {
+            return [Math.round((0.95*rn + 0.05*gn)*255), Math.round((0.433*gn + 0.567*bn)*255), Math.round((0.475*gn + 0.525*bn)*255)];
+        }
+        return [r, g, b];
+    }
+
+    function hslToHex(h, s, l) {
+        const rgb = Wiki.hslToRgb(h, s, l);
+        return Wiki.rgbToHex(rgb.r, rgb.g, rgb.b);
+    }
+
+    function hueToPos(hue) {
+        const rad = (hue - 90) * Math.PI / 180;
+        return {
+            x: cx + Math.cos(rad) * (radius - 20),
+            y: cy + Math.sin(rad) * (radius - 20)
+        };
+    }
+
+    // --- Wheel click ---
+    document.getElementById('colorWheel').addEventListener('click', (e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = e.clientX - rect.left - cx;
+        const y = e.clientY - rect.top - cy;
+        const dist = Math.sqrt(x*x + y*y);
+        if (dist > radius + 10) return;
+        selectedHue = ((Math.atan2(y, x) * 180 / Math.PI) + 90 + 360) % 360;
+        update();
+    });
+
+    // Drag support
+    let dragging = false;
+    document.getElementById('colorWheel').addEventListener('mousedown', (e) => { dragging = true; });
+    document.addEventListener('mousemove', (e) => {
+        if (!dragging) return;
+        const rect = document.getElementById('colorWheel').getBoundingClientRect();
+        const x = e.clientX - rect.left - cx;
+        const y = e.clientY - rect.top - cy;
+        selectedHue = ((Math.atan2(y, x) * 180 / Math.PI) + 90 + 360) % 360;
+        update();
+    });
+    document.addEventListener('mouseup', () => { dragging = false; });
+
+    // --- Mode buttons ---
+    document.getElementById('modeSelector').addEventListener('click', (e) => {
+        const btn = e.target.closest('.mode-btn');
+        if (!btn) return;
+        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        harmonyMode = btn.dataset.mode;
+        update();
+    });
+
+    // --- Color blindness buttons ---
+    document.querySelectorAll('.blind-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.blind-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            blindnessType = btn.dataset.type;
+            update();
+        });
+    });
+
+    // --- Update everything ---
+    function update() {
+        const hues = getHarmonyHues(selectedHue, harmonyMode);
+
+        // Main marker
+        const mainPos = hueToPos(selectedHue);
+        const mainMarker = document.getElementById('mainMarker');
+        mainMarker.style.left = mainPos.x + 'px';
+        mainMarker.style.top = mainPos.y + 'px';
+        mainMarker.style.backgroundColor = `hsl(${selectedHue}, 100%, 50%)`;
+
+        // Remove old harmony markers
+        document.querySelectorAll('.harmony-marker').forEach(m => m.remove());
+        const wrapper = document.querySelector('.wheel-wrapper');
+
+        // SVG harmony lines
+        const svg = document.getElementById('harmonyLines');
+        let linesHTML = '';
+        for (let i = 1; i < hues.length; i++) {
+            const p1 = hueToPos(hues[0]);
+            const p2 = hueToPos(hues[i]);
+            linesHTML += `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="rgba(255,255,255,0.3)" stroke-width="1.5" stroke-dasharray="4,4"/>`;
+        }
+        // Connect all markers in polygon
+        if (hues.length > 2) {
+            let polyPoints = hues.map(h => { const p = hueToPos(h); return `${p.x},${p.y}`; }).join(' ');
+            linesHTML += `<polygon points="${polyPoints}" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>`;
+        }
+        svg.innerHTML = linesHTML;
+
+        // Add harmony markers
+        for (let i = 1; i < hues.length; i++) {
+            const pos = hueToPos(hues[i]);
+            const marker = document.createElement('div');
+            marker.className = 'harmony-marker';
+            marker.style.left = pos.x + 'px';
+            marker.style.top = pos.y + 'px';
+            marker.style.backgroundColor = `hsl(${hues[i]}, 100%, 50%)`;
+            wrapper.appendChild(marker);
+        }
+
+        // Swatches
+        const swatchContainer = document.getElementById('swatches');
+        const labels = ['Base', ...Array.from({length: hues.length-1}, (_, i) => String.fromCharCode(65+i))];
+        swatchContainer.innerHTML = hues.map((hue, i) => {
+            const rgb = Wiki.hslToRgb(hue, 100, 50);
+            const blind = simulateBlindness(rgb.r, rgb.g, rgb.b, blindnessType);
+            const hex = Wiki.rgbToHex(blind[0], blind[1], blind[2]);
+            const displayColor = blindnessType === 'none'
+                ? `hsl(${hue}, 100%, 50%)`
+                : `rgb(${blind[0]}, ${blind[1]}, ${blind[2]})`;
+            return `
+                <div class="swatch">
+                    <div class="swatch-color" style="background: ${displayColor}"></div>
+                    <span class="swatch-label">${labels[i]}</span>
+                    <span class="swatch-hex" title="Click to copy" onclick="navigator.clipboard.writeText('${hex}')">${hex}</span>
+                </div>
+            `;
+        }).join('');
+
+        // Info card
+        const info = harmonyDescriptions[harmonyMode];
+        document.getElementById('harmonyInfo').innerHTML = `<h3>${info.title}</h3><p>${info.desc}</p>`;
+
+        // Contrast demo
+        const baseRgb = Wiki.hslToRgb(selectedHue, 100, 50);
+        const compHue = (selectedHue + 180) % 360;
+        const compRgb = Wiki.hslToRgb(compHue, 100, 50);
+        const baseBlind = simulateBlindness(baseRgb.r, baseRgb.g, baseRgb.b, blindnessType);
+        const compBlind = simulateBlindness(compRgb.r, compRgb.g, compRgb.b, blindnessType);
+        const baseColor = `rgb(${baseBlind[0]},${baseBlind[1]},${baseBlind[2]})`;
+        const compColor = `rgb(${compBlind[0]},${compBlind[1]},${compBlind[2]})`;
+
+        document.getElementById('contrastA').style.background = baseColor;
+        document.getElementById('contrastA').style.color = compColor;
+        document.getElementById('contrastA').textContent = `${Math.round(selectedHue)}°`;
+        document.getElementById('contrastB').style.background = compColor;
+        document.getElementById('contrastB').style.color = baseColor;
+        document.getElementById('contrastB').textContent = `${Math.round(compHue)}°`;
+
+        // Apply color blindness filter to the wheel itself
+        const wheel = document.getElementById('colorWheel');
+        if (blindnessType === 'none') {
+            wheel.style.filter = '';
+        } else {
+            wheel.style.filter = `url(#${blindnessType}-filter)`;
+        }
+    }
+
+    // Init
+    selectedHue = 0;
+    document.querySelector('.blind-btn[data-type="none"]').classList.add('active');
+    update();
+</script>
+</body>
+</html>

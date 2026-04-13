@@ -1,0 +1,18 @@
+{
+  "title": "Digital Twin Case Studies",
+  "category": "digital-twin",
+  "tags": [
+    "digital-twin",
+    "case-study",
+    "smart-building",
+    "manufacturing",
+    "urban"
+  ],
+  "description": "Practical digital twin implementations in buildings, manufacturing, and smart cities with lessons learned and common pitfalls.",
+  "related": [
+    "digital-twin/architecture-overview",
+    "digital-twin/realtime-data-pipeline",
+    "digital-twin/3d-visualization"
+  ],
+  "order": 5
+}

@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lens & Optics Interactive</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        .lens-container {
+            display: flex; flex-wrap: wrap;
+            gap: 20px;
+            height: 100%;
+        }
+        .diagram-area {
+            flex: 1;
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, #16213e 100%);
+            border-radius: 8px;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        .lens-diagram {
+            background: var(--canvas-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 16px;
+            overflow: hidden;
+        }
+        .lens-diagram canvas {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .info-box {
+            background: rgba(233, 236, 239, 0.05);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 12px;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 12px;
+            color: var(--text);
+        }
+        .info-box h4 {
+            margin: 0 0 6px 0;
+            color: #16a085;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .info-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            color: #a1e9d6;
+        }
+        .control-panel {
+            width: 280px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 16px;
+            overflow-y: auto;
+            color: var(--text);
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 13px;
+        }
+        .control-group {
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        .control-group h4 {
+            margin: 0 0 8px 0;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #16a085;
+            letter-spacing: 0.5px;
+        }
+        .slider-row {
+            margin-bottom: 12px;
+        }
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+            font-size: 12px;
+        }
+        input[type="range"] {
+            width: 100%;
+            height: 4px;
+            border-radius: 2px;
+            background: var(--border-strong);
+            outline: none;
+            -webkit-appearance: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #16a085;
+            cursor: pointer;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #16a085;
+            border: none;
+            cursor: pointer;
+        }
+        .object-controls {
+            background: rgba(22, 160, 133, 0.1);
+            border: 1px solid rgba(22, 160, 133, 0.3);
+            border-radius: 4px;
+            padding: 8px;
+            margin-top: 8px;
+            font-size: 11px;
+        }
+        .object-item {
+            padding: 4px 6px;
+            margin: 2px 0;
+            background: rgba(22, 160, 133, 0.2);
+            border-radius: 2px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .object-item:hover {
+            background: rgba(22, 160, 133, 0.35);
+        }
+        .info-text {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 12px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="lens-container">
+        <div class="diagram-area">
+            <div class="lens-diagram">
+                <canvas id="lensCanvas" width="600" height="300"></canvas>
+            </div>
+
+            <div class="info-grid">
+                <div class="info-box">
+                    <h4>Focal Length</h4>
+                    <div class="info-value" id="focalInfo">50mm</div>
+                </div>
+                <div class="info-box">
+                    <h4>Aperture</h4>
+                    <div class="info-value" id="apertureInfo">f/2.8</div>
+                </div>
+                <div class="info-box">
+                    <h4>Depth of Field</h4>
+                    <div class="info-value" id="dofInfo">Narrow</div>
+                </div>
+                <div class="info-box">
+                    <h4>Focus Distance</h4>
+                    <div class="info-value" id="focusInfo">3.0m</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="control-panel">
+            <div class="control-group">
+                <h4>Lens Settings</h4>
+                <div class="slider-row">
+                    <div class="slider-label">
+                        <span>Focal Length</span>
+                        <span id="focalValue">50mm</span>
+                    </div>
+                    <input type="range" id="focalSlider" min="20" max="200" step="10" value="50">
+                    <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Wide → Telephoto</div>
+                </div>
+
+                <div class="slider-row">
+                    <div class="slider-label">
+                        <span>Aperture</span>
+                        <span id="apertureValue">f/2.8</span>
+                    </div>
+                    <input type="range" id="apertureSlider" min="1.4" max="22" step="0.4" value="2.8">
+                    <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Wide → Narrow</div>
+                </div>
+
+                <div class="slider-row">
+                    <div class="slider-label">
+                        <span>Focus Distance</span>
+                        <span id="focusValue">3.0m</span>
+                    </div>
+                    <input type="range" id="focusSlider" min="0.3" max="10" step="0.1" value="3.0">
+                    <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Closer → Farther</div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h4>Scene Objects</h4>
+                <div class="object-controls">
+                    <div class="object-item" data-object="near">Near Object</div>
+                    <div class="object-item" data-object="focus">Focus Target</div>
+                    <div class="object-item" data-object="far">Far Object</div>
+                </div>
+            </div>
+
+            <div class="info-text">
+                Drag scene objects closer to or farther from the camera. Objects at focus distance appear sharp, others are blurred based on aperture.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class LensOptics {
+            constructor() {
+                this.canvas = document.getElementById('lensCanvas');
+                this.ctx = this.canvas.getContext('2d');
+
+                this.focalLength = 50;
+                this.aperture = 2.8;
+                this.focusDistance = 3.0;
+
+                // Scene objects with distances from camera
+                this.objects = [
+                    { name: 'Near Object', distance: 1.5, color: '#e74c3c', focused: false },
+                    { name: 'Focus Target', distance: 3.0, color: '#16a085', focused: true },
+                    { name: 'Far Object', distance: 6.0, color: '#3498db', focused: false }
+                ];
+
+                this.selectedObject = null;
+                this.setupEvents();
+                this.render();
+            }
+
+            setupEvents() {
+                document.getElementById('focalSlider').addEventListener('input', (e) => {
+                    this.focalLength = parseFloat(e.target.value);
+                    document.getElementById('focalValue').textContent = this.focalLength + 'mm';
+                    this.render();
+                });
+
+                document.getElementById('apertureSlider').addEventListener('input', (e) => {
+                    this.aperture = parseFloat(e.target.value);
+                    document.getElementById('apertureValue').textContent = `f/${this.aperture.toFixed(1)}`;
+                    this.render();
+                });
+
+                document.getElementById('focusSlider').addEventListener('input', (e) => {
+                    this.focusDistance = parseFloat(e.target.value);
+                    document.getElementById('focusValue').textContent = this.focusDistance.toFixed(1) + 'm';
+                    this.objects.forEach((obj, i) => {
+                        obj.focused = Math.abs(obj.distance - this.focusDistance) < 0.5;
+                    });
+                    this.render();
+                });
+
+                document.querySelectorAll('.object-item').forEach(item => {
+                    item.addEventListener('click', (e) => {
+                        const objName = e.target.dataset.object;
+                        const obj = this.objects.find(o => o.name.toLowerCase().includes(objName));
+                        if (obj) {
+                            this.selectedObject = obj;
+                            this.render();
+                        }
+                    });
+                });
+
+                this.canvas.addEventListener('mousemove', (e) => {
+                    if (this.selectedObject) {
+                        const rect = this.canvas.getBoundingClientRect();
+                        const x = e.clientX - rect.left;
+                        const distance = (x / this.canvas.width) * 10;
+                        this.selectedObject.distance = Math.max(0.3, Math.min(10, distance));
+                        this.objects.forEach((obj, i) => {
+                            obj.focused = Math.abs(obj.distance - this.focusDistance) < 0.5;
+                        });
+                        document.getElementById('focusSlider').value = this.focusDistance;
+                        this.render();
+                    }
+                });
+
+                this.canvas.addEventListener('mouseup', () => {
+                    this.selectedObject = null;
+                });
+            }
+
+            calculateDOF() {
+                const coc = this.aperture / 1000;
+                const near = (this.focusDistance * this.focalLength) / (this.focalLength + coc * (this.focusDistance - this.focalLength));
+                const far = (this.focusDistance * this.focalLength) / (this.focalLength - coc * (this.focusDistance - this.focalLength));
+                return { near: Math.max(0.3, near), far: Math.min(10, far) };
+            }
+
+            calculateBlur(distance) {
+                const dof = this.calculateDOF();
+                if (distance >= dof.near && distance <= dof.far) return 0;
+                const distFromFocus = Math.abs(distance - this.focusDistance);
+                return Math.min(1, distFromFocus / 2);
+            }
+
+            render() {
+                const w = this.canvas.width;
+                const h = this.canvas.height;
+
+                // Background
+                this.ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--canvas-bg').trim();
+                this.ctx.fillRect(0, 0, w, h);
+
+                // Ground
+                this.ctx.fillStyle = 'rgba(22, 160, 133, 0.1)';
+                this.ctx.fillRect(0, h / 2, w, h / 2);
+
+                // Optical axis
+                this.ctx.strokeStyle = 'rgba(233, 236, 239, 0.1)';
+                this.ctx.setLineDash([4, 4]);
+                this.ctx.lineWidth = 1;
+                this.ctx.beginPath();
+                this.ctx.moveTo(10, h / 2);
+                this.ctx.lineTo(w - 10, h / 2);
+                this.ctx.stroke();
+                this.ctx.setLineDash([]);
+
+                // Camera (left side)
+                this.ctx.fillStyle = '#16a085';
+                this.ctx.fillRect(5, h / 2 - 15, 20, 30);
+                this.ctx.fillStyle = Wiki.colors().bgSecondary;
+                this.ctx.fillRect(8, h / 2 - 10, 8, 20);
+
+                // Lens
+                const lensX = 35;
+                this.ctx.strokeStyle = '#e74c3c';
+                this.ctx.lineWidth = 3;
+                this.ctx.beginPath();
+                this.ctx.arc(lensX, h / 2, 25, Math.PI / 2, -Math.PI / 2);
+                this.ctx.stroke();
+
+                // Focal point
+                const focalPointX = lensX + (this.focalLength / 200) * (w - 60);
+                this.ctx.fillStyle = 'rgba(231, 76, 60, 0.6)';
+                this.ctx.beginPath();
+                this.ctx.arc(focalPointX, h / 2, 3, 0, Math.PI * 2);
+                this.ctx.fill();
+
+                // Light rays
+                this.ctx.strokeStyle = 'rgba(52, 152, 219, 0.4)';
+                this.ctx.lineWidth = 1;
+                for (let i = 1; i < 4; i++) {
+                    const rayY = h / 2 - 20 + (i * 10);
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(35, rayY);
+                    this.ctx.quadraticCurveTo((lensX + focalPointX) / 2, h / 2, focalPointX, h / 2);
+                    this.ctx.stroke();
+                }
+
+                // Draw scene objects
+                const dof = this.calculateDOF();
+                const focusIndicator = `${dof.near.toFixed(1)}-${dof.far.toFixed(1)}m`;
+
+                this.objects.forEach(obj => {
+                    const x = lensX + 30 + (obj.distance / 10) * (w - lensX - 50);
+                    const blur = this.calculateBlur(obj.distance);
+                    const radius = 8 + blur * 5;
+
+                    // Object with blur
+                    this.ctx.fillStyle = obj.color;
+                    this.ctx.globalAlpha = 1 - blur * 0.3;
+                    this.ctx.beginPath();
+                    this.ctx.arc(x, h / 2, radius, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    this.ctx.globalAlpha = 1;
+
+                    // Blur halo
+                    if (blur > 0.2) {
+                        this.ctx.strokeStyle = `rgba(255, 255, 255, ${blur * 0.4})`;
+                        this.ctx.lineWidth = blur * 3;
+                        this.ctx.beginPath();
+                        this.ctx.arc(x, h / 2, radius + blur * 5, 0, Math.PI * 2);
+                        this.ctx.stroke();
+                    }
+
+                    // Label
+                    this.ctx.fillStyle = obj.color;
+                    this.ctx.font = '10px "Space Mono"';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText(`${obj.distance.toFixed(1)}m`, x, h / 2 - 20);
+                });
+
+                // DOF indicator
+                const nearX = lensX + 30 + (dof.near / 10) * (w - lensX - 50);
+                const farX = lensX + 30 + (dof.far / 10) * (w - lensX - 50);
+                this.ctx.fillStyle = 'rgba(22, 160, 133, 0.1)';
+                this.ctx.fillRect(nearX, h / 2 + 35, farX - nearX, 15);
+                this.ctx.strokeStyle = 'rgba(22, 160, 133, 0.5)';
+                this.ctx.lineWidth = 1;
+                this.ctx.strokeRect(nearX, h / 2 + 35, farX - nearX, 15);
+
+                // Focus distance marker
+                const focusX = lensX + 30 + (this.focusDistance / 10) * (w - lensX - 50);
+                this.ctx.fillStyle = '#16a085';
+                this.ctx.beginPath();
+                this.ctx.moveTo(focusX, h / 2 + 35);
+                this.ctx.lineTo(focusX - 5, h / 2 + 25);
+                this.ctx.lineTo(focusX + 5, h / 2 + 25);
+                this.ctx.closePath();
+                this.ctx.fill();
+
+                // Info
+                document.getElementById('focalInfo').textContent = this.focalLength + 'mm';
+                document.getElementById('apertureInfo').textContent = `f/${this.aperture.toFixed(1)}`;
+                document.getElementById('dofInfo').textContent = focusIndicator;
+                document.getElementById('focusInfo').textContent = this.focusDistance.toFixed(1) + 'm';
+            }
+        }
+
+        const lens = new LensOptics();
+    </script>
+</body>
+</html>

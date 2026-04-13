@@ -1,0 +1,11 @@
+{
+  "title": "Lighting & Post-Processing",
+  "category": "game-engines/unity",
+  "tags": ["unity", "lighting", "postprocessing", "bloom", "color-grading", "vignette", "light-probes"],
+  "description": "Interactive scene demonstrating realtime, baked, and mixed lighting modes with post-processing pipeline visualization.",
+  "related": [
+    "game-engines/unity/shader-programming",
+    "game-engines/unreal/nanite-lumen"
+  ],
+  "order": 3
+}

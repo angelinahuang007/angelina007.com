@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blender Animation & Rigging</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        .rigging-container {
+            display: flex; flex-wrap: wrap;
+            gap: 20px;
+            height: 100%;
+        }
+        .viewport {
+            flex: 1;
+            background: linear-gradient(135deg, var(--canvas-bg) 0%, var(--bg-secondary) 100%);
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+        .viewport canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        .control-panel {
+            width: 260px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 16px;
+            overflow-y: auto;
+            color: var(--text);
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 13px;
+        }
+        .control-group {
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        .control-group h4 {
+            margin: 0 0 8px 0;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: var(--accent);
+            letter-spacing: 0.5px;
+        }
+        .btn {
+            width: 100%;
+            padding: 8px 12px;
+            background: var(--border);
+            border: 1px solid var(--border-strong);
+            color: var(--text);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-family: 'Space Grotesk', sans-serif;
+            transition: all 0.2s;
+            margin-bottom: 6px;
+        }
+        .btn:hover {
+            background: rgba(99, 102, 241, 0.2);
+            border-color: var(--accent);
+        }
+        .btn.active {
+            background: var(--accent);
+            color: var(--bg-secondary);
+            border-color: var(--accent);
+        }
+        .mode-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+        .mode-buttons .btn {
+            margin-bottom: 0;
+        }
+        .hierarchy {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 8px;
+            font-size: 11px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .bone-item {
+            padding: 4px 6px;
+            margin: 2px 0;
+            background: rgba(99, 102, 241, 0.2);
+            border-radius: 2px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .bone-item:hover {
+            background: rgba(99, 102, 241, 0.35);
+        }
+        .bone-item.selected {
+            background: rgba(99, 102, 241, 0.5);
+            color: var(--text);
+        }
+        .timeline {
+            height: 80px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            margin-top: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+        .timeline canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        .info-text {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 12px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="rigging-container">
+        <div class="viewport">
+            <canvas id="rigCanvas"></canvas>
+        </div>
+        <div class="control-panel">
+            <div class="control-group">
+                <h4>Kinematics</h4>
+                <div class="mode-buttons">
+                    <button class="btn active" data-mode="fk">FK</button>
+                    <button class="btn" data-mode="ik">IK</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h4>Animation</h4>
+                <button class="btn" data-action="playWalk">Play Walk Cycle</button>
+                <button class="btn" data-action="reset">Reset Pose</button>
+            </div>
+
+            <div class="control-group">
+                <h4>Bone Hierarchy</h4>
+                <div class="hierarchy" id="boneHierarchy">
+                    <div class="bone-item selected">Root</div>
+                    <div style="margin-left: 8px;">
+                        <div class="bone-item">Hips</div>
+                        <div style="margin-left: 8px;">
+                            <div class="bone-item">L.Upper</div>
+                            <div class="bone-item">L.Lower</div>
+                            <div class="bone-item">R.Upper</div>
+                            <div class="bone-item">R.Lower</div>
+                        </div>
+                        <div class="bone-item">Spine</div>
+                        <div style="margin-left: 8px;">
+                            <div class="bone-item">Chest</div>
+                            <div class="bone-item">Head</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h4>Timeline</h4>
+                <div class="timeline">
+                    <canvas id="timelineCanvas"></canvas>
+                </div>
+            </div>
+
+            <div class="info-text">
+                FK: Rotate each joint. IK: Drag end effector for automatic solving.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class RiggingDemo {
+            constructor(canvas, timelineCanvas) {
+                this.canvas = canvas;
+                this.ctx = canvas.getContext('2d');
+                this.timelineCanvas = timelineCanvas;
+                this.timelineCtx = timelineCanvas.getContext('2d');
+
+                this.mode = 'fk';
+                this.bones = [
+                    { name: 'Root', parent: -1, length: 0, angle: 0, x: 0, y: 0 },
+                    { name: 'Hips', parent: 0, length: 60, angle: 0, x: 0, y: 60 },
+                    { name: 'L.Upper', parent: 1, length: 80, angle: 0, x: -20, y: 140 },
+                    { name: 'L.Lower', parent: 2, length: 80, angle: 0, x: 0, y: 220 },
+                    { name: 'R.Upper', parent: 1, length: 80, angle: 0, x: 20, y: 140 },
+                    { name: 'R.Lower', parent: 4, length: 80, angle: 0, x: 0, y: 220 },
+                    { name: 'Spine', parent: 1, length: 60, angle: 0, x: 0, y: 120 },
+                    { name: 'Chest', parent: 6, length: 50, angle: 0, x: 0, y: 170 },
+                    { name: 'Head', parent: 7, length: 40, angle: 0, x: 0, y: 210 }
+                ];
+
+                this.playingAnimation = false;
+                this.animationTime = 0;
+                this.selectedBone = null;
+                this.draggingBone = null;
+                this.ikTarget = null;
+
+                this.resizeCanvas();
+                window.addEventListener('resize', () => this.resizeCanvas());
+                this.setupEvents();
+                this.updateBonePositions();
+                this.render();
+            }
+
+            resizeCanvas() {
+                const rect = this.canvas.parentElement.getBoundingClientRect();
+                this.canvas.width = rect.width;
+                this.canvas.height = rect.height;
+
+                const tlRect = this.timelineCanvas.parentElement.getBoundingClientRect();
+                this.timelineCanvas.width = tlRect.width;
+                this.timelineCanvas.height = tlRect.height;
+
+                this.render();
+            }
+
+            setupEvents() {
+                document.querySelectorAll('[data-mode]').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        document.querySelectorAll('[data-mode]').forEach(b => b.classList.remove('active'));
+                        e.target.classList.add('active');
+                        this.mode = e.target.dataset.mode;
+                        this.ikTarget = null;
+                    });
+                });
+
+                document.querySelectorAll('[data-action]').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const action = e.target.dataset.action;
+                        if (action === 'playWalk') this.playWalkCycle();
+                        else if (action === 'reset') this.resetPose();
+                    });
+                });
+
+                this.canvas.addEventListener('mousedown', (e) => this.onMouseDown(e));
+                this.canvas.addEventListener('mousemove', (e) => this.onMouseMove(e));
+                this.canvas.addEventListener('mouseup', (e) => this.onMouseUp(e));
+            }
+
+            updateBonePositions() {
+                const centerX = this.canvas.width / 2;
+                const centerY = this.canvas.height / 2.5;
+
+                this.bones.forEach((bone, i) => {
+                    if (bone.parent === -1) {
+                        bone.x = centerX;
+                        bone.y = centerY;
+                    } else {
+                        const parent = this.bones[bone.parent];
+                        const px = parent.x + Math.cos(parent.angle) * parent.length;
+                        const py = parent.y + Math.sin(parent.angle) * parent.length;
+                        bone.x = px;
+                        bone.y = py;
+                    }
+                });
+            }
+
+            playWalkCycle() {
+                this.playingAnimation = !this.playingAnimation;
+                if (this.playingAnimation) this.animateWalk();
+            }
+
+            animateWalk() {
+                if (!this.playingAnimation) return;
+
+                const t = (this.animationTime % 2) / 2;
+                const swing = Math.sin(t * Math.PI * 2) * 0.3;
+
+                this.bones[2].angle = swing + 0.2;
+                this.bones[3].angle = -swing * 0.5;
+                this.bones[4].angle = -swing + 0.2;
+                this.bones[5].angle = swing * 0.5;
+                this.bones[6].angle = -swing * 0.1;
+
+                this.animationTime += 0.016;
+                this.updateBonePositions();
+                this.render();
+                requestAnimationFrame(() => this.animateWalk());
+            }
+
+            resetPose() {
+                this.playingAnimation = false;
+                this.bones.forEach(b => b.angle = 0);
+                this.updateBonePositions();
+                this.render();
+            }
+
+            onMouseDown(e) {
+                const rect = this.canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                for (let i = this.bones.length - 1; i >= 0; i--) {
+                    const bone = this.bones[i];
+                    const dist = Math.hypot(bone.x - x, bone.y - y);
+                    if (dist < 12) {
+                        this.selectedBone = i;
+                        this.draggingBone = i;
+                        if (this.mode === 'ik' && i > 2) {
+                            this.ikTarget = { x, y };
+                        }
+                        break;
+                    }
+                }
+            }
+
+            onMouseMove(e) {
+                const rect = this.canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                if (this.draggingBone !== null) {
+                    if (this.mode === 'fk') {
+                        const bone = this.bones[this.draggingBone];
+                        const parent = this.bones[bone.parent];
+                        bone.angle = Math.atan2(y - parent.y, x - parent.x);
+                        this.updateBonePositions();
+                    } else if (this.mode === 'ik' && this.ikTarget) {
+                        this.ikTarget = { x, y };
+                        this.solveIK();
+                    }
+                    this.render();
+                }
+            }
+
+            onMouseUp(e) {
+                this.draggingBone = null;
+            }
+
+            solveIK() {
+                // Simple 2-bone IK solver
+                const legEnd = this.draggingBone;
+                if (legEnd < 2) return;
+
+                const legUpper = this.bones.findIndex((b, i) => i > 0 && b.parent === 1 && i < legEnd);
+                if (legUpper === -1) return;
+
+                const upper = this.bones[legUpper];
+                const lower = this.bones[legEnd];
+                const hip = this.bones[1];
+
+                const tx = this.ikTarget.x;
+                const ty = this.ikTarget.y;
+
+                // Distance from hip to target
+                const dx = tx - hip.x;
+                const dy = ty - hip.y;
+                const dist = Math.hypot(dx, dy);
+
+                // Upper leg angle
+                const len1 = upper.length;
+                const len2 = lower.length;
+                const maxDist = len1 + len2;
+                const d = Math.min(dist, maxDist * 0.95);
+
+                const cos2 = (d * d + len1 * len1 - len2 * len2) / (2 * d * len1);
+                const angle2 = Math.acos(Math.max(-1, Math.min(1, cos2)));
+                upper.angle = Math.atan2(dy, dx) - angle2;
+
+                // Lower leg angle
+                const childX = hip.x + Math.cos(upper.angle) * len1;
+                const childY = hip.y + Math.sin(upper.angle) * len1;
+                lower.angle = Math.atan2(ty - childY, tx - childX) - upper.angle;
+
+                this.updateBonePositions();
+            }
+
+            render() {
+                const w = this.canvas.width;
+                const h = this.canvas.height;
+
+                const styles = getComputedStyle(document.documentElement);
+                this.ctx.fillStyle = styles.getPropertyValue('--canvas-bg').trim();
+                this.ctx.fillRect(0, 0, w, h);
+
+                // Draw bones
+                this.ctx.strokeStyle = 'rgba(99, 102, 241, 0.6)';
+                this.ctx.lineWidth = 4;
+                this.bones.forEach((bone, i) => {
+                    if (bone.parent !== -1) {
+                        const parent = this.bones[bone.parent];
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(parent.x, parent.y);
+                        this.ctx.lineTo(bone.x, bone.y);
+                        this.ctx.stroke();
+                    }
+                });
+
+                // Draw joints
+                this.bones.forEach((bone, i) => {
+                    const isSelected = i === this.selectedBone;
+                    this.ctx.fillStyle = isSelected ? '#e74c3c' : styles.getPropertyValue('--accent').trim();
+                    this.ctx.beginPath();
+                    this.ctx.arc(bone.x, bone.y, isSelected ? 8 : 6, 0, Math.PI * 2);
+                    this.ctx.fill();
+                });
+
+                // Draw IK target
+                if (this.ikTarget) {
+                    this.ctx.fillStyle = 'rgba(52, 152, 219, 0.6)';
+                    this.ctx.beginPath();
+                    this.ctx.arc(this.ikTarget.x, this.ikTarget.y, 4, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+
+                this.renderTimeline();
+            }
+
+            renderTimeline() {
+                const w = this.timelineCanvas.width;
+                const h = this.timelineCanvas.height;
+
+                const styles = getComputedStyle(document.documentElement);
+                this.timelineCtx.fillStyle = styles.getPropertyValue('--bg').trim();
+                this.timelineCtx.fillRect(0, 0, w, h);
+
+                // Grid
+                this.timelineCtx.strokeStyle = 'rgba(228, 228, 231, 0.1)';
+                this.timelineCtx.lineWidth = 0.5;
+                for (let i = 0; i <= 10; i++) {
+                    const x = (w / 10) * i;
+                    this.timelineCtx.beginPath();
+                    this.timelineCtx.moveTo(x, 0);
+                    this.timelineCtx.lineTo(x, h);
+                    this.timelineCtx.stroke();
+                }
+
+                // Keyframes
+                for (let i = 0; i <= 8; i++) {
+                    const x = (w / 8) * i;
+                    this.timelineCtx.fillStyle = i % 2 === 0 ? 'rgba(99, 102, 241, 0.5)' : 'rgba(99, 102, 241, 0.2)';
+                    this.timelineCtx.fillRect(x - 2, h / 2 - 4, 4, 8);
+                }
+
+                // Playhead
+                const playhead = this.playingAnimation ? ((this.animationTime % 2) / 2) * w : 0;
+                this.timelineCtx.fillStyle = '#e74c3c';
+                this.timelineCtx.beginPath();
+                this.timelineCtx.moveTo(playhead, 0);
+                this.timelineCtx.lineTo(playhead - 4, 6);
+                this.timelineCtx.lineTo(playhead + 4, 6);
+                this.timelineCtx.closePath();
+                this.timelineCtx.fill();
+            }
+        }
+
+        const canvas = document.getElementById('rigCanvas');
+        const timelineCanvas = document.getElementById('timelineCanvas');
+        const demo = new RiggingDemo(canvas, timelineCanvas);
+    </script>
+</body>
+</html>

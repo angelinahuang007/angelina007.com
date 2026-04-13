@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Realtime Rendering Pipeline</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        body { padding: 20px; font-family: 'Space Grotesk', sans-serif; }
+
+        .pipeline-flow { display: flex; gap: 20px; margin: 30px 0; overflow-x: auto; padding: 20px 0; }
+        .pipeline-stage {
+            flex: 0 0 200px; background: var(--bg-secondary); border: 2px solid var(--border-color);
+            border-radius: 8px; padding: 15px; text-align: center; transition: all 0.3s;
+            cursor: pointer; user-select: none;
+        }
+        .pipeline-stage:hover { transform: translateY(-4px); border-color: var(--accent);
+                               box-shadow: 0 8px 16px rgba(0,0,0,0.2); }
+        .pipeline-stage h3 { margin: 0 0 8px 0; color: var(--primary); font-size: 14px; }
+        .pipeline-stage p { margin: 0; font-size: 11px; opacity: 0.8; }
+        .pipeline-stage.active { background: var(--accent) + '20'; border-color: var(--accent); }
+
+        .flow-arrow {
+            flex: 0 0 30px; display: flex; align-items: center; justify-content: center;
+            font-size: 24px; color: var(--accent);
+        }
+
+        .canvas-container { display: flex; gap: 20px; margin: 30px 0; }
+        canvas { border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-secondary);
+                 display: block; }
+
+        .info-box { background: var(--bg-secondary); padding: 15px; border-radius: 6px; margin: 15px 0; }
+        .info-box h3 { margin-top: 0; color: var(--primary); }
+        .info-box p { margin: 8px 0; font-size: 13px; }
+
+        .controls { margin: 20px 0; display: flex; gap: 10px; flex-wrap: wrap; }
+        button {
+            padding: 10px 16px; border: none; border-radius: 6px;
+            background: var(--accent); color: white; cursor: pointer; font-weight: 500;
+            transition: all 0.2s; font-family: 'Space Grotesk', sans-serif;
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        button.active { background: var(--primary); }
+
+        .slider-group { margin: 15px 0; display: flex; align-items: center; gap: 10px; }
+        .slider-group label { min-width: 100px; font-weight: 500; }
+        input[type="range"] { flex: 1; max-width: 200px; }
+
+        .buffer-label { position: absolute; bottom: 5px; left: 5px; background: rgba(0,0,0,0.5);
+                       color: white; padding: 4px 8px; border-radius: 3px; font-size: 11px;
+                       font-family: 'JetBrains Mono', monospace; }
+        .stage-canvas-wrapper { position: relative; }
+    </style>
+</head>
+<body>
+    <h1>Realtime Rendering Pipeline</h1>
+    <p>Interactive deferred rendering pipeline. Click each stage to inspect G-Buffers, lighting, and post-processing.</p>
+
+    <div class="controls">
+        <button onclick="toggleSSAO()" id="ssaoBtn" class="active">SSAO: ON</button>
+        <button onclick="toggleBloom()" id="bloomBtn" class="active">Bloom: ON</button>
+        <button onclick="toggleMotionBlur()" id="mbBtn">Motion Blur: OFF</button>
+        <button onclick="resetScene()">Reset</button>
+    </div>
+
+    <h3>Pipeline Flow</h3>
+    <div class="pipeline-flow">
+        <div class="pipeline-stage" onclick="selectStage(0)">
+            <h3>Scene</h3>
+            <p>3D geometry</p>
+        </div>
+        <div class="flow-arrow">→</div>
+
+        <div class="pipeline-stage" onclick="selectStage(1)">
+            <h3>G-Buffer Pass</h3>
+            <p>Albedo, Normal, Depth, PBR</p>
+        </div>
+        <div class="flow-arrow">→</div>
+
+        <div class="pipeline-stage" onclick="selectStage(2)">
+            <h3>Lighting Pass</h3>
+            <p>Direct & Indirect Light</p>
+        </div>
+        <div class="flow-arrow">→</div>
+
+        <div class="pipeline-stage" onclick="selectStage(3)">
+            <h3>Post-Processing</h3>
+            <p>SSAO, Bloom, Tone Mapping</p>
+        </div>
+        <div class="flow-arrow">→</div>
+
+        <div class="pipeline-stage" onclick="selectStage(4)">
+            <h3>Output</h3>
+            <p>Final Framebuffer</p>
+        </div>
+    </div>
+
+    <h3>G-Buffer Decomposition</h3>
+    <div class="canvas-container" id="gBufferContainer">
+        <!-- Canvas elements will be created here -->
+    </div>
+
+    <h3>Lighting & Post-Processing</h3>
+    <div class="canvas-container">
+        <div class="stage-canvas-wrapper">
+            <canvas id="lightingCanvas" width="400" height="300"></canvas>
+            <div class="buffer-label">Lighting</div>
+        </div>
+        <div class="stage-canvas-wrapper">
+            <canvas id="finalCanvas" width="400" height="300"></canvas>
+            <div class="buffer-label">Final Output</div>
+        </div>
+    </div>
+
+    <div class="info-box" id="stageInfo">
+        <h3 id="stageTitle">Scene Setup</h3>
+        <p id="stageDesc">3D scene is rendered to the G-Buffer. Each pixel stores material properties and geometry information.</p>
+    </div>
+
+    <div class="info-box">
+        <h3>Deferred Rendering Advantages</h3>
+        <p><strong>Decoupling:</strong> Geometry pass doesn't know about lights. Allows many lights efficiently.</p>
+        <p><strong>Scalability:</strong> Light count doesn't affect G-Buffer complexity.</p>
+        <p><strong>Trade-off:</strong> Higher bandwidth (multiple render targets), challenges with MSAA.</p>
+    </div>
+
+    <script>
+        const gBufferContainer = document.getElementById('gBufferContainer');
+        const lightingCanvas = document.getElementById('lightingCanvas');
+        const finalCanvas = document.getElementById('finalCanvas');
+        const lightingCtx = lightingCanvas.getContext('2d');
+        const finalCtx = finalCanvas.getContext('2d');
+
+        let ssaoEnabled = true;
+        let bloomEnabled = true;
+        let motionBlurEnabled = false;
+        let selectedStage = -1;
+        let time = 0;
+
+        const bufferNames = ['Albedo', 'Normal', 'Depth', 'Metallic'];
+        const gBufferCanvases = [];
+
+        // Create G-Buffer canvases
+        for (let i = 0; i < bufferNames.length; i++) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'stage-canvas-wrapper';
+            const canvas = document.createElement('canvas');
+            canvas.width = 150;
+            canvas.height = 150;
+            canvas.className = `gBuffer-${i}`;
+            canvas.style.border = '1px solid var(--border-color)';
+            canvas.style.borderRadius = '8px';
+            canvas.style.backgroundColor = 'var(--bg-secondary)';
+            canvas.style.display = 'block';
+            canvas.style.margin = '5px 0';
+
+            const label = document.createElement('div');
+            label.className = 'buffer-label';
+            label.textContent = bufferNames[i];
+
+            wrapper.appendChild(canvas);
+            wrapper.appendChild(label);
+            gBufferContainer.appendChild(wrapper);
+            gBufferCanvases.push(canvas.getContext('2d'));
+        }
+
+        const scene = {
+            shapes: [
+                {x: 80, y: 150, type: 'rect', w: 60, h: 60, color: '#ff6666'},
+                {x: 200, y: 100, type: 'circle', r: 40, color: '#66ff66'},
+                {x: 300, y: 180, type: 'triangle', size: 50, color: '#6666ff'}
+            ]
+        };
+
+        function drawShape(ctx, shape, width, height) {
+            ctx.save();
+            if (shape.type === 'rect') {
+                ctx.fillRect(shape.x - shape.w / 2, shape.y - shape.h / 2, shape.w, shape.h);
+            } else if (shape.type === 'circle') {
+                ctx.beginPath();
+                ctx.arc(shape.x, shape.y, shape.r, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (shape.type === 'triangle') {
+                ctx.beginPath();
+                ctx.moveTo(shape.x, shape.y - shape.size / 2);
+                ctx.lineTo(shape.x + shape.size / 2, shape.y + shape.size / 2);
+                ctx.lineTo(shape.x - shape.size / 2, shape.y + shape.size / 2);
+                ctx.closePath();
+                ctx.fill();
+            }
+            ctx.restore();
+        }
+
+        function renderGBuffers() {
+            const colors = Wiki.colors();
+            const buffers = gBufferCanvases;
+            const w = 150, h = 150;
+
+            // Albedo
+            buffers[0].fillStyle = colors.bg_secondary;
+            buffers[0].fillRect(0, 0, w, h);
+            for (const shape of scene.shapes) {
+                buffers[0].fillStyle = shape.color;
+                drawShape(buffers[0], shape, w, h);
+            }
+
+            // Normal
+            buffers[1].fillStyle = colors.bg_secondary;
+            buffers[1].fillRect(0, 0, w, h);
+            for (const shape of scene.shapes) {
+                const hue = Math.random() * 360;
+                buffers[1].fillStyle = `hsl(${hue}, 100%, 50%)`;
+                drawShape(buffers[1], shape, w, h);
+            }
+
+            // Depth
+            buffers[2].fillStyle = colors.bg_secondary;
+            buffers[2].fillRect(0, 0, w, h);
+            for (let i = 0; i < scene.shapes.length; i++) {
+                const depth = (i + 1) / scene.shapes.length;
+                const gray = Math.floor(depth * 255);
+                buffers[2].fillStyle = `rgb(${gray}, ${gray}, ${gray})`;
+                drawShape(buffers[2], scene.shapes[i], w, h);
+            }
+
+            // Metallic
+            buffers[3].fillStyle = colors.bg_secondary;
+            buffers[3].fillRect(0, 0, w, h);
+            for (let i = 0; i < scene.shapes.length; i++) {
+                const metallic = (i * 0.3) % 1;
+                buffers[3].fillStyle = `rgba(100, 100, 100, ${metallic})`;
+                drawShape(buffers[3], scene.shapes[i], w, h);
+            }
+        }
+
+        function renderLighting() {
+            const colors = Wiki.colors();
+            const w = lightingCanvas.width;
+            const h = lightingCanvas.height;
+
+            lightingCtx.fillStyle = colors.bg_secondary;
+            lightingCtx.fillRect(0, 0, w, h);
+
+            // Light source simulation
+            const lightX = 100 + Math.sin(time) * 30;
+            const lightY = 80 + Math.cos(time * 0.7) * 30;
+
+            // Draw shapes with lighting
+            for (const shape of scene.shapes) {
+                // Distance-based lighting
+                const dx = lightX - shape.x;
+                const dy = lightY - shape.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const brightness = Math.max(0.2, 1 - dist / 150);
+
+                lightingCtx.fillStyle = shape.color;
+                lightingCtx.globalAlpha = brightness * 0.8;
+                drawShape(lightingCtx, shape, w, h);
+                lightingCtx.globalAlpha = 1;
+            }
+
+            // Light glow
+            lightingCtx.fillStyle = 'rgba(255, 255, 100, 0.3)';
+            lightingCtx.beginPath();
+            lightingCtx.arc(lightX, lightY, 80, 0, Math.PI * 2);
+            lightingCtx.fill();
+
+            lightingCtx.fillStyle = colors.accent;
+            lightingCtx.beginPath();
+            lightingCtx.arc(lightX, lightY, 6, 0, Math.PI * 2);
+            lightingCtx.fill();
+        }
+
+        function renderFinal() {
+            const colors = Wiki.colors();
+            const w = finalCanvas.width;
+            const h = finalCanvas.height;
+
+            finalCtx.fillStyle = colors.bg_secondary;
+            finalCtx.fillRect(0, 0, w, h);
+
+            // Copy lighting
+            finalCtx.drawImage(lightingCanvas, 0, 0, w, h);
+
+            // SSAO (Screen Space Ambient Occlusion)
+            if (ssaoEnabled) {
+                finalCtx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+                for (let i = 0; i < 20; i++) {
+                    const x = Math.random() * w;
+                    const y = Math.random() * h;
+                    const r = 5 + Math.random() * 20;
+                    finalCtx.beginPath();
+                    finalCtx.arc(x, y, r, 0, Math.PI * 2);
+                    finalCtx.fill();
+                }
+            }
+
+            // Bloom (bright areas glow)
+            if (bloomEnabled) {
+                finalCtx.fillStyle = 'rgba(255, 255, 100, 0.15)';
+                for (let i = 0; i < 30; i++) {
+                    const x = Math.random() * w;
+                    const y = Math.random() * h;
+                    const r = 10 + Math.random() * 50;
+                    finalCtx.beginPath();
+                    finalCtx.arc(x, y, r, 0, Math.PI * 2);
+                    finalCtx.fill();
+                }
+            }
+
+            // Motion blur (temporal blur)
+            if (motionBlurEnabled) {
+                finalCtx.globalAlpha = 0.1;
+                finalCtx.drawImage(lightingCanvas, Math.sin(time) * 2, Math.cos(time) * 2, w, h);
+                finalCtx.globalAlpha = 1;
+            }
+        }
+
+        function selectStage(stage) {
+            selectedStage = stage;
+            const stages = [
+                {title: 'Scene Setup', desc: '3D scene is rendered to the G-Buffer. Each pixel stores material properties and geometry information.'},
+                {title: 'G-Buffer Pass', desc: 'Multiple render targets capture Albedo (base color), Normal vectors, Depth, and PBR parameters. Decouples geometry from lighting.'},
+                {title: 'Lighting Pass', desc: 'Uses G-Buffer data to compute lighting. Direct light from point sources, indirect from environment maps. Very efficient with many lights.'},
+                {title: 'Post-Processing', desc: 'SSAO darkens corners and crevices. Bloom makes bright areas glow. Tone mapping converts HDR to LDR display range.'},
+                {title: 'Final Output', desc: 'Composed framebuffer ready for display. Result of all passes combined with post-effects.'}
+            ];
+            document.getElementById('stageTitle').textContent = stages[stage].title;
+            document.getElementById('stageDesc').textContent = stages[stage].desc;
+        }
+
+        function toggleSSAO() {
+            ssaoEnabled = !ssaoEnabled;
+            document.getElementById('ssaoBtn').classList.toggle('active');
+            document.getElementById('ssaoBtn').textContent = 'SSAO: ' + (ssaoEnabled ? 'ON' : 'OFF');
+        }
+
+        function toggleBloom() {
+            bloomEnabled = !bloomEnabled;
+            document.getElementById('bloomBtn').classList.toggle('active');
+            document.getElementById('bloomBtn').textContent = 'Bloom: ' + (bloomEnabled ? 'ON' : 'OFF');
+        }
+
+        function toggleMotionBlur() {
+            motionBlurEnabled = !motionBlurEnabled;
+            document.getElementById('mbBtn').classList.toggle('active');
+            document.getElementById('mbBtn').textContent = 'Motion Blur: ' + (motionBlurEnabled ? 'ON' : 'OFF');
+        }
+
+        function resetScene() {
+            time = 0;
+            ssaoEnabled = true;
+            bloomEnabled = true;
+            motionBlurEnabled = false;
+            document.getElementById('ssaoBtn').classList.add('active');
+            document.getElementById('ssaoBtn').textContent = 'SSAO: ON';
+            document.getElementById('bloomBtn').classList.add('active');
+            document.getElementById('bloomBtn').textContent = 'Bloom: ON';
+            document.getElementById('mbBtn').classList.remove('active');
+            document.getElementById('mbBtn').textContent = 'Motion Blur: OFF';
+        }
+
+        function animate() {
+            time += 0.016;
+            renderGBuffers();
+            renderLighting();
+            renderFinal();
+            requestAnimationFrame(animate);
+        }
+
+        selectStage(0);
+        animate();
+    </script>
+</body>
+</html>

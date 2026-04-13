@@ -1,0 +1,20 @@
+{
+  "title": "Curves and Surfaces in Graphics",
+  "category": "graphics-fundamentals",
+  "tags": [
+    "curves",
+    "surfaces",
+    "bezier",
+    "splines",
+    "nurbs",
+    "subdivision",
+    "continuity"
+  ],
+  "description": "Bezier curves, B-splines, NURBS, Bezier surfaces, Catmull-Clark and Loop subdivision, continuity classes, and applications in modeling and rendering.",
+  "related": [
+    "blender/modeling-workflow",
+    "algorithms/computational-geometry",
+    "graphics-fundamentals/mesh-operations"
+  ],
+  "order": 7
+}

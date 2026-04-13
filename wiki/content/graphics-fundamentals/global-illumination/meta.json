@@ -1,0 +1,19 @@
+{
+  "title": "Global Illumination and Advanced Rendering",
+  "category": "graphics-fundamentals",
+  "tags": [
+    "global-illumination",
+    "path-tracing",
+    "photon-mapping",
+    "radiosity",
+    "monte-carlo",
+    "rendering-equation"
+  ],
+  "description": "Path tracing, Monte Carlo integration, importance sampling, photon mapping, radiosity, and the complete rendering equation with convergence analysis.",
+  "related": [
+    "graphics-fundamentals/ray-tracing-fundamentals",
+    "graphics-fundamentals/shading-models",
+    "frontier/realtime-gi"
+  ],
+  "order": 9
+}

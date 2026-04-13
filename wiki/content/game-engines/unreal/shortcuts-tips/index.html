@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unreal Engine Shortcuts & Tips</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--bg-dark); color: var(--fg-light); font-family: 'Space Grotesk', sans-serif; }
+
+        .page { max-width: 900px; margin: 0 auto; padding: 24px; }
+        h1 { font-family: 'Space Grotesk'; font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+        .subtitle { color: var(--fg-muted); font-size: 13px; margin-bottom: 20px; }
+
+        /* Tabs */
+        .mode-bar { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+        .mode-tab {
+            padding: 6px 14px;
+            font-family: 'Space Mono'; font-size: 11px; font-weight: 700;
+            border: 1px solid var(--fg-dark); background: transparent; color: var(--fg-muted);
+            border-radius: 4px; cursor: pointer; transition: all 0.15s;
+        }
+        .mode-tab:hover { border-color: var(--accent); color: var(--accent); }
+        .mode-tab.active { background: var(--accent); color: var(--bg-dark); border-color: var(--accent); }
+
+        .search-input {
+            margin-left: auto;
+            padding: 6px 12px;
+            font-family: 'Space Grotesk'; font-size: 12px;
+            background: var(--bg-darker); color: var(--fg-light);
+            border: 1px solid var(--fg-dark); border-radius: 4px;
+            width: 200px;
+        }
+        .search-input::placeholder { color: var(--fg-dark); }
+
+        /* Cards grid */
+        .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+
+        .category-card {
+            background: var(--bg-darker);
+            border: 1px solid var(--fg-dark);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .category-header {
+            padding: 10px 14px;
+            font-family: 'Space Mono'; font-size: 11px; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.5px;
+            color: var(--bg-dark);
+            background: var(--accent);
+        }
+        .category-body { padding: 6px 0; }
+
+        .shortcut-row {
+            display: flex; align-items: center;
+            padding: 7px 14px;
+            transition: background 0.1s;
+        }
+        .shortcut-row:hover { background: rgba(255,255,255,0.03); }
+
+        .sc-keys {
+            font-family: 'JetBrains Mono'; font-size: 12px; font-weight: 500;
+            color: var(--accent);
+            min-width: 120px;
+            display: flex; gap: 4px; flex-wrap: wrap;
+        }
+        .sc-key {
+            display: inline-block;
+            padding: 2px 7px;
+            background: rgba(99, 102, 241, 0.12);
+            border: 1px solid rgba(99, 102, 241, 0.25);
+            border-radius: 3px;
+            font-size: 11px;
+            line-height: 1.4;
+        }
+        :root.light .sc-key {
+            background: rgba(180, 83, 9, 0.1);
+            border-color: rgba(180, 83, 9, 0.25);
+        }
+
+        .sc-desc {
+            font-size: 12px; color: var(--fg-muted);
+            flex: 1;
+        }
+
+        .sc-context {
+            font-family: 'Space Mono'; font-size: 9px;
+            color: var(--fg-dark);
+            padding: 1px 6px;
+            border: 1px solid var(--fg-dark);
+            border-radius: 2px;
+            white-space: nowrap;
+        }
+
+        /* Tips section */
+        .tips-section { margin-top: 24px; }
+        .tip-card {
+            background: var(--bg-darker);
+            border: 1px solid var(--fg-dark);
+            border-left: 3px solid var(--accent);
+            border-radius: 6px;
+            padding: 14px 16px;
+            margin-bottom: 10px;
+        }
+        .tip-title {
+            font-family: 'Space Mono'; font-size: 12px; font-weight: 700;
+            color: var(--accent); margin-bottom: 4px;
+        }
+        .tip-body { font-size: 12px; color: var(--fg-muted); line-height: 1.6; }
+
+        .hidden { display: none !important; }
+
+        .count-badge {
+            font-family: 'Space Mono'; font-size: 10px;
+            color: var(--fg-dark); margin-left: 8px;
+        }
+    </style>
+</head>
+<body>
+<div class="page">
+    <h1>Unreal Engine Shortcuts & Tips</h1>
+    <p class="subtitle">Quick reference for Unreal Engine keyboard shortcuts by mode. Search or filter by mode.</p>
+
+    <div class="mode-bar">
+        <button class="mode-tab active" data-mode="all">All</button>
+        <button class="mode-tab" data-mode="general">General</button>
+        <button class="mode-tab" data-mode="viewport">Viewport</button>
+        <button class="mode-tab" data-mode="level">Level</button>
+        <button class="mode-tab" data-mode="blueprints">Blueprints</button>
+        <button class="mode-tab" data-mode="materials">Materials</button>
+        <input class="search-input" id="searchInput" type="text" placeholder="Search shortcuts...">
+        <span class="count-badge" id="countBadge"></span>
+    </div>
+
+    <div class="cards" id="cardsContainer"></div>
+
+    <div class="tips-section" id="tipsSection">
+        <div class="tip-card">
+            <div class="tip-title">Viewport Navigation</div>
+            <div class="tip-body">Master the viewport movement with <strong>RMB+WASD</strong> for flight, <strong>Alt+LMB</strong> for orbiting, and <strong>Scroll</strong> to zoom. Use <strong>G</strong> to toggle game view for real-time testing without leaving the editor.</div>
+        </div>
+        <div class="tip-card">
+            <div class="tip-title">Blueprint Productivity</div>
+            <div class="tip-body">Use keyboard shortcuts to place nodes faster: <strong>B+LMB</strong> for Branch, <strong>S+LMB</strong> for Sequence, <strong>C</strong> for Comments. <strong>Ctrl+Shift+F</strong> opens powerful Find-in-Blueprints for searching across all your scripts.</div>
+        </div>
+        <div class="tip-card">
+            <div class="tip-title">Material Editor Tricks</div>
+            <div class="tip-body">Use number pad hotkeys to quickly add nodes: <strong>1+LMB</strong> for Scalar, <strong>2+LMB</strong> for Vector, <strong>3+LMB</strong> for Texture, <strong>4+LMB</strong> for Color. <strong>L+LMB</strong> adds Lerp nodes and <strong>M+LMB</strong> adds Multiply.</div>
+        </div>
+    </div>
+</div>
+
+<script>
+const shortcuts = [
+    // General
+    { keys: ['Ctrl+Z'], desc: 'Undo', mode: 'general', cat: 'General' },
+    { keys: ['Ctrl+Y'], desc: 'Redo', mode: 'general', cat: 'General' },
+    { keys: ['Ctrl+S'], desc: 'Save current', mode: 'general', cat: 'General' },
+    { keys: ['Ctrl+Shift+S'], desc: 'Save all', mode: 'general', cat: 'General' },
+    { keys: ['Delete'], desc: 'Delete', mode: 'general', cat: 'General' },
+    { keys: ['F'], desc: 'Focus on selected', mode: 'general', cat: 'General' },
+    { keys: ['End'], desc: 'Snap to floor', mode: 'general', cat: 'General' },
+
+    // Viewport Navigation
+    { keys: ['RMB+WASD'], desc: 'Fly camera', mode: 'viewport', cat: 'Viewport Navigation' },
+    { keys: ['MMB Drag'], desc: 'Pan view', mode: 'viewport', cat: 'Viewport Navigation' },
+    { keys: ['Alt+LMB'], desc: 'Orbit around target', mode: 'viewport', cat: 'Viewport Navigation' },
+    { keys: ['Scroll'], desc: 'Zoom in / out', mode: 'viewport', cat: 'Viewport Navigation' },
+    { keys: ['F'], desc: 'Focus on selection', mode: 'viewport', cat: 'Viewport Navigation' },
+    { keys: ['G'], desc: 'Toggle game view', mode: 'viewport', cat: 'Viewport Navigation' },
+    { keys: ['Ctrl+1'], desc: 'Bookmark view 1', mode: 'viewport', cat: 'Viewport Navigation' },
+    { keys: ['Ctrl+2'], desc: 'Bookmark view 2', mode: 'viewport', cat: 'Viewport Navigation' },
+    { keys: ['Ctrl+3'], desc: 'Bookmark view 3', mode: 'viewport', cat: 'Viewport Navigation' },
+    { keys: ['Ctrl+4'], desc: 'Bookmark view 4', mode: 'viewport', cat: 'Viewport Navigation' },
+    { keys: ['Ctrl+5'], desc: 'Bookmark view 5', mode: 'viewport', cat: 'Viewport Navigation' },
+    { keys: ['Ctrl+6'], desc: 'Bookmark view 6', mode: 'viewport', cat: 'Viewport Navigation' },
+    { keys: ['Ctrl+7'], desc: 'Bookmark view 7', mode: 'viewport', cat: 'Viewport Navigation' },
+    { keys: ['Ctrl+8'], desc: 'Bookmark view 8', mode: 'viewport', cat: 'Viewport Navigation' },
+    { keys: ['Ctrl+9'], desc: 'Bookmark view 9', mode: 'viewport', cat: 'Viewport Navigation' },
+
+    // Level Editor
+    { keys: ['Ctrl+D'], desc: 'Duplicate selected', mode: 'level', cat: 'Level Editor' },
+    { keys: ['Alt+Drag'], desc: 'Duplicate and move', mode: 'level', cat: 'Level Editor' },
+    { keys: ['Ctrl+G'], desc: 'Group selected', mode: 'level', cat: 'Level Editor' },
+    { keys: ['Shift+G'], desc: 'Ungroup selected', mode: 'level', cat: 'Level Editor' },
+    { keys: ['Ctrl+E'], desc: 'Edit asset in editor', mode: 'level', cat: 'Level Editor' },
+    { keys: ['H'], desc: 'Hide selected', mode: 'level', cat: 'Level Editor' },
+    { keys: ['Ctrl+B'], desc: 'Find in Content Browser', mode: 'level', cat: 'Level Editor' },
+
+    // Blueprints
+    { keys: ['Ctrl+Shift+F'], desc: 'Find in Blueprints', mode: 'blueprints', cat: 'Blueprint Editor' },
+    { keys: ['B+LMB'], desc: 'Create Branch node', mode: 'blueprints', cat: 'Blueprint Editor' },
+    { keys: ['S+LMB'], desc: 'Create Sequence node', mode: 'blueprints', cat: 'Blueprint Editor' },
+    { keys: ['C'], desc: 'Create comment', mode: 'blueprints', cat: 'Blueprint Editor' },
+    { keys: ['Ctrl+W'], desc: 'Duplicate node', mode: 'blueprints', cat: 'Blueprint Editor' },
+    { keys: ['Q'], desc: 'Align nodes left', mode: 'blueprints', cat: 'Blueprint Editor' },
+    { keys: ['E'], desc: 'Align nodes right', mode: 'blueprints', cat: 'Blueprint Editor' },
+    { keys: ['W'], desc: 'Align nodes top', mode: 'blueprints', cat: 'Blueprint Editor' },
+    { keys: ['A'], desc: 'Align nodes bottom', mode: 'blueprints', cat: 'Blueprint Editor' },
+    { keys: ['Ctrl+A'], desc: 'Select all nodes', mode: 'blueprints', cat: 'Blueprint Editor' },
+    { keys: ['Delete'], desc: 'Delete selected node', mode: 'blueprints', cat: 'Blueprint Editor' },
+
+    // Materials
+    { keys: ['1+LMB'], desc: 'Add Scalar node', mode: 'materials', cat: 'Material Editor' },
+    { keys: ['2+LMB'], desc: 'Add Vector node', mode: 'materials', cat: 'Material Editor' },
+    { keys: ['3+LMB'], desc: 'Add Texture node', mode: 'materials', cat: 'Material Editor' },
+    { keys: ['4+LMB'], desc: 'Add Color node', mode: 'materials', cat: 'Material Editor' },
+    { keys: ['L+LMB'], desc: 'Add Lerp node', mode: 'materials', cat: 'Material Editor' },
+    { keys: ['M+LMB'], desc: 'Add Multiply node', mode: 'materials', cat: 'Material Editor' },
+    { keys: ['U+LMB'], desc: 'Add UV coords node', mode: 'materials', cat: 'Material Editor' },
+    { keys: ['Ctrl+A'], desc: 'Select all nodes', mode: 'materials', cat: 'Material Editor' },
+    { keys: ['Delete'], desc: 'Delete selected node', mode: 'materials', cat: 'Material Editor' },
+];
+
+let currentMode = 'all';
+let searchQuery = '';
+
+function render() {
+    const filtered = shortcuts.filter(sc => {
+        const modeMatch = currentMode === 'all' || sc.mode === currentMode;
+        const searchMatch = !searchQuery ||
+            sc.desc.toLowerCase().includes(searchQuery) ||
+            sc.keys.join(' ').toLowerCase().includes(searchQuery) ||
+            sc.cat.toLowerCase().includes(searchQuery);
+        return modeMatch && searchMatch;
+    });
+
+    // Group by category
+    const groups = {};
+    filtered.forEach(sc => {
+        if (!groups[sc.cat]) groups[sc.cat] = [];
+        groups[sc.cat].push(sc);
+    });
+
+    const container = document.getElementById('cardsContainer');
+    container.innerHTML = Object.entries(groups).map(([cat, items]) => `
+        <div class="category-card">
+            <div class="category-header">${cat}</div>
+            <div class="category-body">
+                ${items.map(sc => `
+                    <div class="shortcut-row">
+                        <div class="sc-keys">${sc.keys.map(k => `<span class="sc-key">${k}</span>`).join('')}</div>
+                        <div class="sc-desc">${sc.desc}</div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `).join('');
+
+    document.getElementById('countBadge').textContent = `${filtered.length} shortcuts`;
+
+    // Show/hide tips based on search
+    document.getElementById('tipsSection').classList.toggle('hidden', searchQuery.length > 0);
+}
+
+// Mode tabs
+document.querySelectorAll('.mode-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        currentMode = tab.dataset.mode;
+        render();
+    });
+});
+
+// Search
+document.getElementById('searchInput').addEventListener('input', (e) => {
+    searchQuery = e.target.value.toLowerCase().trim();
+    render();
+});
+
+render();
+</script>
+</body>
+</html>

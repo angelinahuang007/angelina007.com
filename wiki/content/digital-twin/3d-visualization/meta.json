@@ -1,0 +1,19 @@
+{
+  "title": "3D Visualization for Digital Twins",
+  "category": "digital-twin",
+  "tags": [
+    "3D-visualization",
+    "Three.js",
+    "WebGL",
+    "BIM",
+    "point-cloud"
+  ],
+  "description": "Web-based and game engine 3D visualization techniques, BIM integration, real-time data overlay, and performance optimization for digital twin interfaces.",
+  "related": [
+    "digital-twin/architecture-overview",
+    "game-engines/unity/architecture-workflow",
+    "game-engines/unreal/architecture-blueprints",
+    "concepts/realtime-systems"
+  ],
+  "order": 4
+}

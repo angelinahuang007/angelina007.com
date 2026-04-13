@@ -86,6 +86,10 @@ Desktop.ini
 
 # ─── Docker ───
 docker-compose.override.yml
+docker-compose.old.yml
+
+# ─── Wiki ───
+wiki/node_modules/
 
 # ─── Vercel ───
 .vercel/

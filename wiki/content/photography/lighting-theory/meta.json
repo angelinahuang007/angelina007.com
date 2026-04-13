@@ -1,0 +1,19 @@
+{
+  "title": "Photography Lighting Theory and Practice",
+  "category": "photography",
+  "order": 3,
+  "tags": [
+    "photography",
+    "lighting",
+    "color-temperature",
+    "three-point",
+    "studio"
+  ],
+  "description": "Principles of light quality, color temperature, inverse square law, classic lighting patterns, three-point lighting setup, and application to 3D scene illumination and rendering.",
+  "related": [
+    "graphics-fundamentals/shading-models",
+    "graphics-fundamentals/pbr-rendering",
+    "game-engines/unity/lighting-postprocessing",
+    "photography/virtual-cinematography"
+  ]
+}

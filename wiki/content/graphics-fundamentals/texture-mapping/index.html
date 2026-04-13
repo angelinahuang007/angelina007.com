@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Texture Mapping</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        body { padding: 20px; font-family: 'Space Grotesk', sans-serif; }
+        .article { max-width: 900px; margin: 0 auto; }
+
+        .canvas-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin: 30px 0; }
+
+        canvas {
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-secondary);
+            display: block;
+            width: 100%;
+            max-width: 400px;
+            aspect-ratio: 1;
+        }
+
+        .canvas-container { display: flex; flex-direction: column; align-items: center; }
+        .canvas-container h3 { text-align: center; margin-bottom: 15px; }
+
+        .controls {
+            background: var(--bg-secondary);
+            padding: 25px;
+            border-radius: 8px;
+            margin: 30px 0;
+            border: 1px solid var(--border-color);
+        }
+
+        .control-section { margin-bottom: 25px; }
+        .control-section:last-child { margin-bottom: 0; }
+        .control-section h4 { margin-top: 0; margin-bottom: 15px; font-weight: 600; font-size: 14px; }
+
+        .control-group { margin: 15px 0; }
+        .control-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-weight: 500;
+            font-size: 13px;
+        }
+
+        input[type="range"] { width: 100%; }
+
+        .button-group {
+            display: flex;
+            gap: 8px;
+            margin: 10px 0;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 8px 12px;
+            border: 2px solid var(--border-color);
+            background: transparent;
+            color: var(--text);
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+            border-radius: 4px;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 12px;
+        }
+
+        button.active {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+
+        button:hover { transform: translateY(-1px); }
+
+        .info-box {
+            background: var(--bg-secondary);
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+            font-size: 13px;
+            border-left: 4px solid var(--accent);
+        }
+
+        .formula-box {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            margin: 10px 0;
+            padding: 10px;
+            background: var(--bg-secondary);
+            border-left: 3px solid var(--accent);
+            overflow-x: auto;
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .comparison-item h4 {
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 13px;
+        }
+
+        .comparison-canvas {
+            width: 100%;
+            max-width: 250px;
+            aspect-ratio: 1;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            display: block;
+            margin: 0 auto;
+        }
+
+        @media (max-width: 768px) {
+            .canvas-grid { grid-template-columns: 1fr; gap: 20px; }
+            .comparison-grid { grid-template-columns: 1fr; }
+        }
+
+        .divider {
+            border-top: 1px solid var(--border-color);
+            margin: 30px 0;
+            padding-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <article class="article">
+        <h1>Texture Mapping & UV Coordinates</h1>
+        <p>
+            Texture mapping is the process of applying a 2D image (texture) onto a 3D surface.
+            This interactive guide explores UV coordinates, different texture types, wrapping modes,
+            and projection methods. All textures are generated procedurally for instant, reliable rendering.
+        </p>
+
+        <h2>Procedural Textures & UV Mapping</h2>
+        <p>
+            The left panel shows the 2D texture in UV space (0,0 to 1,1).
+            The right panel displays how that texture maps onto a 3D shape using your chosen projection mode.
+            Adjust the controls to see how scaling, offset, and wrapping affect the final result.
+        </p>
+
+        <div class="controls">
+            <div class="control-section">
+                <h4>Texture Type</h4>
+                <div class="button-group">
+                    <button class="active" data-texture="checkerboard">Checkerboard</button>
+                    <button data-texture="brick">Brick</button>
+                    <button data-texture="wood">Wood Grain</button>
+                    <button data-texture="noise">Perlin Noise</button>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <h4>UV Scaling & Offset</h4>
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>UV Scale</span>
+                        <span id="val-scale">1.0x</span>
+                    </div>
+                    <input type="range" id="uv-scale" min="0.5" max="4" value="1" step="0.1">
+                </div>
+
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>Offset X</span>
+                        <span id="val-offset-x">0.0</span>
+                    </div>
+                    <input type="range" id="offset-x" min="-1" max="1" value="0" step="0.05">
+                </div>
+
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>Offset Y</span>
+                        <span id="val-offset-y">0.0</span>
+                    </div>
+                    <input type="range" id="offset-y" min="-1" max="1" value="0" step="0.05">
+                </div>
+            </div>
+
+            <div class="control-section">
+                <h4>Projection Mode</h4>
+                <div class="button-group">
+                    <button class="active" data-projection="planar">Planar</button>
+                    <button data-projection="cylindrical">Cylindrical</button>
+                    <button data-projection="spherical">Spherical</button>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <h4>Wrapping Mode</h4>
+                <div class="button-group">
+                    <button class="active" data-wrap="repeat">Repeat</button>
+                    <button data-wrap="clamp">Clamp</button>
+                    <button data-wrap="mirror">Mirror</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="canvas-grid">
+            <div class="canvas-container">
+                <h3>2D Texture (UV Space)</h3>
+                <canvas id="textureCanvas" width="400" height="400"></canvas>
+                <p style="font-size: 12px; color: var(--text-secondary); text-align: center; margin-top: 10px;">
+                    UV space from (0,0) to (1,1)
+                </p>
+            </div>
+
+            <div class="canvas-container">
+                <h3>3D Projection</h3>
+                <canvas id="projectionCanvas" width="400" height="400"></canvas>
+                <p style="font-size: 12px; color: var(--text-secondary); text-align: center; margin-top: 10px;">
+                    <span id="projection-label">Planar mapping</span>
+                </p>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+        <h2>Texture Wrapping Comparison</h2>
+        <p>
+            When texture coordinates go outside the 0-1 range, different wrapping modes handle them differently.
+            Below is a visual comparison of all three modes.
+        </p>
+
+        <div class="comparison-grid">
+            <div class="comparison-item">
+                <h4>Repeat (Tile)</h4>
+                <canvas class="comparison-canvas" id="wrapRepeatCanvas" width="250" height="250"></canvas>
+                <p style="font-size: 11px; text-align: center;">Texture tiles seamlessly</p>
+            </div>
+            <div class="comparison-item">
+                <h4>Clamp to Edge</h4>
+                <canvas class="comparison-canvas" id="wrapClampCanvas" width="250" height="250"></canvas>
+                <p style="font-size: 11px; text-align: center;">Edge pixels extend outward</p>
+            </div>
+            <div class="comparison-item">
+                <h4>Mirror</h4>
+                <canvas class="comparison-canvas" id="wrapMirrorCanvas" width="250" height="250"></canvas>
+                <p style="font-size: 11px; text-align: center;">Texture mirrors/flips</p>
+            </div>
+        </div>
+
+        <div class="info-box">
+            <strong>How it works:</strong> UV coordinates map 2D texture space onto 3D geometry.
+            The U axis typically corresponds to horizontal (X), and V to vertical (Y).
+            Scale adjusts how many times the texture repeats, while offset shifts the pattern.
+            Different projection modes unwrap 3D shapes differently for optimal texture placement.
+        </div>
+    </article>
+
+    <script>
+        const textureCanvas = document.getElementById('textureCanvas');
+        const projectionCanvas = document.getElementById('projectionCanvas');
+        const wrapRepeatCanvas = document.getElementById('wrapRepeatCanvas');
+        const wrapClampCanvas = document.getElementById('wrapClampCanvas');
+        const wrapMirrorCanvas = document.getElementById('wrapMirrorCanvas');
+
+        const tctx = textureCanvas.getContext('2d');
+        const pctx = projectionCanvas.getContext('2d');
+        const wrepctx = wrapRepeatCanvas.getContext('2d');
+        const wclamptx = wrapClampCanvas.getContext('2d');
+        const wmirrorctx = wrapMirrorCanvas.getContext('2d');
+
+        let state = {
+            textureType: 'checkerboard',
+            scale: 1.0,
+            offsetX: 0,
+            offsetY: 0,
+            projection: 'planar',
+            wrap: 'repeat',
+            textureCache: {}
+        };
+
+        // Perlin-like noise using sine waves
+        function simpleNoise(x, y, seed = 0) {
+            const n = Math.sin(x * 12.9898 + y * 78.233 + seed * 43758.5453) * 43758.5453;
+            return n - Math.floor(n);
+        }
+
+        // Generate checkerboard texture
+        function generateCheckerboard(size) {
+            const canvas = document.createElement('canvas');
+            canvas.width = canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            const squareSize = size / 8;
+            for (let y = 0; y < 8; y++) {
+                for (let x = 0; x < 8; x++) {
+                    ctx.fillStyle = (x + y) % 2 === 0 ? '#ffffff' : '#1a1a1a';
+                    ctx.fillRect(x * squareSize, y * squareSize, squareSize, squareSize);
+                }
+            }
+            return canvas;
+        }
+
+        // Generate brick texture
+        function generateBrick(size) {
+            const canvas = document.createElement('canvas');
+            canvas.width = canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            const colors = Wiki.colors();
+            ctx.fillStyle = colors.bg_secondary;
+            ctx.fillRect(0, 0, size, size);
+
+            const brickWidth = size / 4;
+            const brickHeight = size / 6;
+            const mortarColor = '#444444';
+
+            for (let row = 0; row < 6; row++) {
+                const offset = row % 2 === 1 ? brickWidth / 2 : 0;
+                for (let col = 0; col < 5; col++) {
+                    const x = offset + col * brickWidth;
+                    const y = row * brickHeight;
+
+                    // Vary brick color slightly
+                    const hue = 10 + Math.sin(row * 0.5 + col * 0.3) * 5;
+                    const sat = 50 + Math.sin(row * 0.2) * 10;
+                    ctx.fillStyle = `hsl(${hue}, ${sat}%, ${45 + Math.random() * 10}%)`;
+                    ctx.fillRect(x, y, brickWidth - 2, brickHeight - 2);
+
+                    // Add subtle texture
+                    ctx.fillStyle = `rgba(0, 0, 0, ${0.1 + Math.random() * 0.1})`;
+                    ctx.fillRect(x, y, brickWidth - 2, brickHeight - 2);
+                }
+            }
+            return canvas;
+        }
+
+        // Generate wood grain texture
+        function generateWood(size) {
+            const canvas = document.createElement('canvas');
+            canvas.width = canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            // Base color
+            ctx.fillStyle = '#8B4513';
+            ctx.fillRect(0, 0, size, size);
+
+            // Wood rings
+            for (let y = 0; y < size; y++) {
+                for (let x = 0; x < size; x++) {
+                    const dx = (x - size / 2) / (size / 2);
+                    const dy = (y - size / 2) / (size / 2);
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    const ring = Math.sin(dist * 20 + x * 0.01) * 0.5 + 0.5;
+                    const noise = simpleNoise(x / 50, y / 50) * 0.3;
+                    const brightness = 150 + ring * 80 + noise * 60;
+
+                    ctx.fillStyle = `rgb(${brightness * 0.6}, ${brightness * 0.5}, ${brightness * 0.3})`;
+                    ctx.fillRect(x, y, 1, 1);
+                }
+            }
+            return canvas;
+        }
+
+        // Generate Perlin-like noise
+        function generateNoise(size) {
+            const canvas = document.createElement('canvas');
+            canvas.width = canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            for (let y = 0; y < size; y++) {
+                for (let x = 0; x < size; x++) {
+                    let value = 0;
+                    let amplitude = 1;
+                    let frequency = 1;
+                    let maxValue = 0;
+
+                    for (let i = 0; i < 5; i++) {
+                        value += simpleNoise(x * frequency / 50, y * frequency / 50, i) * amplitude;
+                        maxValue += amplitude;
+                        amplitude *= 0.5;
+                        frequency *= 2;
+                    }
+                    value /= maxValue;
+
+                    const brightness = value * 255;
+                    ctx.fillStyle = `rgb(${brightness}, ${brightness}, ${brightness})`;
+                    ctx.fillRect(x, y, 1, 1);
+                }
+            }
+            return canvas;
+        }
+
+        function getTexture(type) {
+            if (!state.textureCache[type]) {
+                switch (type) {
+                    case 'checkerboard':
+                        state.textureCache[type] = generateCheckerboard(512);
+                        break;
+                    case 'brick':
+                        state.textureCache[type] = generateBrick(512);
+                        break;
+                    case 'wood':
+                        state.textureCache[type] = generateWood(512);
+                        break;
+                    case 'noise':
+                        state.textureCache[type] = generateNoise(512);
+                        break;
+                }
+            }
+            return state.textureCache[type];
+        }
+
+        function sampleTexture(u, v, textureCanvas, wrapMode = 'repeat') {
+            let su = u;
+            let sv = v;
+
+            // Apply wrapping
+            if (wrapMode === 'repeat') {
+                su = su - Math.floor(su);
+                sv = sv - Math.floor(sv);
+            } else if (wrapMode === 'clamp') {
+                su = Math.max(0, Math.min(1, su));
+                sv = Math.max(0, Math.min(1, sv));
+            } else if (wrapMode === 'mirror') {
+                su = su - Math.floor(su);
+                sv = sv - Math.floor(sv);
+                if (Math.floor(u) % 2 !== 0) su = 1 - su;
+                if (Math.floor(v) % 2 !== 0) sv = 1 - sv;
+            }
+
+            const x = Math.floor(su * (textureCanvas.width - 1));
+            const y = Math.floor(sv * (textureCanvas.height - 1));
+
+            const ctx = textureCanvas.getContext('2d');
+            const imageData = ctx.getImageData(x, y, 1, 1);
+            return imageData.data;
+        }
+
+        function drawTexture2D() {
+            const colors = Wiki.colors();
+            const texture = getTexture(state.textureType);
+
+            // Clear and fill background
+            tctx.fillStyle = colors.bg_secondary;
+            tctx.fillRect(0, 0, textureCanvas.width, textureCanvas.height);
+
+            // Draw texture scaled
+            const scale = 1;
+            tctx.drawImage(texture, 0, 0, textureCanvas.width, textureCanvas.height);
+
+            // Grid overlay showing UV coords
+            tctx.strokeStyle = colors.accent + '40';
+            tctx.lineWidth = 1;
+            tctx.font = '11px JetBrains Mono';
+            tctx.fillStyle = colors.accent;
+
+            for (let i = 0; i <= 4; i++) {
+                const pos = (i / 4) * textureCanvas.width;
+                tctx.beginPath();
+                tctx.moveTo(pos, 0);
+                tctx.lineTo(pos, textureCanvas.height);
+                tctx.stroke();
+
+                tctx.beginPath();
+                tctx.moveTo(0, pos);
+                tctx.lineTo(textureCanvas.width, pos);
+                tctx.stroke();
+
+                // Labels
+                if (i > 0 && i < 4) {
+                    const label = (i / 4).toFixed(2);
+                    tctx.fillText(label, pos + 3, 12);
+                    tctx.fillText(label, 3, pos + 12);
+                }
+            }
+
+            // Border
+            tctx.strokeStyle = colors.border_color;
+            tctx.lineWidth = 2;
+            tctx.strokeRect(0, 0, textureCanvas.width, textureCanvas.height);
+        }
+
+        function drawProjection() {
+            const colors = Wiki.colors();
+            const texture = getTexture(state.textureType);
+
+            pctx.fillStyle = colors.bg_secondary;
+            pctx.fillRect(0, 0, projectionCanvas.width, projectionCanvas.height);
+
+            const w = projectionCanvas.width;
+            const h = projectionCanvas.height;
+            const cx = w / 2;
+            const cy = h / 2;
+
+            if (state.projection === 'planar') {
+                // Simple quad with scaled texture
+                const quad = [[50, 50], [w - 50, 50], [w - 50, h - 50], [50, h - 50]];
+
+                const step = 2;
+                for (let y = 0; y < h; y += step) {
+                    for (let x = 0; x < w; x += step) {
+                        const u = ((x - quad[0][0]) / (quad[1][0] - quad[0][0])) * state.scale + state.offsetX;
+                        const v = ((y - quad[0][1]) / (quad[2][1] - quad[0][1])) * state.scale + state.offsetY;
+
+                        const color = sampleTexture(u, v, texture, state.wrap);
+                        pctx.fillStyle = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+                        pctx.fillRect(x, y, step, step);
+                    }
+                }
+
+                // Quad border
+                pctx.strokeStyle = colors.accent;
+                pctx.lineWidth = 2;
+                pctx.beginPath();
+                pctx.moveTo(quad[0][0], quad[0][1]);
+                pctx.lineTo(quad[1][0], quad[1][1]);
+                pctx.lineTo(quad[2][0], quad[2][1]);
+                pctx.lineTo(quad[3][0], quad[3][1]);
+                pctx.closePath();
+                pctx.stroke();
+            } else if (state.projection === 'cylindrical') {
+                // Cylinder unwrap
+                const radius = Math.min(w, h) * 0.3;
+                const step = 2;
+
+                for (let y = 0; y < h; y += step) {
+                    for (let x = 0; x < w; x += step) {
+                        const u = (x / w) * state.scale + state.offsetX;
+                        const v = ((h - y) / h) * state.scale + state.offsetY;
+
+                        const color = sampleTexture(u, v, texture, state.wrap);
+                        pctx.fillStyle = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+                        pctx.fillRect(x, y, step, step);
+                    }
+                }
+
+                // Draw cylinder outline
+                pctx.strokeStyle = colors.accent;
+                pctx.lineWidth = 2;
+                pctx.beginPath();
+                pctx.ellipse(cx, cy * 0.7, radius * 1.5, radius * 0.6, 0, 0, Math.PI * 2);
+                pctx.stroke();
+
+                pctx.beginPath();
+                pctx.moveTo(cx - radius * 1.5, cy * 0.7);
+                pctx.lineTo(cx - radius * 1.5, cy * 1.3);
+                pctx.stroke();
+
+                pctx.beginPath();
+                pctx.moveTo(cx + radius * 1.5, cy * 0.7);
+                pctx.lineTo(cx + radius * 1.5, cy * 1.3);
+                pctx.stroke();
+
+                pctx.beginPath();
+                pctx.ellipse(cx, cy * 1.3, radius * 1.5, radius * 0.6, 0, 0, Math.PI * 2);
+                pctx.stroke();
+            } else if (state.projection === 'spherical') {
+                // Sphere unwrap
+                const radius = Math.min(w, h) * 0.25;
+                const step = 2;
+
+                for (let y = 0; y < h; y += step) {
+                    for (let x = 0; x < w; x += step) {
+                        const u = (x / w) * state.scale + state.offsetX;
+                        const v = ((h - y) / h) * state.scale + state.offsetY;
+
+                        const color = sampleTexture(u, v, texture, state.wrap);
+                        pctx.fillStyle = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+                        pctx.fillRect(x, y, step, step);
+                    }
+                }
+
+                // Draw sphere outline
+                pctx.strokeStyle = colors.accent;
+                pctx.lineWidth = 2;
+                pctx.beginPath();
+                pctx.arc(cx, cy, radius * 1.5, 0, Math.PI * 2);
+                pctx.stroke();
+
+                // Latitude lines
+                for (let i = 1; i < 4; i++) {
+                    const lat = (i / 4) * Math.PI;
+                    const r = radius * 1.5 * Math.sin(lat);
+                    const y = cy - radius * 1.5 * Math.cos(lat);
+                    pctx.beginPath();
+                    pctx.ellipse(cx, y, r, r * 0.3, 0, 0, Math.PI * 2);
+                    pctx.stroke();
+                }
+            }
+        }
+
+        function drawWrappingComparison() {
+            const colors = Wiki.colors();
+            const texture = getTexture(state.textureType);
+
+            const canvases = [
+                { ctx: wrepctx, wrap: 'repeat' },
+                { ctx: wclamptx, wrap: 'clamp' },
+                { ctx: wmirrorctx, wrap: 'mirror' }
+            ];
+
+            canvases.forEach(({ ctx, wrap }) => {
+                ctx.fillStyle = colors.bg_secondary;
+                ctx.fillRect(0, 0, 250, 250);
+
+                // Draw with scaled coordinates to show wrapping behavior
+                const step = 2;
+                for (let y = 0; y < 250; y += step) {
+                    for (let x = 0; x < 250; x += step) {
+                        // Scale UV to show 2x2 area (to clearly see wrapping)
+                        const u = (x / 250) * 2 - 0.5;
+                        const v = (y / 250) * 2 - 0.5;
+
+                        const color = sampleTexture(u, v, texture, wrap);
+                        ctx.fillStyle = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+                        ctx.fillRect(x, y, step, step);
+                    }
+                }
+
+                // Draw grid showing texture boundaries
+                ctx.strokeStyle = colors.accent + '60';
+                ctx.lineWidth = 1;
+                const step2 = 250 / 2;
+                ctx.beginPath();
+                ctx.moveTo(step2, 0);
+                ctx.lineTo(step2, 250);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(0, step2);
+                ctx.lineTo(250, step2);
+                ctx.stroke();
+
+                // Border
+                ctx.strokeStyle = colors.border_color;
+                ctx.lineWidth = 1;
+                ctx.strokeRect(0, 0, 250, 250);
+            });
+        }
+
+        function updateProjectionLabel() {
+            const labels = {
+                planar: 'Planar: Direct 2D → 3D mapping',
+                cylindrical: 'Cylindrical: Wrapped around axis',
+                spherical: 'Spherical: Normalized to sphere surface'
+            };
+            document.getElementById('projection-label').textContent = labels[state.projection];
+        }
+
+        function draw() {
+            drawTexture2D();
+            drawProjection();
+            drawWrappingComparison();
+            updateProjectionLabel();
+        }
+
+        function setupControls() {
+            // Texture type
+            document.querySelectorAll('[data-texture]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('[data-texture]').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    state.textureType = btn.dataset.texture;
+                    draw();
+                });
+            });
+
+            // Scale
+            document.getElementById('uv-scale').addEventListener('input', (e) => {
+                state.scale = parseFloat(e.target.value);
+                document.getElementById('val-scale').textContent = state.scale.toFixed(1) + 'x';
+                draw();
+            });
+
+            // Offsets
+            document.getElementById('offset-x').addEventListener('input', (e) => {
+                state.offsetX = parseFloat(e.target.value);
+                document.getElementById('val-offset-x').textContent = state.offsetX.toFixed(2);
+                draw();
+            });
+
+            document.getElementById('offset-y').addEventListener('input', (e) => {
+                state.offsetY = parseFloat(e.target.value);
+                document.getElementById('val-offset-y').textContent = state.offsetY.toFixed(2);
+                draw();
+            });
+
+            // Projection
+            document.querySelectorAll('[data-projection]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('[data-projection]').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    state.projection = btn.dataset.projection;
+                    draw();
+                });
+            });
+
+            // Wrapping
+            document.querySelectorAll('[data-wrap]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('[data-wrap]').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    state.wrap = btn.dataset.wrap;
+                    draw();
+                });
+            });
+        }
+
+        setupControls();
+        draw();
+
+        Wiki.onThemeChange(() => draw());
+    </script>
+</body>
+</html>

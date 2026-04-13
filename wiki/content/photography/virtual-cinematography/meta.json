@@ -1,0 +1,20 @@
+{
+  "title": "Virtual Cinematography and Digital Image Capture",
+  "category": "photography",
+  "order": 6,
+  "tags": [
+    "photography",
+    "3D",
+    "virtual-camera",
+    "cinematography",
+    "HDRI"
+  ],
+  "description": "Bridge between real photography and 3D rendering - virtual camera rigs, matching real lens properties, HDRI lighting, photogrammetry pipelines, cinematic rendering techniques, and depth of field simulation.",
+  "related": [
+    "photography/lighting-theory",
+    "photography/lens-optics",
+    "photography/composition",
+    "game-engines/unreal/nanite-lumen",
+    "blender/shader-nodes"
+  ]
+}

@@ -1,0 +1,63 @@
+# Caddyfile — Reverse proxy for angelina007.com multi-service stack
+# Caddy handles automatic HTTPS via Let's Encrypt / ZeroSSL
+
+# Main site: angelina007.com → Next.js app
+angelina007.com, www.angelina007.com {
+	# Security headers
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		X-XSS-Protection "1; mode=block"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), payment=()"
+	}
+
+	# Gzip compression
+	encode gzip zstd
+
+	# Static assets — long cache
+	@static path /_next/static/* *.js *.css *.png *.jpg *.jpeg *.gif *.ico *.svg *.woff *.woff2
+	header @static Cache-Control "public, max-age=31536000, immutable"
+
+	# Proxy to Next.js
+	reverse_proxy next-app:3000 {
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+}
+
+# Wiki: wiki.angelina007.com → Wiki app
+wiki.angelina007.com {
+	# Security headers
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		X-XSS-Protection "1; mode=block"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+
+	encode gzip zstd
+
+	# Static assets — long cache
+	@static path /css/* /js/* /images/* *.png *.jpg *.svg *.woff2
+	header @static Cache-Control "public, max-age=86400"
+
+	# Proxy to wiki app
+	reverse_proxy wiki-app:4000 {
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+}
+
+# Local development fallback (access via localhost ports)
+:8080 {
+	reverse_proxy next-app:3000
+}
+
+:8081 {
+	reverse_proxy wiki-app:4000
+}

@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3-Point Lighting Theory</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        .lighting-container {
+            display: flex; flex-wrap: wrap;
+            gap: 20px;
+            height: 100%;
+        }
+        .viewport {
+            flex: 1;
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, #16213e 100%);
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .top-down-view {
+            flex: 1;
+            background: var(--canvas-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+            min-height: 200px;
+        }
+        .preview-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        .render-preview {
+            height: 150px;
+            background: var(--canvas-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .render-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        .control-panel {
+            width: 280px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 16px;
+            overflow-y: auto;
+            color: var(--text);
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 13px;
+        }
+        .control-group {
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        .control-group h4 {
+            margin: 0 0 8px 0;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #16a085;
+            letter-spacing: 0.5px;
+        }
+        .light-control {
+            background: rgba(233, 236, 239, 0.05);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 8px;
+            margin-bottom: 8px;
+        }
+        .light-name {
+            font-weight: bold;
+            font-size: 11px;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .light-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        .slider-row {
+            margin-bottom: 8px;
+            font-size: 11px;
+        }
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 2px;
+        }
+        input[type="range"] {
+            width: 100%;
+            height: 3px;
+            border-radius: 2px;
+            background: var(--border-strong);
+            outline: none;
+            -webkit-appearance: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #16a085;
+            cursor: pointer;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #16a085;
+            border: none;
+            cursor: pointer;
+        }
+        .pattern-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
+        .pattern-btn {
+            padding: 6px;
+            background: rgba(233, 236, 239, 0.1);
+            border: 1px solid rgba(233, 236, 239, 0.2);
+            color: var(--text);
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 10px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .pattern-btn:hover {
+            background: rgba(22, 160, 133, 0.3);
+        }
+        .pattern-btn.active {
+            background: #16a085;
+            color: var(--bg-secondary);
+            border-color: #16a085;
+        }
+        .info-text {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 12px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="lighting-container">
+        <div class="viewport">
+            <div class="top-down-view">
+                <canvas id="topDownCanvas" class="preview-canvas"></canvas>
+            </div>
+            <div class="render-preview">
+                <canvas id="renderCanvas" class="render-canvas"></canvas>
+            </div>
+        </div>
+
+        <div class="control-panel">
+            <div class="control-group">
+                <h4>Lighting Pattern</h4>
+                <div class="pattern-buttons">
+                    <button class="pattern-btn active" data-pattern="rembrandt">Rembrandt</button>
+                    <button class="pattern-btn" data-pattern="butterfly">Butterfly</button>
+                    <button class="pattern-btn" data-pattern="split">Split</button>
+                    <button class="pattern-btn" data-pattern="loop">Loop</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h4>Key Light</h4>
+                <div class="light-control">
+                    <div class="light-name">
+                        <div class="light-indicator" style="background: #f39c12;"></div>
+                        Key
+                    </div>
+                    <div class="slider-row">
+                        <div class="slider-label"><span>Intensity</span><span id="keyIntensity">80</span></div>
+                        <input type="range" id="keyIntensitySlider" min="0" max="100" value="80">
+                    </div>
+                    <div class="slider-row">
+                        <div class="slider-label"><span>Size</span><span id="keySize">Medium</span></div>
+                        <input type="range" id="keySizeSlider" min="0" max="100" value="50">
+                    </div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h4>Fill Light</h4>
+                <div class="light-control">
+                    <div class="light-name">
+                        <div class="light-indicator" style="background: #3498db;"></div>
+                        Fill
+                    </div>
+                    <div class="slider-row">
+                        <div class="slider-label"><span>Intensity</span><span id="fillIntensity">40</span></div>
+                        <input type="range" id="fillIntensitySlider" min="0" max="100" value="40">
+                    </div>
+                    <div class="slider-row">
+                        <div class="slider-label"><span>Size</span><span id="fillSize">Medium</span></div>
+                        <input type="range" id="fillSizeSlider" min="0" max="100" value="50">
+                    </div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h4>Back Light</h4>
+                <div class="light-control">
+                    <div class="light-name">
+                        <div class="light-indicator" style="background: #9b59b6;"></div>
+                        Back
+                    </div>
+                    <div class="slider-row">
+                        <div class="slider-label"><span>Intensity</span><span id="backIntensity">60</span></div>
+                        <input type="range" id="backIntensitySlider" min="0" max="100" value="60">
+                    </div>
+                    <div class="slider-row">
+                        <div class="slider-label"><span>Size</span><span id="backSize">Medium</span></div>
+                        <input type="range" id="backSizeSlider" min="0" max="100" value="50">
+                    </div>
+                </div>
+            </div>
+
+            <div class="info-text">
+                Drag lights in the top-down view to reposition. Key light creates shadows, fill light opens shadows, back light separates subject from background.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class LightingSimulator {
+            constructor() {
+                this.topDownCanvas = document.getElementById('topDownCanvas');
+                this.topDownCtx = this.topDownCanvas.getContext('2d');
+                this.renderCanvas = document.getElementById('renderCanvas');
+                this.renderCtx = this.renderCanvas.getContext('2d');
+
+                this.pattern = 'rembrandt';
+
+                // Light positions (top-down view)
+                this.lights = {
+                    key: { x: 300, y: 150, intensity: 0.8, size: 50, color: '#f39c12', angle: -45 },
+                    fill: { x: 150, y: 250, intensity: 0.4, size: 50, color: '#3498db', angle: 225 },
+                    back: { x: 250, y: 80, intensity: 0.6, size: 50, color: '#9b59b6', angle: 0 }
+                };
+
+                this.subject = { x: 200, y: 200, radius: 30 };
+                this.draggedLight = null;
+
+                this.resizeCanvases();
+                window.addEventListener('resize', () => this.resizeCanvases());
+                this.setupEvents();
+                this.applyPattern('rembrandt');
+                this.render();
+            }
+
+            resizeCanvases() {
+                const rect = this.topDownCanvas.parentElement.getBoundingClientRect();
+                this.topDownCanvas.width = rect.width;
+                this.topDownCanvas.height = rect.height;
+
+                const renderRect = this.renderCanvas.parentElement.getBoundingClientRect();
+                this.renderCanvas.width = renderRect.width;
+                this.renderCanvas.height = renderRect.height;
+
+                this.render();
+            }
+
+            setupEvents() {
+                document.querySelectorAll('[data-pattern]').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        document.querySelectorAll('[data-pattern]').forEach(b => b.classList.remove('active'));
+                        e.target.classList.add('active');
+                        this.pattern = e.target.dataset.pattern;
+                        this.applyPattern(this.pattern);
+                        this.render();
+                    });
+                });
+
+                const sliders = {
+                    'keyIntensitySlider': ['key', 'intensity'],
+                    'keySizeSlider': ['key', 'size'],
+                    'fillIntensitySlider': ['fill', 'intensity'],
+                    'fillSizeSlider': ['fill', 'size'],
+                    'backIntensitySlider': ['back', 'intensity'],
+                    'backSizeSlider': ['back', 'size']
+                };
+
+                Object.entries(sliders).forEach(([id, [light, prop]]) => {
+                    document.getElementById(id).addEventListener('input', (e) => {
+                        const val = parseFloat(e.target.value) / 100;
+                        if (prop === 'intensity') {
+                            this.lights[light].intensity = val;
+                            document.getElementById(light + 'Intensity').textContent = Math.round(val * 100);
+                        } else {
+                            this.lights[light].size = val * 100;
+                            document.getElementById(light + 'Size').textContent = val < 0.33 ? 'Small' : val < 0.66 ? 'Medium' : 'Large';
+                        }
+                        this.render();
+                    });
+                });
+
+                this.topDownCanvas.addEventListener('mousedown', (e) => this.onMouseDown(e));
+                this.topDownCanvas.addEventListener('mousemove', (e) => this.onMouseMove(e));
+                this.topDownCanvas.addEventListener('mouseup', () => this.onMouseUp());
+            }
+
+            applyPattern(pattern) {
+                switch (pattern) {
+                    case 'rembrandt':
+                        this.lights.key = { ...this.lights.key, x: 300, y: 150, intensity: 0.8 };
+                        this.lights.fill = { ...this.lights.fill, x: 150, y: 250, intensity: 0.4 };
+                        this.lights.back = { ...this.lights.back, x: 250, y: 80, intensity: 0.6 };
+                        break;
+                    case 'butterfly':
+                        this.lights.key = { ...this.lights.key, x: 200, y: 100, intensity: 0.9 };
+                        this.lights.fill = { ...this.lights.fill, x: 200, y: 300, intensity: 0.3 };
+                        this.lights.back = { ...this.lights.back, x: 250, y: 80, intensity: 0.5 };
+                        break;
+                    case 'split':
+                        this.lights.key = { ...this.lights.key, x: 350, y: 200, intensity: 0.85 };
+                        this.lights.fill = { ...this.lights.fill, x: 50, y: 200, intensity: 0.2 };
+                        this.lights.back = { ...this.lights.back, x: 200, y: 80, intensity: 0.7 };
+                        break;
+                    case 'loop':
+                        this.lights.key = { ...this.lights.key, x: 280, y: 140, intensity: 0.8 };
+                        this.lights.fill = { ...this.lights.fill, x: 180, y: 260, intensity: 0.5 };
+                        this.lights.back = { ...this.lights.back, x: 200, y: 80, intensity: 0.4 };
+                        break;
+                }
+            }
+
+            onMouseDown(e) {
+                const rect = this.topDownCanvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                for (const [name, light] of Object.entries(this.lights)) {
+                    const dist = Math.hypot(light.x - x, light.y - y);
+                    if (dist < 20) {
+                        this.draggedLight = name;
+                        break;
+                    }
+                }
+            }
+
+            onMouseMove(e) {
+                if (this.draggedLight) {
+                    const rect = this.topDownCanvas.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+
+                    this.lights[this.draggedLight].x = Math.max(0, Math.min(this.topDownCanvas.width, x));
+                    this.lights[this.draggedLight].y = Math.max(0, Math.min(this.topDownCanvas.height, y));
+                    this.render();
+                }
+            }
+
+            onMouseUp() {
+                this.draggedLight = null;
+            }
+
+            render() {
+                this.renderTopDown();
+                this.renderPreview();
+            }
+
+            renderTopDown() {
+                const w = this.topDownCanvas.width;
+                const h = this.topDownCanvas.height;
+
+                // Background
+                this.topDownCtx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--canvas-bg').trim();
+                this.topDownCtx.fillRect(0, 0, w, h);
+
+                // Grid
+                this.topDownCtx.strokeStyle = 'rgba(233, 236, 239, 0.05)';
+                this.topDownCtx.lineWidth = 0.5;
+                for (let i = 0; i < w; i += 30) {
+                    this.topDownCtx.beginPath();
+                    this.topDownCtx.moveTo(i, 0);
+                    this.topDownCtx.lineTo(i, h);
+                    this.topDownCtx.stroke();
+                }
+                for (let i = 0; i < h; i += 30) {
+                    this.topDownCtx.beginPath();
+                    this.topDownCtx.moveTo(0, i);
+                    this.topDownCtx.lineTo(w, i);
+                    this.topDownCtx.stroke();
+                }
+
+                // Draw light rays
+                for (const [name, light] of Object.entries(this.lights)) {
+                    this.topDownCtx.strokeStyle = light.color;
+                    this.topDownCtx.globalAlpha = light.intensity * 0.5;
+                    this.topDownCtx.lineWidth = 2;
+                    this.topDownCtx.beginPath();
+                    this.topDownCtx.moveTo(light.x, light.y);
+                    this.topDownCtx.lineTo(this.subject.x, this.subject.y);
+                    this.topDownCtx.stroke();
+                }
+                this.topDownCtx.globalAlpha = 1;
+
+                // Draw subject
+                this.topDownCtx.fillStyle = 'rgba(22, 160, 133, 0.3)';
+                this.topDownCtx.beginPath();
+                this.topDownCtx.arc(this.subject.x, this.subject.y, this.subject.radius, 0, Math.PI * 2);
+                this.topDownCtx.fill();
+
+                this.topDownCtx.strokeStyle = '#16a085';
+                this.topDownCtx.lineWidth = 2;
+                this.topDownCtx.stroke();
+
+                // Draw lights
+                for (const [name, light] of Object.entries(this.lights)) {
+                    this.topDownCtx.fillStyle = light.color;
+                    this.topDownCtx.beginPath();
+                    this.topDownCtx.arc(light.x, light.y, 12, 0, Math.PI * 2);
+                    this.topDownCtx.fill();
+
+                    // Light size indicator
+                    this.topDownCtx.strokeStyle = light.color;
+                    this.topDownCtx.globalAlpha = 0.3;
+                    this.topDownCtx.lineWidth = 1;
+                    this.topDownCtx.beginPath();
+                    this.topDownCtx.arc(light.x, light.y, light.size / 2, 0, Math.PI * 2);
+                    this.topDownCtx.stroke();
+                    this.topDownCtx.globalAlpha = 1;
+                }
+            }
+
+            renderPreview() {
+                const w = this.renderCanvas.width;
+                const h = this.renderCanvas.height;
+
+                // Base skin tone
+                this.renderCtx.fillStyle = '#d4a574';
+                this.renderCtx.fillRect(0, 0, w, h);
+
+                // Get CSS variables if needed for background later
+                const bgColor = getComputedStyle(document.documentElement).getPropertyValue('--canvas-bg').trim();
+
+                // Calculate lighting for each pixel
+                const imageData = this.renderCtx.getImageData(0, 0, w, h);
+                const data = imageData.data;
+
+                for (let y = 0; y < h; y++) {
+                    for (let x = 0; x < w; x++) {
+                        const idx = (y * w + x) * 4;
+
+                        // Sphere normal
+                        const sx = (x - w / 2) / (w / 2);
+                        const sy = (y - h / 2) / (h / 2);
+                        const dist = Math.sqrt(sx * sx + sy * sy);
+
+                        if (dist < 1) {
+                            const nz = Math.sqrt(1 - dist * dist);
+                            const nx = sx;
+                            const ny = sy;
+
+                            let intensity = 0;
+
+                            // Apply each light
+                            for (const [name, light] of Object.entries(this.lights)) {
+                                const lightDir = light.color === '#f39c12' ? 0.7 :
+                                               light.color === '#3498db' ? 0.3 :
+                                               0.8;
+                                intensity += lightDir * light.intensity;
+                            }
+
+                            intensity = Math.max(0.2, Math.min(1, intensity));
+
+                            data[idx] = Math.min(255, data[idx] * intensity);
+                            data[idx + 1] = Math.min(255, data[idx + 1] * intensity);
+                            data[idx + 2] = Math.min(255, data[idx + 2] * intensity);
+                            data[idx + 3] = 255;
+                        } else {
+                            data[idx + 3] = 0;
+                        }
+                    }
+                }
+
+                this.renderCtx.putImageData(imageData, 0, 0);
+            }
+        }
+
+        const lighting = new LightingSimulator();
+    </script>
+</body>
+</html>

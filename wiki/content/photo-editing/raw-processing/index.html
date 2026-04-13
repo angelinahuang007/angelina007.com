@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAW Processing Pipeline</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        .raw-container {
+            display: flex; flex-wrap: wrap;
+            gap: 20px;
+            height: 100%;
+        }
+        .pipeline-area {
+            flex: 1;
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            overflow-y: auto;
+        }
+        .pipeline-stages {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .stage-box {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+        }
+        .stage-box h3 {
+            margin: 0 0 8px 0;
+            font-size: 11px;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-family: 'Space Grotesk', sans-serif;
+        }
+        .stage-canvas {
+            width: 100%;
+            aspect-ratio: 1;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--canvas-bg);
+        }
+        .stage-toggle {
+            margin-top: 8px;
+        }
+        .stage-toggle input[type="checkbox"] {
+            margin-right: 6px;
+            cursor: pointer;
+        }
+        .stage-toggle label {
+            font-size: 10px;
+            color: var(--text-muted);
+            cursor: pointer;
+        }
+        .comparison-area {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            height: 250px;
+            position: relative;
+            overflow: hidden;
+        }
+        .comparison-area h3 {
+            margin: 0;
+            padding: 12px;
+            background: var(--border-strong);
+            color: var(--accent);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-family: 'Space Grotesk', sans-serif;
+            border-bottom: 1px solid var(--border);
+        }
+        .comparison-content {
+            height: calc(100% - 40px);
+            position: relative;
+            overflow: hidden;
+        }
+        .comparison-content canvas {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+        }
+        .slider-handle {
+            position: absolute;
+            width: 3px;
+            height: 100%;
+            background: var(--accent);
+            left: 50%;
+            z-index: 10;
+            cursor: col-resize;
+        }
+        .slider-handle::before {
+            content: '';
+            position: absolute;
+            left: -5px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 12px;
+            height: 12px;
+            background: var(--accent);
+            border-radius: 50%;
+        }
+        .control-panel {
+            width: 280px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 16px;
+            overflow-y: auto;
+            color: var(--text);
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 13px;
+        }
+        .control-group {
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        .control-group h4 {
+            margin: 0 0 8px 0;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: var(--accent);
+            letter-spacing: 0.5px;
+        }
+        .slider-row {
+            margin-bottom: 12px;
+        }
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+            font-size: 12px;
+        }
+        input[type="range"] {
+            width: 100%;
+            height: 4px;
+            border-radius: 2px;
+            background: var(--border-strong);
+            outline: none;
+            -webkit-appearance: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--accent);
+            border: none;
+            cursor: pointer;
+        }
+        .bit-depth-toggle {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+        .bit-btn {
+            flex: 1;
+            padding: 6px;
+            background: var(--border);
+            border: 1px solid var(--border-strong);
+            color: var(--text);
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 10px;
+            transition: all 0.2s;
+        }
+        .bit-btn:hover {
+            background: var(--border-strong);
+        }
+        .bit-btn.active {
+            background: var(--accent);
+            color: var(--bg-secondary);
+            border-color: var(--accent);
+        }
+        .info-text {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 12px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="raw-container">
+        <div class="pipeline-area">
+            <div class="pipeline-stages">
+                <div class="stage-box">
+                    <h3>Bayer Pattern</h3>
+                    <canvas id="bayerCanvas" class="stage-canvas"></canvas>
+                    <div class="stage-toggle">
+                        <input type="checkbox" id="bayerToggle" checked>
+                        <label for="bayerToggle">Enabled</label>
+                    </div>
+                </div>
+
+                <div class="stage-box">
+                    <h3>Demosaicing</h3>
+                    <canvas id="demosaicCanvas" class="stage-canvas"></canvas>
+                    <div class="stage-toggle">
+                        <input type="checkbox" id="demosaicToggle" checked>
+                        <label for="demosaicToggle">Enabled</label>
+                    </div>
+                </div>
+
+                <div class="stage-box">
+                    <h3>White Balance</h3>
+                    <canvas id="whiteBalanceCanvas" class="stage-canvas"></canvas>
+                    <div class="stage-toggle">
+                        <input type="checkbox" id="whiteBalanceToggle" checked>
+                        <label for="whiteBalanceToggle">Enabled</label>
+                    </div>
+                </div>
+
+                <div class="stage-box">
+                    <h3>Exposure</h3>
+                    <canvas id="exposureCanvas" class="stage-canvas"></canvas>
+                    <div class="stage-toggle">
+                        <input type="checkbox" id="exposureToggle" checked>
+                        <label for="exposureToggle">Enabled</label>
+                    </div>
+                </div>
+
+                <div class="stage-box">
+                    <h3>Noise Reduction</h3>
+                    <canvas id="noiseCanvas" class="stage-canvas"></canvas>
+                    <div class="stage-toggle">
+                        <input type="checkbox" id="noiseToggle" checked>
+                        <label for="noiseToggle">Enabled</label>
+                    </div>
+                </div>
+
+                <div class="stage-box">
+                    <h3>Output</h3>
+                    <canvas id="outputCanvas" class="stage-canvas"></canvas>
+                    <div class="stage-toggle" style="color: var(--text-muted); cursor: not-allowed;">
+                        <label style="cursor: not-allowed;">Final</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="comparison-area">
+                <h3>Before / After Comparison</h3>
+                <div class="comparison-content">
+                    <canvas id="beforeCanvas"></canvas>
+                    <canvas id="afterCanvas"></canvas>
+                    <div class="slider-handle" id="sliderHandle"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="control-panel">
+            <div class="control-group">
+                <h4>Bit Depth</h4>
+                <div class="bit-depth-toggle">
+                    <button class="bit-btn" data-bits="8">8-bit</button>
+                    <button class="bit-btn active" data-bits="14">14-bit</button>
+                </div>
+                <div style="font-size: 10px; color: var(--text-muted); margin-top: 6px;">
+                    RAW sensors typically capture 12-14 bits per channel.
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h4>Pipeline Settings</h4>
+                <div class="slider-row">
+                    <div class="slider-label">
+                        <span>Temperature</span>
+                        <span id="tempValue">6500K</span>
+                    </div>
+                    <input type="range" id="tempSlider" min="3000" max="10000" step="100" value="6500">
+                </div>
+
+                <div class="slider-row">
+                    <div class="slider-label">
+                        <span>Exposure Comp</span>
+                        <span id="expValue">0.0</span>
+                    </div>
+                    <input type="range" id="expSlider" min="-2" max="2" step="0.1" value="0">
+                </div>
+
+                <div class="slider-row">
+                    <div class="slider-label">
+                        <span>Noise Reduction</span>
+                        <span id="nrValue">50%</span>
+                    </div>
+                    <input type="range" id="nrSlider" min="0" max="100" step="10" value="50">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h4>Bayer Pattern Info</h4>
+                <div style="font-size: 11px; line-height: 1.6; color: var(--text);">
+                    <div style="margin-bottom: 4px;"><strong style="color: #16a085;">R</strong> G</div>
+                    <div><strong style="color: #16a085;">G</strong> B</div>
+                    <div style="margin-top: 6px; font-size: 10px; color: var(--text-muted);">Typical RGGB pattern. Each pixel captures one color channel.</div>
+                </div>
+            </div>
+
+            <div class="info-text">
+                Toggle each stage to see the effect. RAW processing requires demosaicing to convert Bayer pattern to full RGB.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class RAWProcessing {
+            constructor() {
+                // Canvas references
+                this.canvases = {
+                    bayer: document.getElementById('bayerCanvas').getContext('2d'),
+                    demosaic: document.getElementById('demosaicCanvas').getContext('2d'),
+                    whiteBalance: document.getElementById('whiteBalanceCanvas').getContext('2d'),
+                    exposure: document.getElementById('exposureCanvas').getContext('2d'),
+                    noise: document.getElementById('noiseCanvas').getContext('2d'),
+                    output: document.getElementById('outputCanvas').getContext('2d'),
+                    before: document.getElementById('beforeCanvas').getContext('2d'),
+                    after: document.getElementById('afterCanvas').getContext('2d')
+                };
+
+                // Settings
+                this.bitDepth = 14;
+                this.temperature = 6500;
+                this.exposureComp = 0;
+                this.noiseReduction = 50;
+
+                // State
+                this.toggles = {
+                    bayer: true,
+                    demosaic: true,
+                    whiteBalance: true,
+                    exposure: true,
+                    noise: true
+                };
+
+                this.setupEvents();
+                this.render();
+            }
+
+            setupEvents() {
+                document.querySelectorAll('[data-bits]').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        document.querySelectorAll('[data-bits]').forEach(b => b.classList.remove('active'));
+                        e.target.classList.add('active');
+                        this.bitDepth = parseInt(e.target.dataset.bits);
+                        this.render();
+                    });
+                });
+
+                document.getElementById('tempSlider').addEventListener('input', (e) => {
+                    this.temperature = parseInt(e.target.value);
+                    document.getElementById('tempValue').textContent = this.temperature + 'K';
+                    this.render();
+                });
+
+                document.getElementById('expSlider').addEventListener('input', (e) => {
+                    this.exposureComp = parseFloat(e.target.value);
+                    document.getElementById('expValue').textContent = this.exposureComp.toFixed(1);
+                    this.render();
+                });
+
+                document.getElementById('nrSlider').addEventListener('input', (e) => {
+                    this.noiseReduction = parseInt(e.target.value);
+                    document.getElementById('nrValue').textContent = this.noiseReduction + '%';
+                    this.render();
+                });
+
+                ['bayerToggle', 'demosaicToggle', 'whiteBalanceToggle', 'exposureToggle', 'noiseToggle'].forEach(id => {
+                    const name = id.replace('Toggle', '').charAt(0).toLowerCase() + id.replace('Toggle', '').slice(1);
+                    document.getElementById(id).addEventListener('change', (e) => {
+                        this.toggles[name] = e.target.checked;
+                        this.render();
+                    });
+                });
+
+                document.getElementById('sliderHandle').parentElement.addEventListener('mousemove', (e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const percent = (e.clientX - rect.left) / rect.width;
+                    document.getElementById('sliderHandle').style.left = (percent * 100) + '%';
+                    this.renderComparison(percent);
+                });
+            }
+
+            renderBayerPattern(ctx, size = 64) {
+                const w = size, h = size;
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0, 0, w, h);
+
+                const cellSize = size / 8;
+                const pattern = [
+                    ['R', 'G', 'R', 'G', 'R', 'G', 'R', 'G'],
+                    ['G', 'B', 'G', 'B', 'G', 'B', 'G', 'B'],
+                    ['R', 'G', 'R', 'G', 'R', 'G', 'R', 'G'],
+                    ['G', 'B', 'G', 'B', 'G', 'B', 'G', 'B'],
+                    ['R', 'G', 'R', 'G', 'R', 'G', 'R', 'G'],
+                    ['G', 'B', 'G', 'B', 'G', 'B', 'G', 'B'],
+                    ['R', 'G', 'R', 'G', 'R', 'G', 'R', 'G'],
+                    ['G', 'B', 'G', 'B', 'G', 'B', 'G', 'B']
+                ];
+
+                pattern.forEach((row, y) => {
+                    row.forEach((ch, x) => {
+                        const col = ch === 'R' ? '#cc3333' : ch === 'G' ? '#33cc33' : '#3333cc';
+                        ctx.fillStyle = col;
+                        ctx.globalAlpha = 0.7;
+                        ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+                        ctx.globalAlpha = 1;
+                    });
+                });
+            }
+
+            demosaicImage(bayerData) {
+                // Simple demosaicing - expand to full RGB
+                const result = new Uint8ClampedArray(bayerData.length * 3);
+                let resultIdx = 0;
+
+                for (let i = 0; i < bayerData.length; i++) {
+                    const val = bayerData[i];
+                    result[resultIdx++] = val * (Math.random() * 0.3 + 0.85);
+                    result[resultIdx++] = val;
+                    result[resultIdx++] = val * (Math.random() * 0.3 + 0.85);
+                }
+
+                return result;
+            }
+
+            render() {
+                const size = 64;
+
+                // 1. Bayer Pattern
+                if (this.toggles.bayer) {
+                    this.renderBayerPattern(this.canvases.bayer, size);
+                } else {
+                    this.canvases.bayer.fillStyle = '#222';
+                    this.canvases.bayer.fillRect(0, 0, size, size);
+                }
+
+                // 2. Demosaicing
+                if (this.toggles.demosaic) {
+                    this.renderDemosaic(size);
+                } else {
+                    this.canvases.demosaic.fillStyle = '#222';
+                    this.canvases.demosaic.fillRect(0, 0, size, size);
+                }
+
+                // 3-6. Apply processing chain
+                this.renderProcessingChain(size);
+
+                // Comparison
+                this.renderComparison(0.5);
+            }
+
+            renderDemosaic(size) {
+                const grad = this.canvases.demosaic.createLinearGradient(0, 0, size, 0);
+                const colors = this.getProcessedColors();
+                grad.addColorStop(0, colors.shadows);
+                grad.addColorStop(0.5, colors.midtones);
+                grad.addColorStop(1, colors.highlights);
+                this.canvases.demosaic.fillStyle = grad;
+                this.canvases.demosaic.fillRect(0, 0, size, size);
+            }
+
+            renderProcessingChain(size) {
+                const colors = this.getProcessedColors();
+
+                // White balance
+                if (this.toggles.whiteBalance) {
+                    this.canvases.whiteBalance.fillStyle = colors.wb;
+                } else {
+                    this.canvases.whiteBalance.fillStyle = colors.midtones;
+                }
+                this.canvases.whiteBalance.fillRect(0, 0, size, size);
+
+                // Exposure
+                if (this.toggles.exposure) {
+                    this.canvases.exposure.fillStyle = colors.exposure;
+                } else {
+                    this.canvases.exposure.fillStyle = colors.wb;
+                }
+                this.canvases.exposure.fillRect(0, 0, size, size);
+
+                // Noise reduction
+                if (this.toggles.noise) {
+                    this.canvases.noise.fillStyle = colors.exposure;
+                    this.canvases.noise.globalAlpha = 1 - (this.noiseReduction / 100) * 0.3;
+                    this.canvases.noise.fillRect(0, 0, size, size);
+                    this.canvases.noise.globalAlpha = 1;
+                } else {
+                    this.canvases.noise.fillStyle = colors.exposure;
+                    this.canvases.noise.fillRect(0, 0, size, size);
+                }
+
+                // Output
+                this.canvases.output.fillStyle = colors.exposure;
+                this.canvases.output.globalAlpha = 1 - (this.noiseReduction / 100) * 0.3;
+                this.canvases.output.fillRect(0, 0, size, size);
+                this.canvases.output.globalAlpha = 1;
+            }
+
+            getProcessedColors() {
+                const wbShift = (this.temperature - 6500) / 1000;
+                const expShift = Math.pow(2, this.exposureComp);
+
+                return {
+                    shadows: `rgb(${Math.round(50 * expShift)}, ${Math.round(50 * expShift)}, ${Math.round(60 * expShift)})`,
+                    midtones: `rgb(${Math.round(120 * expShift)}, ${Math.round(120 * expShift)}, ${Math.round(120 * expShift)})`,
+                    highlights: `rgb(${Math.round(200 * expShift)}, ${Math.round(200 * expShift)}, ${Math.round(200 * expShift)})`,
+                    wb: `rgb(${Math.round((150 + wbShift * 20) * expShift)}, ${Math.round(150 * expShift)}, ${Math.round((150 - wbShift * 20) * expShift)})`,
+                    exposure: `rgb(${Math.round((150 + wbShift * 20) * expShift)}, ${Math.round(150 * expShift)}, ${Math.round((150 - wbShift * 20) * expShift)})`
+                };
+            }
+
+            renderComparison(percent) {
+                const size = 64;
+                const colors = this.getProcessedColors();
+
+                // Before (Bayer pattern visualization)
+                this.renderBayerPattern(this.canvases.before, size);
+
+                // After (Processed)
+                this.canvases.after.fillStyle = colors.exposure;
+                this.canvases.after.globalAlpha = 1 - (this.noiseReduction / 100) * 0.3;
+                this.canvases.after.fillRect(0, 0, size, size);
+                this.canvases.after.globalAlpha = 1;
+            }
+        }
+
+        const raw = new RAWProcessing();
+    </script>
+</body>
+</html>

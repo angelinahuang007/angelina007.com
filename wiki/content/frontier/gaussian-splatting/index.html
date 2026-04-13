@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gaussian Splatting</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        body { background: var(--bg-dark); color: var(--fg-light); }
+        .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+        .controls { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+        button { padding: 8px 16px; background: var(--accent); color: var(--bg-dark); border: none; border-radius: 4px; cursor: pointer; font-family: 'Space Mono'; font-weight: 700; }
+        button.active { background: var(--accent-alt); }
+        button:hover { opacity: 0.8; }
+        #canvas { border: 1px solid var(--fg-dark); background: var(--bg-darker); display: block; margin: 0 auto; }
+        .info { font-size: 0.9em; color: var(--fg-muted); margin-top: 10px; font-family: 'Space Mono'; }
+        .papers-section { margin-top: 40px; padding-top: 24px; border-top: 1px solid var(--border-strong, rgba(228,228,231,0.2)); }
+        .papers-section h2 { font-family: 'Space Mono', monospace; font-size: 1.1rem; color: var(--accent, #6366f1); margin-bottom: 16px; }
+        .paper-list { display: flex; flex-direction: column; gap: 12px; }
+        .paper-card { display: block; background: var(--bg-secondary, #1a1b27); border: 1px solid var(--border, rgba(228,228,231,0.1)); border-radius: 8px; padding: 16px; text-decoration: none; transition: border-color 0.2s; }
+        .paper-card:hover { border-color: var(--accent, #6366f1); }
+        .paper-title { font-family: 'Space Mono', monospace; font-size: 0.9rem; font-weight: 700; color: var(--text, #e4e4e7); margin-bottom: 4px; }
+        .paper-authors { font-size: 0.8rem; color: var(--text-muted, #a1a1aa); margin-bottom: 8px; }
+        .paper-desc { font-size: 0.85rem; color: var(--text-dim, #71717a); line-height: 1.5; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Gaussian Splatting</h1>
+        <p>Interactive 2D Gaussian splatting: drag Gaussians, resize them, and see real-time compositing.</p>
+
+        <div class="controls">
+            <button id="addBtn">Add Gaussian</button>
+            <button id="compareBtn">Compare NeRF</button>
+            <button id="refinBtn">Refine Density</button>
+            <button id="clearBtn">Clear</button>
+        </div>
+
+        <canvas id="canvas" width="800" height="500"></canvas>
+        <div class="info" id="info">Click to add Gaussians. Drag to move, scroll to resize, right-click to delete. Live compositing shown in real-time.</div>
+    </div>
+
+    <script>
+        const canvas = Wiki.createCanvas('canvas', 800, 500);
+        const ctx = canvas.getContext('2d');
+        let gaussians = [];
+        let selectedGaussian = null;
+        let isDragging = false;
+        let isResizing = false;
+        let showComparison = false;
+        let refineDensity = false;
+        let time = 0;
+
+        class Gaussian {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.scaleX = 30;
+                this.scaleY = 30;
+                this.rotation = 0;
+                this.color = {
+                    h: Math.random() * 360,
+                    s: 70 + Math.random() * 30,
+                    l: 50
+                };
+                this.opacity = 0.6 + Math.random() * 0.4;
+                this.id = Math.random();
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rotation);
+                ctx.scale(this.scaleX, this.scaleY);
+
+                // Draw ellipse with Gaussian falloff
+                const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+                const color = `hsl(${this.color.h}, ${this.color.s}%, ${this.color.l}%)`;
+                gradient.addColorStop(0, color);
+                gradient.addColorStop(1, `hsla(${this.color.h}, ${this.color.s}%, ${this.color.l}%, 0)`);
+
+                ctx.fillStyle = gradient;
+                ctx.globalAlpha = this.opacity;
+                ctx.beginPath();
+                ctx.arc(0, 0, 1, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.globalAlpha = 1;
+                ctx.restore();
+            }
+
+            drawControls(ctx, selected) {
+                const controlSize = 8;
+                ctx.fillStyle = selected ? '#ffe66d' : '#4ecdc4';
+                ctx.globalAlpha = 0.8;
+
+                // Center point
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, controlSize, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Scale handles
+                ctx.fillRect(this.x + this.scaleX - controlSize / 2, this.y - controlSize / 2, controlSize, controlSize);
+                ctx.fillRect(this.x - controlSize / 2, this.y + this.scaleY - controlSize / 2, controlSize, controlSize);
+
+                ctx.globalAlpha = 1;
+            }
+
+            contains(x, y) {
+                const dx = x - this.x;
+                const dy = y - this.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                return dist < Math.max(this.scaleX, this.scaleY) + 10;
+            }
+        }
+
+        function drawComposite() {
+            // Draw all Gaussians blended
+            gaussians.forEach(g => g.draw(ctx));
+        }
+
+        function drawNerfComparison(x, y, w, h) {
+            // Side-by-side comparison
+            ctx.fillStyle = 'rgba(100, 100, 100, 0.2)';
+            ctx.fillRect(x, y, w / 2, h);
+            ctx.fillStyle = 'rgba(100, 150, 200, 0.2)';
+            ctx.fillRect(x + w / 2, y, w / 2, h);
+
+            ctx.strokeStyle = '#888';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x, y, w, h);
+            ctx.beginPath();
+            ctx.moveTo(x + w / 2, y);
+            ctx.lineTo(x + w / 2, y + h);
+            ctx.stroke();
+
+            // NeRF (left)
+            ctx.fillStyle = '#ff6b6b';
+            ctx.globalAlpha = 0.3;
+            ctx.beginPath();
+            ctx.arc(x + w / 4, y + h / 2, 30, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Splatting (right)
+            const numGaussians = Math.min(gaussians.length, 5);
+            for (let i = 0; i < numGaussians; i++) {
+                const angle = (i / numGaussians) * Math.PI * 2;
+                ctx.fillStyle = `hsl(${i * 60}, 70%, 50%)`;
+                ctx.globalAlpha = 0.5;
+                ctx.beginPath();
+                ctx.arc(x + w / 4 * 3 + Math.cos(angle) * 15, y + h / 2 + Math.sin(angle) * 15, 10, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            ctx.globalAlpha = 1;
+
+            // Labels
+            ctx.fillStyle = '#ff6b6b';
+            ctx.font = 'bold 11px Space Mono';
+            ctx.textAlign = 'center';
+            ctx.fillText('NeRF', x + w / 4, y + h - 10);
+
+            ctx.fillStyle = '#4ecdc4';
+            ctx.fillText('Splatting', x + w / 4 * 3, y + h - 10);
+        }
+
+        function draw() {
+            ctx.fillStyle = Wiki.colors().bg;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = Wiki.colors().fg;
+            ctx.font = 'bold 18px Space Grotesk';
+            ctx.fillText('Gaussian Splatting', 20, 35);
+
+            if (showComparison) {
+                drawNerfComparison(20, 70, 860, 150);
+                ctx.globalCompositeOperation = 'lighter';
+                drawComposite();
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.save();
+                ctx.globalAlpha = 0.5;
+            } else {
+                ctx.save();
+                drawComposite();
+            }
+
+            ctx.restore();
+
+            // Draw controls
+            gaussians.forEach((g, idx) => {
+                g.drawControls(ctx, g === selectedGaussian);
+            });
+
+            // Stats
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.font = '11px Space Mono';
+            ctx.textAlign = 'left';
+            ctx.fillText(`Gaussians: ${gaussians.length}`, 20, showComparison ? 250 : 70);
+            ctx.fillText(`Compositing: ${showComparison ? 'Additive' : 'Multiplicative'}`, 20, showComparison ? 270 : 90);
+
+            if (refineDensity && gaussians.length > 0) {
+                ctx.fillStyle = '#4ecdc4';
+                ctx.fillText('Refining: High-density regions splitting...', 20, showComparison ? 290 : 110);
+                // Simulate refinement
+                time++;
+                if (time % 5 === 0 && gaussians.length < 50) {
+                    const g = gaussians[Math.floor(Math.random() * gaussians.length)];
+                    if (Math.random() > 0.7) {
+                        const newG = new Gaussian(g.x + Math.random() * 20 - 10, g.y + Math.random() * 20 - 10);
+                        newG.scaleX = g.scaleX * 0.6;
+                        newG.scaleY = g.scaleY * 0.6;
+                        gaussians.push(newG);
+                    }
+                }
+            }
+
+            ctx.strokeStyle = Wiki.colors().fg;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(0, 0, canvas.width, canvas.height);
+        }
+
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            selectedGaussian = null;
+            gaussians.forEach(g => {
+                if (g.contains(x, y)) {
+                    selectedGaussian = g;
+                }
+            });
+
+            if (!selectedGaussian) {
+                const newG = new Gaussian(x, y);
+                gaussians.push(newG);
+            }
+        });
+
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            if (e.button === 2) {
+                // Right click to delete
+                gaussians = gaussians.filter(g => !g.contains(x, y));
+                return;
+            }
+
+            gaussians.forEach(g => {
+                if (g.contains(x, y)) {
+                    selectedGaussian = g;
+                    isDragging = true;
+                }
+            });
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (isDragging && selectedGaussian) {
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                selectedGaussian.x = x;
+                selectedGaussian.y = y;
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            if (selectedGaussian) {
+                const scale = e.deltaY > 0 ? 0.95 : 1.05;
+                selectedGaussian.scaleX *= scale;
+                selectedGaussian.scaleY *= scale;
+            }
+        });
+
+        canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+        document.getElementById('addBtn').addEventListener('click', () => {
+            const newG = new Gaussian(Math.random() * 700 + 100, Math.random() * 400 + 100);
+            gaussians.push(newG);
+        });
+
+        document.getElementById('compareBtn').addEventListener('click', () => {
+            showComparison = !showComparison;
+            document.getElementById('compareBtn').classList.toggle('active');
+        });
+
+        document.getElementById('refinBtn').addEventListener('click', () => {
+            refineDensity = !refineDensity;
+            document.getElementById('refinBtn').classList.toggle('active');
+        });
+
+        document.getElementById('clearBtn').addEventListener('click', () => {
+            gaussians = [];
+            selectedGaussian = null;
+            refineDensity = false;
+            document.getElementById('refinBtn').classList.remove('active');
+        });
+
+        Wiki.animate(draw);
+    </script>
+
+    <div class="container papers-section">
+        <h2>Key Papers</h2>
+        <div class="paper-list">
+            <a href="https://arxiv.org/abs/2308.04079" class="paper-card">
+                <div class="paper-title">3D Gaussian Splatting for Real-Time Radiance Field Rendering</div>
+                <div class="paper-authors">Kerbl, Kopanas, Leimkühler, Drettakis — SIGGRAPH 2023</div>
+                <div class="paper-desc">开创性论文。用各向异性 3D 高斯基元表示场景，通过可微分光栅化实现实时渲染。提出自适应密度控制（克隆与分裂）来优化高斯分布，在 1080p 下达到 30+ FPS 的同时保持与 NeRF 相当的视觉质量。</div>
+            </a>
+            <a href="https://arxiv.org/abs/2403.17888" class="paper-card">
+                <div class="paper-title">2D Gaussian Splatting for Geometrically Accurate Radiance Fields</div>
+                <div class="paper-authors">Huang, Yu, Chen, Geiger — SIGGRAPH 2024</div>
+                <div class="paper-desc">用 2D 高斯圆盘替代 3D 椭球，使表面重建更精确。对几何重建（法线、深度）的准确性大幅提升，特别适合需要精确网格提取的应用场景。</div>
+            </a>
+            <a href="https://arxiv.org/abs/2311.16493" class="paper-card">
+                <div class="paper-title">Mip-Splatting: Alias-free 3D Gaussian Splatting</div>
+                <div class="paper-authors">Yu, Chen, Gao, Li, Geiger, Anber — CVPR 2024</div>
+                <div class="paper-desc">解决 3DGS 在不同分辨率下的锯齿问题，引入 3D 平滑滤波器和 2D Mip 滤波器。使高斯 Splatting 在任意缩放比例下保持稳定的渲染质量，避免了放大时的模糊和缩小时的闪烁。</div>
+            </a>
+            <a href="https://arxiv.org/abs/2311.12775" class="paper-card">
+                <div class="paper-title">SuGaR: Surface-Aligned Gaussian Representation for Efficient 3D Mesh Reconstruction</div>
+                <div class="paper-authors">Guédon, Lepetit — CVPR 2024</div>
+                <div class="paper-desc">提出将高斯基元对齐到场景表面的正则化方法，从而从 3DGS 结果中提取高质量三角网格。弥补了 3DGS 在网格重建方面的不足，使其适用于需要显式几何表示的下游任务。</div>
+            </a>
+            <a href="https://arxiv.org/abs/2308.09713" class="paper-card">
+                <div class="paper-title">Dynamic 3D Gaussians: Tracking by Persistent Dynamic View Synthesis</div>
+                <div class="paper-authors">Luiten, Kopanas, Leibe, Ramanan — 3DV 2024</div>
+                <div class="paper-desc">将 3DGS 扩展到动态场景，每个高斯基元随时间运动。同时实现新视角合成和 3D 跟踪，为动态场景的实时渲染开辟了新方向。</div>
+            </a>
+            <a href="https://arxiv.org/abs/2311.14521" class="paper-card">
+                <div class="paper-title">GaussianEditor: Swift and Controllable 3D Editing with Gaussian Splatting</div>
+                <div class="paper-authors">Chen, Chen, Zhang, Wang, Wong — CVPR 2024</div>
+                <div class="paper-desc">基于 3DGS 的 3D 场景编辑框架，结合文本指令（通过 diffusion 模型引导）实现对场景的局部编辑。支持删除、替换、风格化等操作，展示了 3DGS 作为可编辑 3D 表示的潜力。</div>
+            </a>
+        </div>
+    </div>
+</body>
+</html>

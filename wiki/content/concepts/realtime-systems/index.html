@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time Systems Design</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        body { background: var(--bg-dark); color: var(--fg-light); font-family: 'Space Grotesk', sans-serif; }
+        .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+        h1 { font-size: 2em; margin-bottom: 10px; font-family: 'Space Grotesk'; font-weight: 700; }
+        .intro { font-size: 0.95em; color: var(--fg-muted); margin-bottom: 30px; line-height: 1.6; }
+
+        .section { margin-bottom: 40px; }
+        .section h2 { font-size: 1.4em; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid var(--accent); font-weight: 600; }
+
+        .controls { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; align-items: center; }
+        button { padding: 8px 14px; background: var(--accent); color: var(--bg-dark); border: none; border-radius: 4px; cursor: pointer; font-family: 'Space Mono'; font-weight: 700; font-size: 0.9em; transition: opacity 0.2s; }
+        button:hover { opacity: 0.9; }
+        button.active { opacity: 1; box-shadow: 0 0 8px var(--accent); }
+
+        input[type="range"] { width: 150px; cursor: pointer; }
+        label { cursor: pointer; display: flex; align-items: center; font-family: 'Space Mono'; font-size: 0.9em; }
+        input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; margin-right: 6px; }
+
+        canvas { border: 1px solid var(--fg-dark); background: var(--bg-darker); display: block; margin: 20px auto; border-radius: 4px; }
+
+        .info-box { background: rgba(100, 150, 200, 0.1); border-left: 3px solid var(--accent); padding: 12px 15px; margin-top: 15px; font-size: 0.9em; font-family: 'Space Mono'; line-height: 1.5; color: var(--fg-light); }
+
+        .control-group { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+        .control-item { display: flex; align-items: center; gap: 8px; }
+        .control-label { font-family: 'Space Mono'; font-size: 0.9em; color: var(--fg-muted); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Real-time Systems Design</h1>
+        <p class="intro">Understand core real-time system patterns: frame budgets, buffering strategies, game loops, and thread architectures. Interactive diagrams show how timing constraints shape system design.</p>
+
+        <!-- SECTION 1: Frame Timing -->
+        <div class="section">
+            <h2>Frame Timing & Budget</h2>
+            <div class="controls">
+                <div class="control-group">
+                    <span class="control-label">Target FPS:</span>
+                    <input type="range" id="fpsSlider" min="30" max="144" value="60" step="1" />
+                    <span id="fpsDisplay" style="font-family: 'Space Mono'; font-weight: 700; min-width: 40px;">60</span>
+                </div>
+            </div>
+            <canvas id="frameTimingCanvas" width="800" height="320"></canvas>
+            <div class="info-box">
+                <strong>Frame Budget:</strong> At 60 FPS, you have 16.67ms to update physics, render, and display. Each phase (Update, Physics, Render) must fit within this window. Exceeding it causes frame drops visible to players.
+            </div>
+        </div>
+
+        <!-- SECTION 2: Buffering Strategies -->
+        <div class="section">
+            <h2>Buffering: Double vs Triple</h2>
+            <div class="controls">
+                <button id="doubleBufferBtn" class="active">Double Buffering</button>
+                <button id="tripleBufferBtn">Triple Buffering</button>
+                <label><input type="checkbox" id="animateBufferCheck" checked> Animate Swaps</label>
+            </div>
+            <canvas id="bufferingCanvas" width="800" height="380"></canvas>
+            <div class="info-box">
+                <strong>Double Buffering:</strong> Front buffer (displayed), back buffer (being rendered). After render, buffers swap. Risk: long renders delay display.<br><br>
+                <strong>Triple Buffering:</strong> Three buffers allow GPU to work while CPU renders, reducing stalls. Trade-off: one frame of input latency.
+            </div>
+        </div>
+
+        <!-- SECTION 3: Game Loop Patterns -->
+        <div class="section">
+            <h2>Game Loop Patterns</h2>
+            <div class="controls">
+                <button id="fixedLoopBtn" class="active">Fixed Timestep</button>
+                <button id="variableLoopBtn">Variable Timestep</button>
+                <button id="semiFixedLoopBtn">Semi-Fixed</button>
+            </div>
+            <canvas id="gameLoopCanvas" width="800" height="380"></canvas>
+            <div class="info-box">
+                <strong>Fixed Timestep:</strong> Update at constant dt (e.g., 16.67ms). Physics is deterministic. May render multiple times per update or skip frames.<br><br>
+                <strong>Variable Timestep:</strong> dt = frame delta time. Render matches frame rate. Physics less stable with large deltas.<br><br>
+                <strong>Semi-Fixed:</strong> Update fixed timesteps multiple times per frame, render once. Best of both: stable physics + smooth visuals.
+            </div>
+        </div>
+
+        <!-- SECTION 4: Thread Architecture -->
+        <div class="section">
+            <h2>Thread Architecture</h2>
+            <canvas id="threadArchCanvas" width="800" height="420"></canvas>
+            <div class="info-box">
+                <strong>Typical Layout:</strong> Main thread handles game logic, physics, and input. Render thread prepares GPU commands (single-threaded in most engines). Worker threads handle physics simulation, audio, network I/O in parallel. Thread synchronization at frame boundaries prevents race conditions.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============ CANVAS SETUP ============
+        function createNamedCanvas(canvasId, width, height) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) {
+                console.error('Canvas not found:', canvasId);
+                return null;
+            }
+            canvas.width = width;
+            canvas.height = height;
+            return canvas;
+        }
+
+        const frameTimingCanvas = createNamedCanvas('frameTimingCanvas', 900, 320);
+        const bufferingCanvas = createNamedCanvas('bufferingCanvas', 900, 380);
+        const gameLoopCanvas = createNamedCanvas('gameLoopCanvas', 900, 380);
+        const threadArchCanvas = createNamedCanvas('threadArchCanvas', 900, 420);
+
+        const ctxFrameTiming = frameTimingCanvas.getContext('2d');
+        const ctxBuffering = bufferingCanvas.getContext('2d');
+        const ctxGameLoop = gameLoopCanvas.getContext('2d');
+        const ctxThreadArch = threadArchCanvas.getContext('2d');
+
+        // ============ STATE ============
+        let targetFps = 60;
+        let bufferingMode = 'double'; // 'double' or 'triple'
+        let animateBuffers = true;
+        let gameLoopPattern = 'fixed'; // 'fixed', 'variable', 'semiFixed'
+        let animationTime = 0;
+
+        // ============ HELPERS ============
+        function getFrameBudget() {
+            return 1000 / targetFps;
+        }
+
+        function drawBox(ctx, x, y, w, h, fill, label, fontSize = 12) {
+            ctx.fillStyle = fill;
+            ctx.fillRect(x, y, w, h);
+            ctx.strokeStyle = Wiki.colors().text;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x, y, w, h);
+            if (label) {
+                ctx.fillStyle = Wiki.colors().text;
+                ctx.font = `bold ${fontSize}px Space Mono`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(label, x + w/2, y + h/2);
+            }
+        }
+
+        function drawArrow(ctx, fromX, fromY, toX, toY, color = '#999', width = 2) {
+            const headlen = 8;
+            const angle = Math.atan2(toY - fromY, toX - fromX);
+
+            ctx.strokeStyle = color;
+            ctx.lineWidth = width;
+            ctx.beginPath();
+            ctx.moveTo(fromX, fromY);
+            ctx.lineTo(toX, toY);
+            ctx.stroke();
+
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.moveTo(toX, toY);
+            ctx.lineTo(toX - headlen * Math.cos(angle - Math.PI / 6), toY - headlen * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(toX - headlen * Math.cos(angle + Math.PI / 6), toY - headlen * Math.sin(angle + Math.PI / 6));
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        // ============ DRAW: FRAME TIMING ============
+        function drawFrameTiming() {
+            const ctx = ctxFrameTiming;
+            const colors = Wiki.colors();
+            const budget = getFrameBudget();
+
+            ctx.fillStyle = colors.bg;
+            ctx.fillRect(0, 0, frameTimingCanvas.width, frameTimingCanvas.height);
+
+            ctx.fillStyle = colors.fg;
+            ctx.font = 'bold 14px Space Mono';
+            ctx.textAlign = 'left';
+            ctx.fillText(`Frame Budget @ ${targetFps} FPS: ${budget.toFixed(2)}ms`, 20, 30);
+
+            // Draw timeline
+            const timelineY = 80;
+            const maxWidth = 600;
+            const budgetPx = (budget / (budget * 2)) * maxWidth; // scale factor
+
+            // Update phase
+            drawBox(ctx, 40, timelineY, budgetPx * 0.25, 40, '#ff6b6b', 'Update', 11);
+            ctx.fillStyle = '#ff6b6b';
+            ctx.font = '10px Space Mono';
+            ctx.textAlign = 'center';
+            ctx.fillText('Input', 40 + budgetPx * 0.125, timelineY + 55);
+            ctx.fillText('Logic', 40 + budgetPx * 0.125, timelineY + 67);
+
+            // Physics phase
+            drawBox(ctx, 40 + budgetPx * 0.25, timelineY, budgetPx * 0.35, 40, '#4ecdc4', 'Physics', 11);
+            ctx.fillStyle = '#4ecdc4';
+            ctx.textAlign = 'center';
+            ctx.fillText('Simulation', 40 + budgetPx * 0.425, timelineY + 55);
+            ctx.fillText('(0.35x)', 40 + budgetPx * 0.425, timelineY + 67);
+
+            // Render phase
+            drawBox(ctx, 40 + budgetPx * 0.6, timelineY, budgetPx * 0.4, 40, '#ffe66d', 'Render', 11);
+            ctx.fillStyle = '#ffe66d';
+            ctx.textAlign = 'center';
+            ctx.fillText('GPU Draw', 40 + budgetPx * 0.8, timelineY + 55);
+            ctx.fillText('Commands', 40 + budgetPx * 0.8, timelineY + 67);
+
+            // Budget line
+            ctx.strokeStyle = '#888';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.moveTo(40 + budgetPx, timelineY - 20);
+            ctx.lineTo(40 + budgetPx, timelineY + 60);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            ctx.fillStyle = '#888';
+            ctx.font = 'bold 10px Space Mono';
+            ctx.textAlign = 'center';
+            ctx.fillText('Budget End', 40 + budgetPx, timelineY - 8);
+
+            // Details
+            ctx.fillStyle = colors.fg;
+            ctx.font = '11px Space Mono';
+            ctx.textAlign = 'left';
+            ctx.fillText('Typical timing breakdown (60 FPS):', 20, 180);
+
+            const details = [
+                `Update (Input, Logic): ~4ms (25%)`,
+                `Physics Simulation: ~5.8ms (35%)`,
+                `Render (Draw Calls): ~6.7ms (40%)`,
+                `Total: ${budget.toFixed(2)}ms`
+            ];
+
+            details.forEach((detail, i) => {
+                ctx.fillText(detail, 40, 210 + i * 25);
+            });
+
+            // Frame drop indicator
+            ctx.fillStyle = '#ff6b6b';
+            ctx.font = '10px Space Mono';
+            ctx.fillText('If any phase exceeds budget → frame drop (half FPS)', 20, 300);
+
+            ctx.strokeStyle = colors.fg;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(0, 0, frameTimingCanvas.width, frameTimingCanvas.height);
+        }
+
+        // ============ DRAW: BUFFERING ============
+        function drawBuffering() {
+            const ctx = ctxBuffering;
+            const colors = Wiki.colors();
+
+            ctx.fillStyle = colors.bg;
+            ctx.fillRect(0, 0, bufferingCanvas.width, bufferingCanvas.height);
+
+            ctx.fillStyle = colors.fg;
+            ctx.font = 'bold 14px Space Mono';
+            ctx.textAlign = 'left';
+            ctx.fillText(bufferingMode === 'double' ? 'Double Buffering' : 'Triple Buffering', 20, 30);
+
+            const bufY = 70;
+            const bufW = 120;
+            const bufH = 60;
+            const gap = 20;
+
+            if (bufferingMode === 'double') {
+                // Double buffering: front and back
+                ctx.fillStyle = '#999';
+                ctx.font = '10px Space Mono';
+                ctx.fillText('Display', 20, bufY - 10);
+
+                // Front buffer (shown)
+                drawBox(ctx, 20, bufY, bufW, bufH, '#4ecdc4', 'FRONT\n(Display)', 10);
+                ctx.fillStyle = '#4ecdc4';
+                ctx.fillText('Currently shown', 20, bufY + bufH + 20);
+
+                // Back buffer (rendered to)
+                drawBox(ctx, 20 + bufW + gap, bufY, bufW, bufH, '#ffe66d', 'BACK\n(Render)', 10);
+                ctx.fillStyle = '#ffe66d';
+                ctx.fillText('Being rendered', 20 + bufW + gap, bufY + bufH + 20);
+
+                // Swap arrow
+                const swapX = 20 + bufW + gap / 2;
+                if (animateBuffers) {
+                    const swapPhase = (animationTime % 2) > 1 ? 0 : 1;
+                    ctx.fillStyle = swapPhase === 0 ? '#ff6b6b' : '#888';
+                    ctx.strokeStyle = swapPhase === 0 ? '#ff6b6b' : '#888';
+                } else {
+                    ctx.fillStyle = '#888';
+                    ctx.strokeStyle = '#888';
+                }
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(swapX - 30, bufY + bufH / 2);
+                ctx.lineTo(swapX + 30, bufY + bufH / 2);
+                ctx.stroke();
+
+                // Arrow head
+                ctx.fillStyle = ctx.strokeStyle;
+                ctx.beginPath();
+                ctx.moveTo(swapX + 30, bufY + bufH / 2);
+                ctx.lineTo(swapX + 22, bufY + bufH / 2 - 5);
+                ctx.lineTo(swapX + 22, bufY + bufH / 2 + 5);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.fillStyle = ctx.strokeStyle;
+                ctx.font = 'bold 10px Space Mono';
+                ctx.textAlign = 'center';
+                ctx.fillText('SWAP', swapX, bufY + bufH + 38);
+
+                // Explanation
+                ctx.fillStyle = colors.fg;
+                ctx.font = '11px Space Mono';
+                ctx.textAlign = 'left';
+                const expl = [
+                    'Frame 1: Render to BACK, display FRONT',
+                    'Swap happens at VSync',
+                    'Frame 2: Render to FRONT, display BACK (now)',
+                    'Risk: If render takes too long, display',
+                    'waits and causes frame drops'
+                ];
+                expl.forEach((line, i) => {
+                    ctx.fillText(line, 20, 200 + i * 22);
+                });
+
+            } else {
+                // Triple buffering
+                ctx.fillStyle = '#999';
+                ctx.font = '10px Space Mono';
+                ctx.fillText('Display', 20, bufY - 10);
+
+                // Three buffers
+                const buffers = [
+                    { color: '#4ecdc4', label: 'FRONT\n(Display)', desc: 'Currently shown' },
+                    { color: '#a8dadc', label: 'BACK1\n(Render)', desc: 'Being rendered' },
+                    { color: '#ffe66d', label: 'BACK2\n(Ready)', desc: 'Ready to swap' }
+                ];
+
+                buffers.forEach((buf, i) => {
+                    const x = 20 + i * (bufW + gap);
+                    drawBox(ctx, x, bufY, bufW, bufH, buf.color, buf.label, 10);
+                    ctx.fillStyle = buf.color;
+                    ctx.font = '9px Space Mono';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(buf.desc, x + bufW / 2, bufY + bufH + 20);
+                });
+
+                // Animation: rotating swap
+                if (animateBuffers) {
+                    const phase = Math.floor((animationTime % 3) * 0.5) % 3;
+                    const swapColor = '#ff6b6b';
+                    ctx.strokeStyle = swapColor;
+                    ctx.lineWidth = 3;
+
+                    if (phase === 0) {
+                        // FRONT -> BACK2
+                        ctx.strokeRect(20 - 5, bufY - 5, bufW + 10, bufH + 10);
+                    } else if (phase === 1) {
+                        // BACK2 -> FRONT
+                        ctx.strokeRect(20 + bufW + gap - 5, bufY - 5, bufW + 10, bufH + 10);
+                    } else {
+                        // BACK1 -> BACK2
+                        ctx.strokeRect(20 + (bufW + gap) * 2 - 5, bufY - 5, bufW + 10, bufH + 10);
+                    }
+                }
+
+                // Explanation
+                ctx.fillStyle = colors.fg;
+                ctx.font = '11px Space Mono';
+                ctx.textAlign = 'left';
+                const expl = [
+                    'Three buffers rotate: GPU draws to BACK1,',
+                    'while BACK2 waits to swap with FRONT.',
+                    'When FRONT is displayed, rotation continues.',
+                    'Benefit: No stalls if render takes >16.67ms',
+                    'Trade-off: Extra frame of input latency'
+                ];
+                expl.forEach((line, i) => {
+                    ctx.fillText(line, 20, 200 + i * 22);
+                });
+            }
+
+            ctx.strokeStyle = colors.fg;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(0, 0, bufferingCanvas.width, bufferingCanvas.height);
+        }
+
+        // ============ DRAW: GAME LOOP PATTERNS ============
+        function drawGameLoop() {
+            const ctx = ctxGameLoop;
+            const colors = Wiki.colors();
+
+            ctx.fillStyle = colors.bg;
+            ctx.fillRect(0, 0, gameLoopCanvas.width, gameLoopCanvas.height);
+
+            ctx.fillStyle = colors.fg;
+            ctx.font = 'bold 14px Space Mono';
+            ctx.textAlign = 'left';
+
+            const patternNames = {
+                'fixed': 'Fixed Timestep',
+                'variable': 'Variable Timestep',
+                'semiFixed': 'Semi-Fixed Timestep'
+            };
+            ctx.fillText(patternNames[gameLoopPattern], 20, 30);
+
+            const timelineY = 70;
+            const budget = getFrameBudget();
+
+            if (gameLoopPattern === 'fixed') {
+                // Fixed timestep: update 1x per frame (or more), render once
+                ctx.fillStyle = '#888';
+                ctx.font = '10px Space Mono';
+                ctx.fillText('Time:', 20, timelineY - 10);
+
+                const dt = budget;
+                const updateW = 40;
+                const renderW = 100;
+                const frameW = updateW + renderW + 20;
+
+                // Frame 1
+                drawBox(ctx, 40, timelineY, updateW, 40, '#ff6b6b', 'UPD\ndt=fixed', 9);
+                drawBox(ctx, 40 + updateW + 10, timelineY, renderW, 40, '#4ecdc4', 'RENDER', 10);
+                ctx.fillStyle = '#888';
+                ctx.font = '9px Space Mono';
+                ctx.fillText(`${budget.toFixed(1)}ms frame`, 40, timelineY + 55);
+
+                // Frame 2
+                drawBox(ctx, 40 + frameW, timelineY, updateW, 40, '#ff6b6b', 'UPD\ndt=fixed', 9);
+                drawBox(ctx, 40 + frameW + updateW + 10, timelineY, renderW, 40, '#4ecdc4', 'RENDER', 10);
+
+                ctx.fillStyle = colors.fg;
+                ctx.font = '11px Space Mono';
+                ctx.textAlign = 'left';
+                const fixedExpl = [
+                    'Update happens at fixed timestep (e.g., 16.67ms)',
+                    'Physics is deterministic and independent of frame rate',
+                    'Render happens once per frame',
+                    'If render is slow, may skip frames or update multiple times',
+                    'Best for: Deterministic physics, competitive games'
+                ];
+                fixedExpl.forEach((line, i) => {
+                    ctx.fillText(line, 20, 140 + i * 25);
+                });
+
+            } else if (gameLoopPattern === 'variable') {
+                // Variable timestep: dt = frame delta
+                ctx.fillStyle = '#888';
+                ctx.font = '10px Space Mono';
+                ctx.fillText('Time:', 20, timelineY - 10);
+
+                const f1dt = 16;
+                const f2dt = 20;
+                const f3dt = 14;
+
+                const px1 = (f1dt / 40) * 100;
+                const px2 = (f2dt / 40) * 100;
+                const px3 = (f3dt / 40) * 100;
+
+                // Frame 1
+                drawBox(ctx, 40, timelineY, px1, 40, '#ff6b6b', `UPD\ndt=${f1dt}ms`, 8);
+                drawBox(ctx, 40 + px1 + 5, timelineY, 80, 40, '#4ecdc4', 'RENDER', 10);
+                ctx.fillStyle = '#888';
+                ctx.font = '9px Space Mono';
+                ctx.fillText('var frame', 40, timelineY + 55);
+
+                // Frame 2
+                drawBox(ctx, 40 + 200, timelineY, px2, 40, '#ff6b6b', `UPD\ndt=${f2dt}ms`, 8);
+                drawBox(ctx, 40 + 200 + px2 + 5, timelineY, 80, 40, '#4ecdc4', 'RENDER', 10);
+                ctx.fillStyle = '#888';
+                ctx.fillText('var frame', 40 + 200, timelineY + 55);
+
+                // Frame 3
+                drawBox(ctx, 40 + 400, timelineY, px3, 40, '#ff6b6b', `UPD\ndt=${f3dt}ms`, 8);
+                drawBox(ctx, 40 + 400 + px3 + 5, timelineY, 80, 40, '#4ecdc4', 'RENDER', 10);
+                ctx.fillStyle = '#888';
+                ctx.fillText('var frame', 40 + 400, timelineY + 55);
+
+                ctx.fillStyle = colors.fg;
+                ctx.font = '11px Space Mono';
+                ctx.textAlign = 'left';
+                const varExpl = [
+                    'Update delta = actual frame time (varies with frame rate)',
+                    'Render once per frame at native refresh rate',
+                    'If frame takes 20ms, next update also gets dt=20ms',
+                    'Pro: Smooth visuals. Con: Physics less stable with large dt',
+                    'Best for: Action games, frame rate independence'
+                ];
+                varExpl.forEach((line, i) => {
+                    ctx.fillText(line, 20, 140 + i * 25);
+                });
+
+            } else {
+                // Semi-fixed: fixed updates, variable renders
+                ctx.fillStyle = '#888';
+                ctx.font = '10px Space Mono';
+                ctx.fillText('Time:', 20, timelineY - 10);
+
+                const fixedDt = 8;
+                const fixedW = 35;
+
+                // Frame 1: 2 updates, 1 render
+                drawBox(ctx, 40, timelineY, fixedW, 35, '#ff6b6b', 'UPD1', 9);
+                drawBox(ctx, 40 + fixedW + 3, timelineY, fixedW, 35, '#ff6b6b', 'UPD2', 9);
+                drawBox(ctx, 40 + (fixedW + 3) * 2, timelineY, 70, 35, '#4ecdc4', 'RENDER', 9);
+                ctx.fillStyle = '#888';
+                ctx.font = '9px Space Mono';
+                ctx.fillText('2x update, 1x render', 40, timelineY + 45);
+
+                // Frame 2: 1 update, 1 render
+                drawBox(ctx, 40 + 250, timelineY, fixedW, 35, '#ff6b6b', 'UPD3', 9);
+                drawBox(ctx, 40 + 250 + fixedW + 3, timelineY, 70, 35, '#4ecdc4', 'RENDER', 9);
+                ctx.fillStyle = '#888';
+                ctx.fillText('1x update, 1x render', 40 + 250, timelineY + 45);
+
+                ctx.fillStyle = colors.fg;
+                ctx.font = '11px Space Mono';
+                ctx.textAlign = 'left';
+                const semiExpl = [
+                    'Fixed timesteps execute multiple times until accumulated time is consumed',
+                    'One render per frame, decoupled from physics update rate',
+                    'Accumulate delta and run fixed updates in loop: while (time_acc >= dt) { update(); time_acc -= dt; }',
+                    'Pro: Stable physics + smooth visuals. Con: More CPU if physics updates often',
+                    'Best for: Modern engines (Godot, Unreal use this)'
+                ];
+                semiExpl.forEach((line, i) => {
+                    ctx.fillText(line, 20, 140 + i * 25);
+                });
+            }
+
+            ctx.strokeStyle = colors.fg;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(0, 0, gameLoopCanvas.width, gameLoopCanvas.height);
+        }
+
+        // ============ DRAW: THREAD ARCHITECTURE ============
+        function drawThreadArchitecture() {
+            const ctx = ctxThreadArch;
+            const colors = Wiki.colors();
+
+            ctx.fillStyle = colors.bg;
+            ctx.fillRect(0, 0, threadArchCanvas.width, threadArchCanvas.height);
+
+            ctx.fillStyle = colors.fg;
+            ctx.font = 'bold 14px Space Mono';
+            ctx.textAlign = 'left';
+            ctx.fillText('Thread Architecture (Typical Game Engine)', 20, 30);
+
+            // Timeline at top
+            ctx.fillStyle = '#888';
+            ctx.font = '10px Space Mono';
+            ctx.fillText('Frame time >', 20, 65);
+            ctx.strokeStyle = '#888';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(20, 75);
+            ctx.lineTo(880, 75);
+            ctx.stroke();
+
+            // Main thread
+            const mainY = 100;
+            drawBox(ctx, 40, mainY, 150, 50, '#ff6b6b', 'MAIN THREAD', 10);
+            ctx.fillStyle = '#ff6b6b';
+            ctx.font = '8px Space Mono';
+            ctx.textAlign = 'center';
+            ctx.fillText('Input, Logic,', 40 + 75, mainY + 30);
+            ctx.fillText('Game State', 40 + 75, mainY + 40);
+
+            // Physics thread
+            const physicsY = 100;
+            drawBox(ctx, 220, physicsY, 140, 50, '#4ecdc4', 'PHYSICS', 10);
+            ctx.fillStyle = '#4ecdc4';
+            ctx.font = '8px Space Mono';
+            ctx.textAlign = 'center';
+            ctx.fillText('Parallel Sim', 220 + 70, physicsY + 30);
+
+            // Audio thread
+            const audioY = 100;
+            drawBox(ctx, 380, audioY, 120, 50, '#a8dadc', 'AUDIO', 10);
+            ctx.fillStyle = '#a8dadc';
+            ctx.font = '8px Space Mono';
+            ctx.textAlign = 'center';
+            ctx.fillText('Mix, Playback', 380 + 60, audioY + 30);
+
+            // I/O thread (network, disk)
+            const ioY = 100;
+            drawBox(ctx, 520, ioY, 120, 50, '#ffe66d', 'I/O THREAD', 9);
+            ctx.fillStyle = '#ffe66d';
+            ctx.font = '8px Space Mono';
+            ctx.textAlign = 'center';
+            ctx.fillText('Network,', 520 + 60, ioY + 30);
+            ctx.fillText('Disk', 520 + 60, ioY + 40);
+
+            // Synchronization barrier
+            ctx.strokeStyle = Wiki.colors().text;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.moveTo(40, 170);
+            ctx.lineTo(640, 170);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            ctx.fillStyle = Wiki.colors().text;
+            ctx.font = 'bold 9px Space Mono';
+            ctx.fillText('SYNCHRONIZATION BARRIER (Frame Boundary)', 40, 190);
+
+            // Render thread
+            const renderY = 210;
+            drawBox(ctx, 40, renderY, 200, 60, '#00d4ff', 'RENDER THREAD', 10);
+            ctx.fillStyle = '#00d4ff';
+            ctx.font = '8px Space Mono';
+            ctx.textAlign = 'center';
+            ctx.fillText('Read game state,', 40 + 100, renderY + 25);
+            ctx.fillText('Issue draw calls to GPU', 40 + 100, renderY + 37);
+            ctx.fillText('(Single-threaded access)', 40 + 100, renderY + 49);
+
+            // GPU
+            const gpuY = 210;
+            drawBox(ctx, 260, gpuY, 180, 60, '#ff8c00', 'GPU', 11);
+            ctx.fillStyle = '#ff8c00';
+            ctx.font = '8px Space Mono';
+            ctx.textAlign = 'center';
+            ctx.fillText('Execute draw calls', 260 + 90, gpuY + 25);
+            ctx.fillText('Rasterize, composite', 260 + 90, gpuY + 37);
+            ctx.fillText('(Asynchronous)', 260 + 90, gpuY + 49);
+
+            // Worker pool
+            const workerY = 210;
+            drawBox(ctx, 460, workerY, 180, 60, '#9b59b6', 'WORKER POOL', 10);
+            ctx.fillStyle = '#9b59b6';
+            ctx.font = '8px Space Mono';
+            ctx.textAlign = 'center';
+            ctx.fillText('Parallel tasks:', 460 + 90, workerY + 20);
+            ctx.fillText('Animation, pathfind,', 460 + 90, workerY + 32);
+            ctx.fillText('AI, compression', 460 + 90, workerY + 44);
+
+            // Arrows showing flow
+            drawArrow(ctx, 195, 125, 220, 125, '#888', 1.5);
+            drawArrow(ctx, 360, 125, 380, 125, '#888', 1.5);
+            drawArrow(ctx, 500, 125, 520, 125, '#888', 1.5);
+
+            // Sync barrier arrows
+            drawArrow(ctx, 115, 170, 115, 210, '#fff', 2);
+            drawArrow(ctx, 350, 170, 350, 210, '#fff', 2);
+            drawArrow(ctx, 550, 170, 550, 210, '#fff', 2);
+
+            // Key points
+            ctx.fillStyle = colors.fg;
+            ctx.font = '10px Space Mono';
+            ctx.textAlign = 'left';
+            const points = [
+                '• Main thread gathers input and updates game logic',
+                '• Physics, audio, I/O run in parallel without blocking render',
+                '• Synchronization point at frame boundary ensures consistency',
+                '• Render thread reads state once and builds GPU commands',
+                '• GPU executes independently; CPU can start next frame'
+            ];
+            points.forEach((point, i) => {
+                ctx.fillText(point, 40, 300 + i * 20);
+            });
+
+            ctx.strokeStyle = colors.fg;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(0, 0, threadArchCanvas.width, threadArchCanvas.height);
+        }
+
+        // ============ MAIN ANIMATION LOOP ============
+        function animate() {
+            animationTime += 0.016; // ~60 FPS
+
+            drawFrameTiming();
+            drawBuffering();
+            drawGameLoop();
+            drawThreadArchitecture();
+
+            Wiki.animate(animate);
+        }
+
+        // ============ EVENT LISTENERS ============
+        document.getElementById('fpsSlider').addEventListener('input', (e) => {
+            targetFps = parseInt(e.target.value);
+            document.getElementById('fpsDisplay').textContent = targetFps;
+        });
+
+        document.getElementById('doubleBufferBtn').addEventListener('click', () => {
+            bufferingMode = 'double';
+            document.getElementById('doubleBufferBtn').classList.add('active');
+            document.getElementById('tripleBufferBtn').classList.remove('active');
+        });
+
+        document.getElementById('tripleBufferBtn').addEventListener('click', () => {
+            bufferingMode = 'triple';
+            document.getElementById('tripleBufferBtn').classList.add('active');
+            document.getElementById('doubleBufferBtn').classList.remove('active');
+        });
+
+        document.getElementById('animateBufferCheck').addEventListener('change', (e) => {
+            animateBuffers = e.target.checked;
+        });
+
+        document.getElementById('fixedLoopBtn').addEventListener('click', () => {
+            gameLoopPattern = 'fixed';
+            document.getElementById('fixedLoopBtn').classList.add('active');
+            document.getElementById('variableLoopBtn').classList.remove('active');
+            document.getElementById('semiFixedLoopBtn').classList.remove('active');
+        });
+
+        document.getElementById('variableLoopBtn').addEventListener('click', () => {
+            gameLoopPattern = 'variable';
+            document.getElementById('variableLoopBtn').classList.add('active');
+            document.getElementById('fixedLoopBtn').classList.remove('active');
+            document.getElementById('semiFixedLoopBtn').classList.remove('active');
+        });
+
+        document.getElementById('semiFixedLoopBtn').addEventListener('click', () => {
+            gameLoopPattern = 'semiFixed';
+            document.getElementById('semiFixedLoopBtn').classList.add('active');
+            document.getElementById('fixedLoopBtn').classList.remove('active');
+            document.getElementById('variableLoopBtn').classList.remove('active');
+        });
+
+        // Start animation
+        animate();
+    </script>
+</body>
+</html>

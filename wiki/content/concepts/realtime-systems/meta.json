@@ -1,0 +1,19 @@
+{
+  "title": "Real-Time System Design",
+  "category": "concepts",
+  "order": 4,
+  "tags": [
+    "real-time",
+    "frame-budget",
+    "latency",
+    "buffering",
+    "vsync",
+    "networking"
+  ],
+  "description": "Comprehensive guide to real-time system design principles including frame budgets, latency management, buffering strategies, and applications to games, digital twins, and live visualization.",
+  "related": [
+    "digital-twin/architecture-overview",
+    "digital-twin/realtime-data-pipeline",
+    "game-engines/unity/performance-optimization"
+  ]
+}

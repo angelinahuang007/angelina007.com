@@ -1,0 +1,11 @@
+{
+  "title": "Unity Shader Programming",
+  "category": "game-engines/unity",
+  "tags": ["unity", "shaders", "materials", "hlsl", "node-graph", "rendering"],
+  "description": "Interactive shader node graph editor with live HLSL code generation and material preview.",
+  "related": [
+    "game-engines/unity/lighting-postprocessing",
+    "game-engines/unreal/materials-nanite"
+  ],
+  "order": 2
+}

@@ -1,0 +1,19 @@
+{
+  "title": "Spatial Data Structures",
+  "category": "algorithms",
+  "tags": [
+    "algorithms",
+    "spatial",
+    "octree",
+    "BSP",
+    "R-tree",
+    "hash-grid"
+  ],
+  "description": "Construction and querying of spatial data structures including octrees, BSP trees, R-trees, and hash grids for broadphase collision detection and spatial queries.",
+  "related": [
+    "graphics-fundamentals/acceleration-structures",
+    "algorithms/computational-geometry",
+    "algorithms/gpu-parallel-computing"
+  ],
+  "order": 1
+}

@@ -1,0 +1,18 @@
+{
+  "title": "RAW Processing and Demosaicing",
+  "category": "photo-editing",
+  "tags": [
+    "RAW",
+    "demosaicing",
+    "noise-reduction",
+    "sharpening",
+    "bit-depth"
+  ],
+  "description": "Technical deep-dive into RAW file structure, Bayer pattern demosaicing algorithms, noise reduction, sharpening, and RAW converter comparison.",
+  "related": [
+    "photography/exposure-fundamentals",
+    "photo-editing/lightroom-workflow",
+    "photography/color-theory-photography"
+  ],
+  "order": 4
+}

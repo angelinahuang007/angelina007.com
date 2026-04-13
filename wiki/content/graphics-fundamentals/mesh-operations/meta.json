@@ -1,0 +1,19 @@
+{
+  "title": "Mesh Operations and Data Structures",
+  "category": "graphics-fundamentals",
+  "tags": [
+    "mesh",
+    "simplification",
+    "data-structures",
+    "lod",
+    "remeshing",
+    "topology"
+  ],
+  "description": "Mesh data structures (half-edge), simplification algorithms (edge collapse, QEM), subdivision, remeshing, smoothing, and LOD generation for efficient rendering.",
+  "related": [
+    "graphics-fundamentals/curves-and-surfaces",
+    "blender/modeling-workflow",
+    "algorithms/spatial-data-structures"
+  ],
+  "order": 8
+}

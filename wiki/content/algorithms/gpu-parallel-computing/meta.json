@@ -1,0 +1,18 @@
+{
+  "title": "GPU Parallel Computing",
+  "category": "algorithms",
+  "tags": [
+    "GPU",
+    "parallel-computing",
+    "compute-shader",
+    "CUDA",
+    "SIMD"
+  ],
+  "description": "GPU architecture, compute shaders, parallel reduction, sorting algorithms, and optimization techniques for GPU computation.",
+  "related": [
+    "graphics-fundamentals/rasterization-pipeline",
+    "graphics-fundamentals/realtime-rendering-pipeline",
+    "game-engines/unreal/niagara-particles"
+  ],
+  "order": 4
+}

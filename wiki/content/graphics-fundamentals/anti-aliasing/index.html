@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anti-Aliasing Techniques</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        body {
+            padding: 20px;
+            font-family: 'Space Grotesk', sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            margin-bottom: 10px;
+        }
+
+        .intro {
+            color: var(--text-secondary);
+            margin-bottom: 30px;
+        }
+
+        .method-selector {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .method-selector button {
+            padding: 8px 14px;
+            border: 2px solid var(--border-color);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 500;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .method-selector button:hover {
+            border-color: var(--accent);
+        }
+
+        .method-selector button.active {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+
+        .split-view {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .canvas-section {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .canvas-section h3 {
+            margin: 0;
+            font-size: 15px;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        canvas {
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-secondary);
+            display: block;
+            width: 100%;
+            height: auto;
+            max-width: 100%;
+        }
+
+        .canvas-info {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+
+        .zoom-control {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            padding: 12px;
+            background: var(--bg-secondary);
+            border-radius: 6px;
+        }
+
+        .zoom-control label {
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .zoom-control input[type="range"] {
+            flex: 1;
+            max-width: 200px;
+        }
+
+        .zoom-control span {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            min-width: 40px;
+            text-align: right;
+        }
+
+        .pixel-view {
+            margin-top: 25px;
+            padding-top: 25px;
+            border-top: 2px solid var(--border-color);
+        }
+
+        .pixel-view h3 {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+
+        .pixel-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .pixel-grid-item {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .pixel-grid-item h4 {
+            margin: 0;
+            font-size: 13px;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .pixel-grid-item canvas {
+            border: 1px solid var(--border-color);
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+
+        .explanation {
+            background: var(--bg-secondary);
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 3px solid var(--accent);
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .explanation h4 {
+            margin: 0 0 10px 0;
+            color: var(--accent);
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .explanation p {
+            margin: 8px 0;
+        }
+
+        .explanation strong {
+            color: var(--text-primary);
+        }
+
+        .techniques-info {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+            margin-top: 25px;
+        }
+
+        .tech-card {
+            background: var(--bg-secondary);
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 3px solid var(--accent);
+            font-size: 12px;
+        }
+
+        .tech-card h4 {
+            margin: 0 0 6px 0;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .tech-card p {
+            margin: 0;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        @media (max-width: 768px) {
+            .split-view {
+                grid-template-columns: 1fr;
+            }
+
+            .pixel-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Anti-Aliasing Techniques</h1>
+    <p class="intro">Explore how different anti-aliasing methods reduce jagged edges. Compare rendering without AA (showing obvious aliasing artifacts) to various AA techniques. Use the zoom control to inspect individual pixels.</p>
+
+    <div class="method-selector">
+        <button id="noneBtn" class="active" data-mode="none">No AA (Aliased)</button>
+        <button id="ssaaBtn" data-mode="ssaa">SSAA (4x)</button>
+        <button id="msaaBtn" data-mode="msaa">MSAA (4x)</button>
+        <button id="fxaaBtn" data-mode="fxaa">FXAA</button>
+    </div>
+
+    <div class="zoom-control">
+        <label>Pixel Zoom:</label>
+        <input type="range" id="zoomSlider" min="1" max="16" step="1" value="4">
+        <span id="zoomValue">4x</span>
+    </div>
+
+    <div class="split-view">
+        <div class="canvas-section">
+            <h3>Left: No Anti-Aliasing (Aliased)</h3>
+            <canvas id="aliasedCanvas" width="300" height="300"></canvas>
+            <div class="canvas-info">Raw pixel rendering — shows obvious jaggies</div>
+        </div>
+        <div class="canvas-section">
+            <h3 id="aaTitle">Right: With Anti-Aliasing</h3>
+            <canvas id="aaCanvas" width="300" height="300"></canvas>
+            <div class="canvas-info" id="aaInfo">Selected AA technique applied</div>
+        </div>
+    </div>
+
+    <div class="pixel-view">
+        <h3>Zoomed Pixel View (8x magnification)</h3>
+        <p style="font-size: 12px; color: var(--text-secondary); margin: 0 0 15px 0;">Left edge of diagonal line — notice the pixel-by-pixel difference</p>
+        <div class="pixel-grid">
+            <div class="pixel-grid-item">
+                <h4>No AA (Aliased)</h4>
+                <canvas id="zoomAliasedCanvas" width="200" height="200"></canvas>
+            </div>
+            <div class="pixel-grid-item">
+                <h4 id="zoomAATitle">With AA</h4>
+                <canvas id="zoomAACanvas" width="200" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="explanation">
+        <h4>How Anti-Aliasing Works</h4>
+        <p>Aliasing occurs because the pixel grid cannot perfectly represent smooth lines and curves. Anti-aliasing solutions:</p>
+        <p><strong>No AA:</strong> Each pixel is fully on or off. Diagonal lines create jagged "stair-step" patterns.</p>
+        <p><strong>SSAA (Supersampling):</strong> Render at higher resolution (4x), then downsample. Provides excellent quality but is expensive.</p>
+        <p><strong>MSAA (Multisample):</strong> Test edges at multiple points within each pixel, blend results. Efficient edge smoothing.</p>
+        <p><strong>FXAA:</strong> Post-process edge detection. Fast but can blur fine details. Detects edges and applies directional blur.</p>
+    </div>
+
+    <div class="techniques-info">
+        <div class="tech-card">
+            <h4>No AA — Raw Rasterization</h4>
+            <p>Each pixel samples only the line's center point. Produces harsh aliasing with visible jaggies on diagonals.</p>
+        </div>
+        <div class="tech-card">
+            <h4>SSAA (4x Supersampling) — Highest Quality</h4>
+            <p>Renders geometry at 4x resolution internally, then downsamples. Extremely smooth but 4-16x more expensive than basic rendering.</p>
+        </div>
+        <div class="tech-card">
+            <h4>MSAA (4x Multisample) — Practical Balance</h4>
+            <p>Samples edges at 4 points per pixel. Much faster than SSAA, good for real-time graphics. Primarily helps edges, not fill areas.</p>
+        </div>
+        <div class="tech-card">
+            <h4>FXAA (Fast Approximate) — Real-time</h4>
+            <p>Post-process filter that detects high-contrast edges and blurs them. Very fast, works on any rendering. May reduce detail sharpness.</p>
+        </div>
+    </div>
+
+    <script>
+        const aliasedCanvas = document.getElementById('aliasedCanvas');
+        const aliasedCtx = aliasedCanvas.getContext('2d', { willReadFrequently: true });
+        const aaCanvas = document.getElementById('aaCanvas');
+        const aaCtx = aaCanvas.getContext('2d', { willReadFrequently: true });
+        const zoomAliasedCanvas = document.getElementById('zoomAliasedCanvas');
+        const zoomAliasedCtx = zoomAliasedCanvas.getContext('2d', { willReadFrequently: true });
+        const zoomAACanvas = document.getElementById('zoomAACanvas');
+        const zoomAACtx = zoomAACanvas.getContext('2d', { willReadFrequently: true });
+
+        const zoomSlider = document.getElementById('zoomSlider');
+        const zoomValue = document.getElementById('zoomValue');
+
+        let aaMode = 'none';
+        let pixelZoom = 4;
+
+        // Setup method selector buttons
+        document.querySelectorAll('.method-selector button').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.method-selector button').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                aaMode = e.target.dataset.mode;
+                updateTitles();
+            });
+        });
+
+        function updateTitles() {
+            const titles = {
+                'none': 'Right: No AA (for comparison)',
+                'ssaa': 'Right: SSAA 4x (Supersampling)',
+                'msaa': 'Right: MSAA 4x (Multisample)',
+                'fxaa': 'Right: FXAA (Post-process)'
+            };
+            const infos = {
+                'none': 'Same as left — no anti-aliasing',
+                'ssaa': '4x supersampling — render at high res, downsample',
+                'msaa': '4x MSAA — multi-sample at edges',
+                'fxaa': 'Post-process edge detection and blur'
+            };
+            document.getElementById('aaTitle').textContent = titles[aaMode] || 'Anti-Aliasing';
+            document.getElementById('aaInfo').textContent = infos[aaMode] || '';
+            document.getElementById('zoomAATitle').textContent = 'With ' + aaMode.toUpperCase();
+        }
+
+        zoomSlider.addEventListener('input', (e) => {
+            pixelZoom = parseInt(e.target.value);
+            zoomValue.textContent = pixelZoom + 'x';
+        });
+
+        function getColors() {
+            return Wiki.colors();
+        }
+
+        function drawCircle(ctx, centerX, centerY, radius, pixelSize, aaMode) {
+            const colors = getColors();
+
+            // Fill background
+            ctx.fillStyle = colors.bg_secondary;
+            ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
+            // Create image data for pixel-level control
+            const imgData = ctx.createImageData(ctx.canvas.width, ctx.canvas.height);
+            const data = imgData.data;
+
+            // Helper to set pixel (RGBA)
+            function setPixel(x, y, r, g, b, a) {
+                if (x >= 0 && x < ctx.canvas.width && y >= 0 && y < ctx.canvas.height) {
+                    const idx = (y * ctx.canvas.width + x) * 4;
+                    data[idx] = r;
+                    data[idx + 1] = g;
+                    data[idx + 2] = b;
+                    data[idx + 3] = a;
+                }
+            }
+
+            // Parse accent color
+            const accentColor = colors.accent;
+            const match = accentColor.match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
+            const [_, r, g, b] = match ? [0, parseInt(match[1], 16), parseInt(match[2], 16), parseInt(match[3], 16)] : [0, 100, 150, 255];
+
+            if (aaMode === 'none') {
+                // No AA: Simple midpoint sampling
+                for (let py = 0; py < ctx.canvas.height; py++) {
+                    for (let px = 0; px < ctx.canvas.width; px++) {
+                        const dx = px - centerX;
+                        const dy = py - centerY;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        if (dist < radius) {
+                            setPixel(px, py, r, g, b, 255);
+                        }
+                    }
+                }
+            } else if (aaMode === 'ssaa') {
+                // SSAA: Render at 4x, downsample
+                const scale = 4;
+                const superData = ctx.createImageData(ctx.canvas.width * scale, ctx.canvas.height * scale);
+                const superRGBA = superData.data;
+
+                // Render at high res
+                for (let py = 0; py < ctx.canvas.height * scale; py++) {
+                    for (let px = 0; px < ctx.canvas.width * scale; px++) {
+                        const dx = px - centerX * scale;
+                        const dy = py - centerY * scale;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        if (dist < radius * scale) {
+                            const idx = (py * ctx.canvas.width * scale + px) * 4;
+                            superRGBA[idx] = r;
+                            superRGBA[idx + 1] = g;
+                            superRGBA[idx + 2] = b;
+                            superRGBA[idx + 3] = 255;
+                        }
+                    }
+                }
+
+                // Downsample
+                for (let py = 0; py < ctx.canvas.height; py++) {
+                    for (let px = 0; px < ctx.canvas.width; px++) {
+                        let sumR = 0, sumG = 0, sumB = 0, sumA = 0;
+                        for (let sy = 0; sy < scale; sy++) {
+                            for (let sx = 0; sx < scale; sx++) {
+                                const sIdx = ((py * scale + sy) * ctx.canvas.width * scale + (px * scale + sx)) * 4;
+                                sumR += superRGBA[sIdx];
+                                sumG += superRGBA[sIdx + 1];
+                                sumB += superRGBA[sIdx + 2];
+                                sumA += superRGBA[sIdx + 3];
+                            }
+                        }
+                        setPixel(px, py, Math.round(sumR / 16), Math.round(sumG / 16), Math.round(sumB / 16), Math.round(sumA / 16));
+                    }
+                }
+            } else if (aaMode === 'msaa') {
+                // MSAA: 4-sample edges
+                const samples = [[0.25, 0.25], [0.75, 0.25], [0.25, 0.75], [0.75, 0.75]];
+                for (let py = 0; py < ctx.canvas.height; py++) {
+                    for (let px = 0; px < ctx.canvas.width; px++) {
+                        let coverage = 0;
+                        for (const [sx, sy] of samples) {
+                            const sampleX = px + sx;
+                            const sampleY = py + sy;
+                            const dx = sampleX - centerX;
+                            const dy = sampleY - centerY;
+                            const dist = Math.sqrt(dx * dx + dy * dy);
+                            if (dist < radius) coverage += 0.25;
+                        }
+                        if (coverage > 0) {
+                            const alpha = Math.round(coverage * 255);
+                            setPixel(px, py, r, g, b, alpha);
+                        }
+                    }
+                }
+            } else if (aaMode === 'fxaa') {
+                // First pass: basic sampling
+                for (let py = 0; py < ctx.canvas.height; py++) {
+                    for (let px = 0; px < ctx.canvas.width; px++) {
+                        const dx = px - centerX;
+                        const dy = py - centerY;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        if (dist < radius) {
+                            setPixel(px, py, r, g, b, 255);
+                        }
+                    }
+                }
+
+                // Second pass: FXAA edge detection and blur
+                const tempData = ctx.createImageData(ctx.canvas.width, ctx.canvas.height);
+                const tempRGBA = tempData.data;
+                for (let i = 0; i < data.length; i++) tempRGBA[i] = data[i];
+
+                for (let py = 1; py < ctx.canvas.height - 1; py++) {
+                    for (let px = 1; px < ctx.canvas.width - 1; px++) {
+                        const idx = (py * ctx.canvas.width + px) * 4;
+                        const current = tempRGBA[idx + 3];
+
+                        // Sample neighbors
+                        const n = tempRGBA[((py - 1) * ctx.canvas.width + px) * 4 + 3];
+                        const s = tempRGBA[((py + 1) * ctx.canvas.width + px) * 4 + 3];
+                        const e = tempRGBA[(py * ctx.canvas.width + (px + 1)) * 4 + 3];
+                        const w = tempRGBA[(py * ctx.canvas.width + (px - 1)) * 4 + 3];
+
+                        // Edge detection
+                        const edginess = Math.max(
+                            Math.abs(n - s),
+                            Math.abs(e - w)
+                        );
+
+                        // Apply blur at edges
+                        if (edginess > 50) {
+                            const blurAlpha = Math.round((current + n + s + e + w) / 5);
+                            data[idx] = r;
+                            data[idx + 1] = g;
+                            data[idx + 2] = b;
+                            data[idx + 3] = blurAlpha;
+                        }
+                    }
+                }
+            }
+
+            ctx.putImageData(imgData, 0, 0);
+        }
+
+        function drawZoomedView(ctx, sourceCanvas, centerX, centerY, zoomLevel) {
+            const colors = getColors();
+            ctx.fillStyle = colors.bg_secondary;
+            ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
+            const tileSize = ctx.canvas.width / zoomLevel;
+            const pixelSize = ctx.canvas.width / zoomLevel;
+
+            // Draw grid
+            ctx.strokeStyle = colors.border_color;
+            ctx.lineWidth = 0.5;
+            for (let i = 0; i <= zoomLevel; i++) {
+                ctx.beginPath();
+                ctx.moveTo(i * pixelSize, 0);
+                ctx.lineTo(i * pixelSize, ctx.canvas.height);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(0, i * pixelSize);
+                ctx.lineTo(ctx.canvas.width, i * pixelSize);
+                ctx.stroke();
+            }
+
+            // Get image data from source
+            const sourceCtx = sourceCanvas.getContext('2d');
+            const sourceData = sourceCtx.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height);
+            const srcPixels = sourceData.data;
+
+            // Draw zoomed pixels
+            const startPixel = Math.max(0, Math.floor(centerX - zoomLevel / 2));
+            const endPixel = Math.min(sourceCanvas.width, startPixel + zoomLevel);
+
+            for (let i = 0; i < zoomLevel; i++) {
+                const px = startPixel + i;
+                if (px >= 0 && px < sourceCanvas.width) {
+                    for (let j = 0; j < zoomLevel; j++) {
+                        const py = Math.floor(centerY - zoomLevel / 2) + j;
+                        if (py >= 0 && py < sourceCanvas.height) {
+                            const idx = (py * sourceCanvas.width + px) * 4;
+                            const r = srcPixels[idx];
+                            const g = srcPixels[idx + 1];
+                            const b = srcPixels[idx + 2];
+                            const a = srcPixels[idx + 3];
+
+                            ctx.fillStyle = `rgba(${r},${g},${b},${a / 255})`;
+                            ctx.fillRect(i * pixelSize, j * pixelSize, pixelSize, pixelSize);
+                        }
+                    }
+                }
+            }
+        }
+
+        function animate() {
+            // Main canvas size is 300x300, circle at center with radius 80
+            const centerX = 150;
+            const centerY = 150;
+            const radius = 80;
+
+            drawCircle(aliasedCtx, centerX, centerY, radius, 1, 'none');
+            drawCircle(aaCtx, centerX, centerY, radius, 1, aaMode);
+
+            // Zoomed views - focus on right edge of circle
+            const zoomCenterX = centerX + radius - 20;
+            drawZoomedView(zoomAliasedCtx, aliasedCanvas, zoomCenterX, centerY, 8);
+            drawZoomedView(zoomAACtx, aaCanvas, zoomCenterX, centerY, 8);
+
+            requestAnimationFrame(animate);
+        }
+
+        updateTitles();
+        animate();
+    </script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+{
+  "title": "Ray Tracing Fundamentals",
+  "category": "graphics-fundamentals",
+  "tags": [
+    "ray-tracing",
+    "intersection",
+    "geometry",
+    "rendering",
+    "optics",
+    "recursive"
+  ],
+  "description": "Ray tracing from first principles including ray generation, triangle/sphere intersection tests, recursive ray tracing, Whitted-style ray tracing, and Fresnel equations.",
+  "related": [
+    "graphics-fundamentals/acceleration-structures",
+    "graphics-fundamentals/global-illumination",
+    "frontier/realtime-gi"
+  ],
+  "order": 5
+}

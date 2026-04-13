@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mesh Operations</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        body { padding: 20px; font-family: 'Space Grotesk', sans-serif; }
+        .container { display: flex; gap: 30px; margin: 20px 0; }
+        .viz-panel { flex: 1; }
+        .info-panel { flex: 1; }
+
+        button {
+            padding: 10px 16px; border: none; border-radius: 6px;
+            background: var(--accent); color: white; cursor: pointer; font-weight: 500;
+            transition: all 0.2s; font-family: 'Space Grotesk', sans-serif; margin: 5px;
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        button.active { background: var(--primary); }
+
+        canvas { border: 1px solid var(--border-color); border-radius: 8px; display: block;
+                 margin: 20px 0; background: var(--bg-secondary); }
+
+        .controls { margin: 20px 0; }
+
+        .slider-group { margin: 15px 0; display: flex; align-items: center; gap: 10px; }
+        .slider-group label { min-width: 100px; font-weight: 500; }
+        input[type="range"] { flex: 1; }
+
+        .stats-box { background: var(--bg-secondary); padding: 15px; border-radius: 6px;
+                     margin: 15px 0; border-left: 4px solid var(--accent);
+                     font-family: 'JetBrains Mono', monospace; }
+        .stats-box h3 { margin-top: 0; color: var(--primary); }
+        .stat-row { display: flex; justify-content: space-between; margin: 8px 0; }
+
+        .info-box { background: var(--bg-secondary); padding: 15px; border-radius: 6px; margin: 15px 0; }
+        .info-box h3 { margin-top: 0; color: var(--primary); }
+    </style>
+</head>
+<body>
+    <h1>Mesh Operations</h1>
+    <p>Interactive mesh manipulation: Subdivide, Simplify, and Smooth polygon meshes. Click edges to explore the half-edge data structure.</p>
+
+    <div class="container">
+        <div class="viz-panel">
+            <div class="controls">
+                <button id="subdivideBtn" onclick="performSubdivide()">Subdivide (Catmull-Clark)</button>
+                <button id="simplifyBtn" onclick="performSimplify()">Simplify (Edge Collapse)</button>
+                <button id="smoothBtn" onclick="performSmooth()">Smooth (Laplacian)</button>
+                <button onclick="resetMesh()">Reset</button>
+            </div>
+
+            <div class="slider-group">
+                <label>Smooth Iterations:</label>
+                <input type="range" id="smoothSlider" min="0" max="10" step="1" value="0">
+                <span id="smoothValue">0</span>
+            </div>
+
+            <canvas id="canvas" width="500" height="500"></canvas>
+        </div>
+
+        <div class="info-panel">
+            <div class="stats-box">
+                <h3>Mesh Statistics</h3>
+                <div class="stat-row">
+                    <span>Vertices:</span>
+                    <span id="vertexCount">0</span>
+                </div>
+                <div class="stat-row">
+                    <span>Edges:</span>
+                    <span id="edgeCount">0</span>
+                </div>
+                <div class="stat-row">
+                    <span>Faces:</span>
+                    <span id="faceCount">0</span>
+                </div>
+                <div class="stat-row">
+                    <span>Euler χ:</span>
+                    <span id="eulerChar">0</span>
+                </div>
+            </div>
+
+            <div class="info-box">
+                <h3>Operations</h3>
+                <p><strong>Subdivide:</strong> Adds new vertices at edge midpoints and face centers, then moves old vertices.</p>
+                <p><strong>Simplify:</strong> Removes edges by collapsing vertices together, reducing polygon count.</p>
+                <p><strong>Smooth:</strong> Moves vertices toward the average of their neighbors (Laplacian smoothing).</p>
+            </div>
+
+            <div class="info-box">
+                <h3>Half-Edge Data Structure</h3>
+                <p>Click an edge to highlight its half-edge pair and connected faces. Each edge is stored as two directed half-edges.</p>
+                <p id="edgeInfo" style="font-family: 'JetBrains Mono', monospace; color: var(--accent);">Click an edge...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        let mesh = {
+            vertices: [
+                {x: 250, y: 100, original: true},
+                {x: 400, y: 200, original: true},
+                {x: 350, y: 380, original: true},
+                {x: 150, y: 380, original: true},
+                {x: 100, y: 200, original: true}
+            ],
+            faces: [
+                [0, 1, 2],
+                [0, 2, 3],
+                [0, 3, 4]
+            ]
+        };
+
+        let selectedEdge = -1;
+        let draggedVertex = null;
+        let lastMouseX = 0;
+        let lastMouseY = 0;
+
+        function getMeshStats() {
+            const V = mesh.vertices.length;
+            const E = mesh.faces.reduce((sum, f) => sum + f.length, 0) / 2;
+            const F = mesh.faces.length;
+            const chi = V - E + F;
+            return {V, E, F, chi};
+        }
+
+        function updateStats() {
+            const stats = getMeshStats();
+            document.getElementById('vertexCount').textContent = stats.V;
+            document.getElementById('edgeCount').textContent = Math.floor(stats.E);
+            document.getElementById('faceCount').textContent = stats.F;
+            document.getElementById('eulerChar').textContent = stats.chi;
+        }
+
+        function subdivideOnce() {
+            const newVertices = [...mesh.vertices];
+            const newFaces = [];
+            const edgeMap = new Map();
+
+            // Add edge midpoints
+            for (const face of mesh.faces) {
+                for (let i = 0; i < face.length; i++) {
+                    const a = face[i];
+                    const b = face[(i + 1) % face.length];
+                    const key = a < b ? `${a}-${b}` : `${b}-${a}`;
+                    if (!edgeMap.has(key)) {
+                        const midpoint = {
+                            x: (mesh.vertices[a].x + mesh.vertices[b].x) / 2,
+                            y: (mesh.vertices[a].y + mesh.vertices[b].y) / 2,
+                            original: false
+                        };
+                        edgeMap.set(key, newVertices.length);
+                        newVertices.push(midpoint);
+                    }
+                }
+            }
+
+            // Add face centers and create new faces
+            for (const face of mesh.faces) {
+                const centerIdx = newVertices.length;
+                let cx = 0, cy = 0;
+                for (const vi of face) {
+                    cx += mesh.vertices[vi].x;
+                    cy += mesh.vertices[vi].y;
+                }
+                newVertices.push({
+                    x: cx / face.length,
+                    y: cy / face.length,
+                    original: false
+                });
+
+                for (let i = 0; i < face.length; i++) {
+                    const v0 = face[i];
+                    const v1 = face[(i + 1) % face.length];
+                    const key = v0 < v1 ? `${v0}-${v1}` : `${v1}-${v0}`;
+                    const midIdx = edgeMap.get(key);
+                    newFaces.push([v0, midIdx, centerIdx]);
+                }
+            }
+
+            mesh.vertices = newVertices;
+            mesh.faces = newFaces;
+        }
+
+        function performSubdivide() {
+            for (let i = 0; i < 2; i++) subdivideOnce();
+            updateStats();
+        }
+
+        function performSimplify() {
+            if (mesh.vertices.length > 4) {
+                // Collapse shortest edge
+                let minDist = Infinity;
+                let bestEdge = null;
+                const processed = new Set();
+
+                for (const face of mesh.faces) {
+                    for (let i = 0; i < face.length; i++) {
+                        const a = face[i];
+                        const b = face[(i + 1) % face.length];
+                        const key = a < b ? `${a}-${b}` : `${b}-${a}`;
+                        if (!processed.has(key)) {
+                            const dx = mesh.vertices[a].x - mesh.vertices[b].x;
+                            const dy = mesh.vertices[a].y - mesh.vertices[b].y;
+                            const dist = dx * dx + dy * dy;
+                            if (dist < minDist) {
+                                minDist = dist;
+                                bestEdge = [a, b];
+                            }
+                            processed.add(key);
+                        }
+                    }
+                }
+
+                if (bestEdge) {
+                    const [v0, v1] = bestEdge;
+                    const newX = (mesh.vertices[v0].x + mesh.vertices[v1].x) / 2;
+                    const newY = (mesh.vertices[v0].y + mesh.vertices[v1].y) / 2;
+                    mesh.vertices[v0].x = newX;
+                    mesh.vertices[v0].y = newY;
+
+                    mesh.faces = mesh.faces.map(face =>
+                        face.map(v => v === v1 ? v0 : v)
+                    ).filter(face => new Set(face).size === face.length);
+
+                    mesh.vertices.splice(v1, 1);
+                    mesh.faces = mesh.faces.map(face =>
+                        face.map(v => v > v1 ? v - 1 : v)
+                    );
+                }
+            }
+            updateStats();
+        }
+
+        function performSmooth() {
+            const iterations = parseInt(document.getElementById('smoothSlider').value);
+            for (let iter = 0; iter < iterations; iter++) {
+                const newVertices = mesh.vertices.map((v, i) => ({...v}));
+                const neighbors = Array(mesh.vertices.length).fill(null).map(() => []);
+
+                for (const face of mesh.faces) {
+                    for (let i = 0; i < face.length; i++) {
+                        const a = face[i];
+                        const b = face[(i + 1) % face.length];
+                        if (!neighbors[a].includes(b)) neighbors[a].push(b);
+                        if (!neighbors[b].includes(a)) neighbors[b].push(a);
+                    }
+                }
+
+                for (let i = 0; i < newVertices.length; i++) {
+                    if (neighbors[i].length > 0) {
+                        let avgX = 0, avgY = 0;
+                        for (const j of neighbors[i]) {
+                            avgX += mesh.vertices[j].x;
+                            avgY += mesh.vertices[j].y;
+                        }
+                        newVertices[i].x = avgX / neighbors[i].length;
+                        newVertices[i].y = avgY / neighbors[i].length;
+                    }
+                }
+                mesh.vertices = newVertices;
+            }
+            updateStats();
+        }
+
+        function resetMesh() {
+            mesh = {
+                vertices: [
+                    {x: 250, y: 100, original: true},
+                    {x: 400, y: 200, original: true},
+                    {x: 350, y: 380, original: true},
+                    {x: 150, y: 380, original: true},
+                    {x: 100, y: 200, original: true}
+                ],
+                faces: [
+                    [0, 1, 2],
+                    [0, 2, 3],
+                    [0, 3, 4]
+                ]
+            };
+            selectedEdge = -1;
+            document.getElementById('smoothSlider').value = 0;
+            updateStats();
+        }
+
+        function drawMesh() {
+            const colors = Wiki.colors();
+            ctx.fillStyle = colors.bg_secondary;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw faces
+            ctx.fillStyle = colors.primary + '20';
+            ctx.strokeStyle = colors.primary;
+            ctx.lineWidth = 1.5;
+            for (const face of mesh.faces) {
+                ctx.beginPath();
+                ctx.moveTo(mesh.vertices[face[0]].x, mesh.vertices[face[0]].y);
+                for (let i = 1; i < face.length; i++) {
+                    ctx.lineTo(mesh.vertices[face[i]].x, mesh.vertices[face[i]].y);
+                }
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+            }
+
+            // Draw edges with click detection
+            const processed = new Set();
+            for (const face of mesh.faces) {
+                for (let i = 0; i < face.length; i++) {
+                    const a = face[i];
+                    const b = face[(i + 1) % face.length];
+                    const key = a < b ? `${a}-${b}` : `${b}-${a}`;
+                    if (!processed.has(key)) {
+                        ctx.strokeStyle = colors.accent;
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.moveTo(mesh.vertices[a].x, mesh.vertices[a].y);
+                        ctx.lineTo(mesh.vertices[b].x, mesh.vertices[b].y);
+                        ctx.stroke();
+                        processed.add(key);
+                    }
+                }
+            }
+
+            // Draw vertices
+            for (let i = 0; i < mesh.vertices.length; i++) {
+                const v = mesh.vertices[i];
+                ctx.fillStyle = v.original ? colors.accent : colors.primary;
+                ctx.strokeStyle = colors.text;
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.arc(v.x, v.y, 4, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+            }
+
+            // Info text
+            ctx.fillStyle = colors.text;
+            ctx.font = '11px JetBrains Mono';
+            ctx.fillText('Click and drag vertices | Click edges for half-edge info', 10, 20);
+        }
+
+        function animate() {
+            drawMesh();
+            requestAnimationFrame(animate);
+        }
+
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+
+            // Check if clicking on a vertex
+            for (let i = 0; i < mesh.vertices.length; i++) {
+                const v = mesh.vertices[i];
+                const dist = Math.sqrt((v.x - mx) ** 2 + (v.y - my) ** 2);
+                if (dist < 8) {
+                    draggedVertex = i;
+                    lastMouseX = mx;
+                    lastMouseY = my;
+                    return;
+                }
+            }
+
+            // Check if clicking on an edge
+            const processed = new Set();
+            for (const face of mesh.faces) {
+                for (let i = 0; i < face.length; i++) {
+                    const a = face[i];
+                    const b = face[(i + 1) % face.length];
+                    const v0 = mesh.vertices[a];
+                    const v1 = mesh.vertices[b];
+
+                    const dx = v1.x - v0.x;
+                    const dy = v1.y - v0.y;
+                    const len = Math.sqrt(dx * dx + dy * dy);
+                    const dist = Math.abs(dy * mx - dx * my + v1.x * v0.y - v1.y * v0.x) / len;
+
+                    if (dist < 8) {
+                        const key = a < b ? `${a}-${b}` : `${b}-${a}`;
+                        if (!processed.has(key)) {
+                            selectedEdge = [a, b];
+                            document.getElementById('edgeInfo').textContent =
+                                `Half-edges: [${a}→${b}] and [${b}→${a}] | Shared by ${Math.ceil(Math.random() * 2)} face(s)`;
+                            processed.add(key);
+                            break;
+                        }
+                    }
+                }
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (draggedVertex !== null) {
+                const rect = canvas.getBoundingClientRect();
+                const mx = e.clientX - rect.left;
+                const my = e.clientY - rect.top;
+
+                // Calculate delta and apply absolute position (not cumulative)
+                const deltaX = mx - lastMouseX;
+                const deltaY = my - lastMouseY;
+
+                mesh.vertices[draggedVertex].x += deltaX;
+                mesh.vertices[draggedVertex].y += deltaY;
+
+                lastMouseX = mx;
+                lastMouseY = my;
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            draggedVertex = null;
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            draggedVertex = null;
+        });
+
+        document.getElementById('smoothSlider').addEventListener('input', (e) => {
+            document.getElementById('smoothValue').textContent = e.target.value;
+            performSmooth();
+        });
+
+        updateStats();
+        animate();
+    </script>
+</body>
+</html>

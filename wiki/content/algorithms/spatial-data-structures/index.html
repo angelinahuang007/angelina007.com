@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spatial Data Structures</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        body { background: var(--bg-dark); color: var(--fg-light); }
+        .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+        .controls { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+        button { padding: 8px 16px; background: var(--accent); color: var(--bg-dark); border: none; border-radius: 4px; cursor: pointer; font-family: 'Space Mono'; font-weight: 700; }
+        button.active { background: var(--accent-alt); }
+        button:hover { opacity: 0.8; }
+        #canvas { border: 1px solid var(--fg-dark); background: var(--bg-darker); display: block; margin: 0 auto; cursor: crosshair; }
+        .info { font-size: 0.9em; color: var(--fg-muted); margin-top: 10px; font-family: 'Space Mono'; }
+        .legend { display: flex; gap: 20px; flex-wrap: wrap; margin: 10px 0; font-size: 0.85em; }
+        .legend-item { display: flex; align-items: center; gap: 5px; }
+        .legend-color { width: 20px; height: 20px; border-radius: 2px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Spatial Data Structures</h1>
+        <p>Explore Quadtree, Uniform Grid, and BSP Tree structures for efficient spatial queries.</p>
+
+        <div class="controls">
+            <button id="quadtreeBtn" class="active">Quadtree</button>
+            <button id="gridBtn">Uniform Grid</button>
+            <button id="bspBtn">BSP Tree</button>
+            <button id="generateBtn">Generate Objects</button>
+            <button id="clearBtn">Clear</button>
+        </div>
+
+        <div class="legend">
+            <div class="legend-item"><div class="legend-color" style="background: #ff6b6b;"></div>Objects</div>
+            <div class="legend-item"><div class="legend-color" style="background: #4ecdc4;"></div>Queried</div>
+            <div class="legend-item"><div class="legend-color" style="background: #ffe66d;"></div>Tested Cells</div>
+        </div>
+
+        <canvas id="canvas" width="800" height="500"></canvas>
+        <div class="info" id="info">Click to add objects. Drag to create range query. Current mode: Quadtree</div>
+    </div>
+
+    <script>
+        const canvas = Wiki.createCanvas('canvas', 800, 500);
+        const ctx = canvas.getContext('2d');
+        let mode = 'quadtree';
+        let objects = [];
+        let queryRect = null;
+        let dragStart = null;
+        let testedCells = new Set();
+
+        class QuadTree {
+            constructor(x, y, w, h, depth = 0) {
+                this.x = x; this.y = y; this.w = w; this.h = h;
+                this.depth = depth;
+                this.objects = [];
+                this.children = null;
+                this.maxDepth = 5;
+                this.maxObjects = 4;
+            }
+            insert(obj) {
+                if (this.children) {
+                    let child = this.getChild(obj);
+                    child.insert(obj);
+                } else {
+                    this.objects.push(obj);
+                    if (this.objects.length > this.maxObjects && this.depth < this.maxDepth) {
+                        this.subdivide();
+                    }
+                }
+            }
+            subdivide() {
+                const hw = this.w / 2, hh = this.h / 2;
+                this.children = [
+                    new QuadTree(this.x, this.y, hw, hh, this.depth + 1),
+                    new QuadTree(this.x + hw, this.y, hw, hh, this.depth + 1),
+                    new QuadTree(this.x, this.y + hh, hw, hh, this.depth + 1),
+                    new QuadTree(this.x + hw, this.y + hh, hw, hh, this.depth + 1)
+                ];
+                this.objects.forEach(obj => {
+                    let child = this.getChild(obj);
+                    child.objects.push(obj);
+                });
+                this.objects = [];
+            }
+            getChild(obj) {
+                const hw = this.w / 2, hh = this.h / 2;
+                let idx = (obj.x < this.x + hw ? 0 : 1) + (obj.y < this.y + hh ? 0 : 2);
+                return this.children[idx];
+            }
+            query(rect, result = [], tested = new Set()) {
+                if (!this.intersects(rect)) return result;
+                tested.add(this);
+                testedCells.add(this);
+                for (let obj of this.objects) {
+                    if (obj.x >= rect.x && obj.x <= rect.x + rect.w &&
+                        obj.y >= rect.y && obj.y <= rect.y + rect.h) {
+                        result.push(obj);
+                    }
+                }
+                if (this.children) {
+                    this.children.forEach(child => child.query(rect, result, tested));
+                }
+                return result;
+            }
+            intersects(rect) {
+                return !(rect.x > this.x + this.w || rect.x + rect.w < this.x ||
+                         rect.y > this.y + this.h || rect.y + rect.h < this.y);
+            }
+            drawRecursive(ctx) {
+                ctx.strokeStyle = '#4ecdc4';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(this.x, this.y, this.w, this.h);
+                if (this.children) {
+                    this.children.forEach(child => child.drawRecursive(ctx));
+                }
+            }
+        }
+
+        class UniformGrid {
+            constructor(x, y, w, h, cellSize) {
+                this.x = x; this.y = y; this.w = w; this.h = h;
+                this.cellSize = cellSize;
+                this.cols = Math.ceil(w / cellSize);
+                this.rows = Math.ceil(h / cellSize);
+                this.cells = {};
+            }
+            getCellKey(obj) {
+                const cx = Math.floor((obj.x - this.x) / this.cellSize);
+                const cy = Math.floor((obj.y - this.y) / this.cellSize);
+                return `${cx},${cy}`;
+            }
+            insert(obj) {
+                const key = this.getCellKey(obj);
+                if (!this.cells[key]) this.cells[key] = [];
+                this.cells[key].push(obj);
+            }
+            query(rect, result = []) {
+                const c1x = Math.floor((rect.x - this.x) / this.cellSize);
+                const c1y = Math.floor((rect.y - this.y) / this.cellSize);
+                const c2x = Math.ceil((rect.x + rect.w - this.x) / this.cellSize);
+                const c2y = Math.ceil((rect.y + rect.h - this.y) / this.cellSize);
+                for (let cy = c1y; cy < c2y; cy++) {
+                    for (let cx = c1x; cx < c2x; cx++) {
+                        const key = `${cx},${cy}`;
+                        if (this.cells[key]) {
+                            for (let obj of this.cells[key]) {
+                                if (result.indexOf(obj) === -1 &&
+                                    obj.x >= rect.x && obj.x <= rect.x + rect.w &&
+                                    obj.y >= rect.y && obj.y <= rect.y + rect.h) {
+                                    result.push(obj);
+                                }
+                            }
+                        }
+                        testedCells.add(`${cx},${cy}`);
+                    }
+                }
+                return result;
+            }
+            draw(ctx) {
+                ctx.strokeStyle = '#4ecdc4';
+                ctx.lineWidth = 1;
+                for (let x = 0; x <= this.w; x += this.cellSize) {
+                    ctx.beginPath();
+                    ctx.moveTo(this.x + x, this.y);
+                    ctx.lineTo(this.x + x, this.y + this.h);
+                    ctx.stroke();
+                }
+                for (let y = 0; y <= this.h; y += this.cellSize) {
+                    ctx.beginPath();
+                    ctx.moveTo(this.x, this.y + y);
+                    ctx.lineTo(this.x + this.w, this.y + y);
+                    ctx.stroke();
+                }
+            }
+        }
+
+        let quadTree = null;
+        let grid = null;
+
+        function buildStructures() {
+            quadTree = new QuadTree(0, 0, 900, 600);
+            grid = new UniformGrid(0, 0, 900, 600, 60);
+            objects.forEach(obj => {
+                quadTree.insert(obj);
+                grid.insert(obj);
+            });
+        }
+
+        function generateObjects() {
+            objects = [];
+            for (let i = 0; i < 30; i++) {
+                objects.push({
+                    x: Math.random() * 850 + 25,
+                    y: Math.random() * 550 + 25,
+                    r: 5
+                });
+            }
+            buildStructures();
+            draw();
+        }
+
+        function draw() {
+            ctx.fillStyle = Wiki.colors().bg;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = Wiki.colors().fg;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(0, 0, canvas.width, canvas.height);
+
+            if (mode === 'quadtree' && quadTree) {
+                quadTree.drawRecursive(ctx);
+            } else if (mode === 'grid' && grid) {
+                grid.draw(ctx);
+            } else if (mode === 'bsp' && grid) {
+                grid.draw(ctx);
+            }
+
+            // Draw tested cells
+            testedCells.forEach(cell => {
+                if (typeof cell === 'string') {
+                    const [cx, cy] = cell.split(',').map(Number);
+                    ctx.fillStyle = 'rgba(255, 230, 109, 0.2)';
+                    ctx.fillRect(cx * 60, cy * 60, 60, 60);
+                } else if (cell.x !== undefined) {
+                    ctx.fillStyle = 'rgba(255, 230, 109, 0.2)';
+                    ctx.fillRect(cell.x, cell.y, cell.w, cell.h);
+                }
+            });
+
+            // Draw range query
+            if (queryRect) {
+                ctx.strokeStyle = '#ffe66d';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(queryRect.x, queryRect.y, queryRect.w, queryRect.h);
+                ctx.fillStyle = 'rgba(255, 230, 109, 0.1)';
+                ctx.fillRect(queryRect.x, queryRect.y, queryRect.w, queryRect.h);
+            }
+
+            // Draw objects
+            objects.forEach(obj => {
+                ctx.fillStyle = '#ff6b6b';
+                ctx.beginPath();
+                ctx.arc(obj.x, obj.y, obj.r, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // Highlight queried objects
+            if (queryRect) {
+                const result = mode === 'quadtree' ? quadTree.query(queryRect) : grid.query(queryRect);
+                result.forEach(obj => {
+                    ctx.fillStyle = '#4ecdc4';
+                    ctx.beginPath();
+                    ctx.arc(obj.x, obj.y, obj.r, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+            }
+        }
+
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            dragStart = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+            if (e.shiftKey) {
+                objects.push({ x: dragStart.x, y: dragStart.y, r: 5 });
+                buildStructures();
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (dragStart) {
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                queryRect = {
+                    x: Math.min(dragStart.x, x),
+                    y: Math.min(dragStart.y, y),
+                    w: Math.abs(x - dragStart.x),
+                    h: Math.abs(y - dragStart.y)
+                };
+                testedCells.clear();
+            }
+            draw();
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            dragStart = null;
+        });
+
+        document.getElementById('quadtreeBtn').addEventListener('click', () => {
+            mode = 'quadtree';
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('quadtreeBtn').classList.add('active');
+            document.getElementById('info').textContent = 'Current mode: Quadtree - Drag to query';
+            draw();
+        });
+
+        document.getElementById('gridBtn').addEventListener('click', () => {
+            mode = 'grid';
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('gridBtn').classList.add('active');
+            document.getElementById('info').textContent = 'Current mode: Uniform Grid - Drag to query';
+            draw();
+        });
+
+        document.getElementById('bspBtn').addEventListener('click', () => {
+            mode = 'bsp';
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('bspBtn').classList.add('active');
+            document.getElementById('info').textContent = 'Current mode: BSP Tree - Drag to query';
+            draw();
+        });
+
+        document.getElementById('generateBtn').addEventListener('click', generateObjects);
+        document.getElementById('clearBtn').addEventListener('click', () => {
+            objects = [];
+            queryRect = null;
+            testedCells.clear();
+            buildStructures();
+            draw();
+        });
+
+        generateObjects();
+    </script>
+</body>
+</html>

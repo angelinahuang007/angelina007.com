@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blender Shader Nodes</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        .shader-container {
+            display: flex; flex-wrap: wrap;
+            gap: 20px;
+            height: 100%;
+        }
+        .node-editor {
+            flex: 1;
+            background: linear-gradient(135deg, var(--bg) 0%, var(--canvas-bg) 100%);
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+        .node-editor canvas {
+            display: block;
+        }
+        .preview-panel {
+            width: 300px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 16px;
+            color: var(--text);
+            font-family: 'Space Grotesk', sans-serif;
+            overflow-y: auto;
+        }
+        .preview-sphere {
+            width: 100%;
+            aspect-ratio: 1;
+            background: var(--canvas-bg);
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
+        .material-settings {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 12px;
+            margin-bottom: 12px;
+        }
+        .setting-row {
+            margin-bottom: 12px;
+            font-size: 12px;
+        }
+        .setting-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+            color: var(--accent);
+            font-weight: 500;
+        }
+        input[type="range"] {
+            width: 100%;
+            height: 4px;
+            border-radius: 2px;
+            background: var(--border-strong);
+            outline: none;
+            -webkit-appearance: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--accent);
+            border: none;
+            cursor: pointer;
+        }
+        .render-mode {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .render-btn {
+            flex: 1;
+            padding: 6px;
+            background: var(--border);
+            border: 1px solid var(--border-strong);
+            color: var(--text);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .render-btn:hover {
+            background: rgba(99, 102, 241, 0.2);
+        }
+        .render-btn.active {
+            background: var(--accent);
+            color: var(--bg-secondary);
+            border-color: var(--accent);
+        }
+        .node {
+            position: absolute;
+            background: rgba(99, 102, 241, 0.15);
+            border: 1px solid rgba(99, 102, 241, 0.4);
+            border-radius: 4px;
+            padding: 8px;
+            min-width: 140px;
+            color: var(--text);
+            font-size: 11px;
+            font-family: 'Space Mono', monospace;
+        }
+        .node-title {
+            font-weight: bold;
+            color: var(--accent);
+            margin-bottom: 6px;
+            font-size: 10px;
+            text-transform: uppercase;
+        }
+        .connection {
+            position: absolute;
+            pointer-events: none;
+        }
+        .info-text {
+            font-size: 11px;
+            color: var(--text-muted);
+            line-height: 1.6;
+            margin-top: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="shader-container">
+        <div class="node-editor">
+            <canvas id="nodeCanvas"></canvas>
+        </div>
+        <div class="preview-panel">
+            <div class="render-mode">
+                <button class="render-btn active" data-mode="cycles">Cycles</button>
+                <button class="render-btn" data-mode="eevee">EEVEE</button>
+            </div>
+
+            <canvas id="previewSphere" class="preview-sphere"></canvas>
+
+            <div class="material-settings">
+                <div class="setting-row">
+                    <div class="setting-label">
+                        <span>Metallic</span>
+                        <span id="metalValue">0.5</span>
+                    </div>
+                    <input type="range" id="metalSlider" min="0" max="1" step="0.01" value="0.5">
+                </div>
+                <div class="setting-row">
+                    <div class="setting-label">
+                        <span>Roughness</span>
+                        <span id="roughValue">0.3</span>
+                    </div>
+                    <input type="range" id="roughSlider" min="0" max="1" step="0.01" value="0.3">
+                </div>
+                <div class="setting-row">
+                    <div class="setting-label">
+                        <span>Specular</span>
+                        <span id="specValue">0.5</span>
+                    </div>
+                    <input type="range" id="specSlider" min="0" max="1" step="0.01" value="0.5">
+                </div>
+                <div class="setting-row">
+                    <div class="setting-label">
+                        <span>IOR</span>
+                        <span id="iorValue">1.5</span>
+                    </div>
+                    <input type="range" id="iorSlider" min="1" max="3" step="0.1" value="1.5">
+                </div>
+                <div class="setting-row">
+                    <div class="setting-label">
+                        <span>Subsurface</span>
+                        <span id="subsurfValue">0.0</span>
+                    </div>
+                    <input type="range" id="subsurfSlider" min="0" max="1" step="0.01" value="0.0">
+                </div>
+            </div>
+
+            <div class="info-text">
+                The Principled BSDF is the main shader for realistic materials. Connect nodes to modify the output appearance.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class ShaderNodeEditor {
+            constructor(editorCanvas, previewCanvas) {
+                this.editorCanvas = editorCanvas;
+                this.editorCtx = editorCanvas.getContext('2d');
+                this.previewCanvas = previewCanvas;
+                this.previewCtx = previewCanvas.getContext('2d');
+
+                this.renderMode = 'cycles';
+                this.material = {
+                    metallic: 0.5,
+                    roughness: 0.3,
+                    specular: 0.5,
+                    ior: 1.5,
+                    subsurface: 0.0,
+                    baseColor: { r: 200, g: 120, b: 80 }
+                };
+
+                this.nodes = [
+                    { id: 0, x: 50, y: 150, type: 'principled', title: 'Principled BSDF', outputs: 2 },
+                    { id: 1, x: 250, y: 50, type: 'noise', title: 'Noise Texture', outputs: 2 },
+                    { id: 2, x: 250, y: 200, type: 'colorramp', title: 'Color Ramp', outputs: 1 },
+                    { id: 3, x: 450, y: 150, type: 'output', title: 'Material Output', outputs: 0 }
+                ];
+
+                this.connections = [];
+                this.resizeCanvases();
+                window.addEventListener('resize', () => this.resizeCanvases());
+                this.setupEvents();
+                this.render();
+            }
+
+            resizeCanvases() {
+                const rect = this.editorCanvas.parentElement.getBoundingClientRect();
+                this.editorCanvas.width = rect.width;
+                this.editorCanvas.height = rect.height;
+
+                const prevRect = this.previewCanvas.getBoundingClientRect();
+                this.previewCanvas.width = prevRect.width;
+                this.previewCanvas.height = prevRect.height;
+
+                this.renderPreview();
+            }
+
+            setupEvents() {
+                document.querySelectorAll('.render-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        document.querySelectorAll('.render-btn').forEach(b => b.classList.remove('active'));
+                        e.target.classList.add('active');
+                        this.renderMode = e.target.dataset.mode;
+                        this.renderPreview();
+                    });
+                });
+
+                const sliders = {
+                    'metalSlider': 'metallic',
+                    'roughSlider': 'roughness',
+                    'specSlider': 'specular',
+                    'iorSlider': 'ior',
+                    'subsurfSlider': 'subsurface'
+                };
+
+                Object.entries(sliders).forEach(([id, prop]) => {
+                    const slider = document.getElementById(id);
+                    slider.addEventListener('input', (e) => {
+                        const val = parseFloat(e.target.value);
+                        this.material[prop] = val;
+                        document.getElementById(prop + 'Value').textContent = val.toFixed(2);
+                        this.renderPreview();
+                    });
+                });
+            }
+
+            renderPreview() {
+                const canvas = this.previewCanvas;
+                const ctx = this.previewCtx;
+                const w = canvas.width;
+                const h = canvas.height;
+
+                // Background
+                const styles = getComputedStyle(document.documentElement);
+                const bgGrad = ctx.createLinearGradient(0, 0, w, h);
+                bgGrad.addColorStop(0, styles.getPropertyValue('--canvas-bg').trim());
+                bgGrad.addColorStop(1, styles.getPropertyValue('--bg-secondary').trim());
+                ctx.fillStyle = bgGrad;
+                ctx.fillRect(0, 0, w, h);
+
+                const centerX = w / 2;
+                const centerY = h / 2;
+                const radius = Math.min(w, h) * 0.35;
+
+                // Draw sphere with shading based on material
+                const roughness = this.material.roughness;
+                const metallic = this.material.metallic;
+                const specular = this.material.specular;
+
+                for (let y = centerY - radius; y < centerY + radius; y++) {
+                    for (let x = centerX - radius; x < centerX + radius; x++) {
+                        const dx = x - centerX;
+                        const dy = y - centerY;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+
+                        if (dist <= radius) {
+                            // Normal mapping
+                            const nx = dx / radius;
+                            const ny = dy / radius;
+                            const nz = Math.sqrt(1 - nx * nx - ny * ny);
+
+                            // Light direction
+                            const lx = 0.7, ly = -0.7, lz = 0.5;
+                            const llen = Math.sqrt(lx * lx + ly * ly + lz * lz);
+                            const ldot = (nx * lx + ny * ly + nz * lz) / llen;
+
+                            // Fresnel effect
+                            const viewZ = 1;
+                            const fresnel = Math.pow(1 - Math.abs(nz / viewZ), 1 - specular * 0.5);
+
+                            // Specular highlight
+                            const spec = this.renderMode === 'cycles' ?
+                                Math.pow(Math.max(0, ldot), 1 / (roughness + 0.1)) * specular * 0.5 :
+                                Math.pow(Math.max(0, ldot), 1 / (roughness + 0.05)) * specular * 0.8;
+
+                            // Base shading
+                            let shade = Math.max(0.1, ldot * 0.7 + 0.3);
+                            shade = shade * (1 - metallic * 0.5) + metallic * 0.7;
+                            shade += spec;
+                            shade += fresnel * 0.2;
+
+                            // Base color with subsurface
+                            const sss = this.material.subsurface * 0.3;
+                            let r = this.material.baseColor.r * (shade + sss) / 255;
+                            let g = this.material.baseColor.g * (shade + sss) / 255;
+                            let b = this.material.baseColor.b * (shade + sss) / 255;
+
+                            // Metallic color shift
+                            if (metallic > 0) {
+                                r = r * (1 - metallic) + metallic * 0.8;
+                                g = g * (1 - metallic) + metallic * 0.7;
+                                b = b * (1 - metallic) + metallic * 0.5;
+                            }
+
+                            r = Math.min(255, r * 255);
+                            g = Math.min(255, g * 255);
+                            b = Math.min(255, b * 255);
+
+                            ctx.fillStyle = `rgb(${Math.floor(r)}, ${Math.floor(g)}, ${Math.floor(b)})`;
+                            ctx.fillRect(x, y, 1, 1);
+                        }
+                    }
+                }
+
+                // Rim light
+                ctx.strokeStyle = `rgba(255, 255, 255, ${0.1 * specular})`;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            render() {
+                const w = this.editorCanvas.width;
+                const h = this.editorCanvas.height;
+
+                // Background
+                const styles = getComputedStyle(document.documentElement);
+                const grad = this.editorCtx.createLinearGradient(0, 0, w, h);
+                grad.addColorStop(0, styles.getPropertyValue('--bg').trim());
+                grad.addColorStop(1, styles.getPropertyValue('--canvas-bg').trim());
+                this.editorCtx.fillStyle = grad;
+                this.editorCtx.fillRect(0, 0, w, h);
+
+                // Grid
+                this.editorCtx.strokeStyle = 'rgba(228, 228, 231, 0.03)';
+                this.editorCtx.lineWidth = 0.5;
+                for (let x = 0; x < w; x += 50) {
+                    this.editorCtx.beginPath();
+                    this.editorCtx.moveTo(x, 0);
+                    this.editorCtx.lineTo(x, h);
+                    this.editorCtx.stroke();
+                }
+                for (let y = 0; y < h; y += 50) {
+                    this.editorCtx.beginPath();
+                    this.editorCtx.moveTo(0, y);
+                    this.editorCtx.lineTo(w, y);
+                    this.editorCtx.stroke();
+                }
+
+                // Draw connections
+                this.editorCtx.strokeStyle = 'rgba(99, 102, 241, 0.4)';
+                this.editorCtx.lineWidth = 2;
+                this.connections.forEach(conn => {
+                    const from = this.nodes[conn.from];
+                    const to = this.nodes[conn.to];
+                    this.editorCtx.beginPath();
+                    this.editorCtx.moveTo(from.x + 140, from.y + 30);
+                    this.editorCtx.quadraticCurveTo((from.x + to.x) / 2, (from.y + to.y) / 2, to.x, to.y + 30);
+                    this.editorCtx.stroke();
+                });
+
+                // Draw nodes
+                this.nodes.forEach(node => {
+                    const nodeColor = node.type === 'principled' ? 'rgba(99, 102, 241, 0.25)' :
+                                     node.type === 'noise' ? 'rgba(52, 73, 94, 0.3)' :
+                                     node.type === 'colorramp' ? 'rgba(149, 165, 166, 0.2)' :
+                                     'rgba(46, 204, 113, 0.2)';
+
+                    this.editorCtx.fillStyle = nodeColor;
+                    this.editorCtx.fillRect(node.x, node.y, 140, 60);
+
+                    this.editorCtx.strokeStyle = node.type === 'principled' ? 'rgba(99, 102, 241, 0.6)' : 'rgba(228, 228, 231, 0.3)';
+                    this.editorCtx.lineWidth = 1;
+                    this.editorCtx.strokeRect(node.x, node.y, 140, 60);
+
+                    this.editorCtx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+                    this.editorCtx.font = 'bold 10px "Space Mono"';
+                    this.editorCtx.fillText(node.title, node.x + 6, node.y + 16);
+
+                    // Output sockets
+                    for (let i = 0; i < node.outputs; i++) {
+                        const socketY = node.y + 35 + (i * 15);
+                        this.editorCtx.fillStyle = 'rgba(99, 102, 241, 0.8)';
+                        this.editorCtx.beginPath();
+                        this.editorCtx.arc(node.x + 140, socketY, 3, 0, Math.PI * 2);
+                        this.editorCtx.fill();
+                    }
+                });
+            }
+        }
+
+        const editorCanvas = document.getElementById('nodeCanvas');
+        const previewCanvas = document.getElementById('previewSphere');
+        const editor = new ShaderNodeEditor(editorCanvas, previewCanvas);
+    </script>
+</body>
+</html>

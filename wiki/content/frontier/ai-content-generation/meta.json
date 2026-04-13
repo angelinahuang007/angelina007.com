@@ -1,0 +1,18 @@
+{
+  "title": "AI-Driven Content Generation",
+  "category": "frontier",
+  "order": 3,
+  "tags": [
+    "AI",
+    "diffusion",
+    "text-to-3D",
+    "generative",
+    "style-transfer"
+  ],
+  "description": "Comprehensive guide to AI content generation including diffusion models, text-to-image, text-to-3D techniques, texture synthesis, animation, and ethical considerations.",
+  "related": [
+    "frontier/gaussian-splatting",
+    "frontier/neural-radiance-fields",
+    "frontier/procedural-generation"
+  ]
+}

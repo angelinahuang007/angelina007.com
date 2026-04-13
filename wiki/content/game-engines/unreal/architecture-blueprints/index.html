@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unreal Architecture & Blueprints</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        body { background: var(--bg-primary); color: var(--text-primary); font-family: 'Space+Grotesk', sans-serif; }
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        .layout { display: grid; grid-template-columns: 1.2fr 1fr; gap: 2rem; }
+        #hierarchyCanvas { border: 2px solid var(--accent-primary); border-radius: 8px; background: var(--bg-secondary); cursor: pointer; }
+        .info-panel { background: var(--bg-secondary); padding: 1.5rem; border-radius: 8px; border: 1px solid var(--accent-secondary); }
+        .info-panel h3 { margin-top: 0; color: var(--accent-primary); }
+        .class-item { padding: 1rem; margin: 0.75rem 0; background: var(--bg-primary); border-left: 4px solid var(--accent-secondary); border-radius: 4px; font-size: 0.95rem; }
+        .class-item.selected { border-left-color: var(--accent-primary); background: var(--bg-primary); box-shadow: 0 0 10px var(--accent-primary) + '33'; }
+        .responsibility { font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.5rem; font-style: italic; }
+        .runtime-info { margin-top: 1.5rem; padding: 1rem; background: var(--bg-primary); border-radius: 4px; border: 1px solid var(--accent-secondary); }
+        .button-group { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+        button { padding: 0.5rem 1rem; border: 2px solid var(--accent-primary); background: var(--bg-secondary); color: var(--text-primary); cursor: pointer; border-radius: 4px; font-weight: 600; transition: all 0.3s; }
+        button.active { background: var(--accent-primary); color: var(--bg-primary); }
+        button:hover { transform: translateY(-2px); }
+        @media (max-width: 768px) { .layout { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Unreal Class Hierarchy & Data Flow</h1>
+        <p>Interactive visualization of Unreal's class architecture and runtime communication.</p>
+
+        <div class="button-group">
+            <button id="hierarchyBtn" class="active">Class Hierarchy</button>
+            <button id="runtimeBtn">Runtime Sequence</button>
+        </div>
+
+        <div class="layout">
+            <div>
+                <canvas id="hierarchyCanvas" width="700" height="550"></canvas>
+                <p style="font-size: 0.85rem; color: var(--text-secondary); text-align: center; margin-top: 0.5rem;">Click a class to see details</p>
+            </div>
+
+            <div class="info-panel">
+                <h3>Class Information</h3>
+                <div id="classInfo">
+                    <p style="color: var(--text-secondary);">Select a class</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { colors, onThemeChange } = Wiki;
+        const canvas = document.getElementById('hierarchyCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let selectedClass = null;
+        let showRuntime = false;
+        let runtimeStep = 0;
+
+        const classHierarchy = {
+            name: 'UObject',
+            desc: 'Base class for all objects',
+            x: canvas.width / 2,
+            y: 50,
+            children: [
+                {
+                    name: 'AGameModeBase',
+                    desc: 'Game rules & setup',
+                    responsibility: 'Defines game rules, spawn behavior',
+                    children: []
+                },
+                {
+                    name: 'AGameState',
+                    desc: 'Game state information',
+                    responsibility: 'Tracks score, teams, player list',
+                    children: []
+                },
+                {
+                    name: 'APlayerController',
+                    desc: 'Player input & logic',
+                    responsibility: 'Handles input, camera, possessed pawn',
+                    children: []
+                },
+                {
+                    name: 'APawn',
+                    desc: 'Possess-able character',
+                    responsibility: 'Can be possessed, handles movement',
+                    children: [
+                        {
+                            name: 'ACharacter',
+                            desc: 'Humanoid character',
+                            responsibility: 'Walking, jumping, animation',
+                            children: []
+                        }
+                    ]
+                }
+            ]
+        };
+
+        const classDetails = {
+            'UObject': { desc: 'Base class for all objects', responsibility: 'Serialization, property system, reflection' },
+            'AGameModeBase': { desc: 'Game rules & setup', responsibility: 'Defines game rules, spawn behavior, game state' },
+            'AGameState': { desc: 'Game state information', responsibility: 'Tracks score, teams, player list, game time' },
+            'APlayerController': { desc: 'Player input & logic', responsibility: 'Handles input, camera, possessed pawn, UI' },
+            'APawn': { desc: 'Possess-able character', responsibility: 'Can be possessed, handles movement, rotation' },
+            'ACharacter': { desc: 'Humanoid character', responsibility: 'Walking, jumping, animation, skeletal mesh' }
+        };
+
+        const runtimeSequences = [
+            { event: 'Player Spawn', classes: ['AGameMode', 'AGameState', 'APlayerController', 'APawn', 'ACharacter'], desc: 'GameMode spawns player, assigns to controller' },
+            { event: 'Input Handling', classes: ['APlayerController', 'APawn', 'ACharacter'], desc: 'PlayerController receives input, moves pawn' },
+            { event: 'Game Over', classes: ['AGameState', 'AGameMode', 'APlayerController'], desc: 'GameState updates, notifies controller' }
+        ];
+
+        function getThemeColors() {
+            const theme = colors();
+            return {
+                bg: theme['bg-primary'],
+                text: theme['text-primary'],
+                accent: theme['accent-primary'],
+                secondary: theme['accent-secondary']
+            };
+        }
+
+        function drawHierarchy() {
+            const theme = getThemeColors();
+            ctx.fillStyle = theme.bg;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            function drawNode(node, x, y, depth) {
+                const isSelected = node.name === selectedClass;
+                const nodeW = 120;
+                const nodeH = 45;
+                const yGap = 120;
+
+                // Draw node
+                ctx.fillStyle = isSelected ? theme.accent : theme.secondary;
+                ctx.fillRect(x - nodeW/2, y - nodeH/2, nodeW, nodeH);
+                ctx.fillStyle = theme.bg;
+                ctx.fillRect(x - nodeW/2 + 2, y - nodeH/2 + 2, nodeW - 4, nodeH - 4);
+
+                // Text
+                ctx.fillStyle = isSelected ? theme.accent : theme.text;
+                ctx.font = isSelected ? 'bold 11px Space+Mono' : '10px Space+Mono';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(node.name.substring(0, 10), x, y - 8);
+                ctx.font = '8px Space+Grotesk';
+                ctx.fillStyle = theme.secondary;
+                ctx.fillText(node.desc.substring(0, 15), x, y + 8);
+
+                // Draw children
+                const numChildren = node.children.length;
+                let childX = x - (numChildren - 1) * 140 / 2;
+
+                node.children.forEach(child => {
+                    // Connection line
+                    ctx.strokeStyle = theme.secondary;
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.moveTo(x, y + nodeH/2);
+                    ctx.lineTo(childX, y + 40);
+                    ctx.stroke();
+
+                    drawNode(child, childX, y + yGap, depth + 1);
+                    childX += 140;
+                });
+            }
+
+            // Draw base class
+            drawNode(classHierarchy, canvas.width / 2, 50, 0);
+
+            // Draw all nodes and flatten for clicking
+            const flatNodes = [];
+            function flatten(node) {
+                flatNodes.push(node);
+                node.children.forEach(child => flatten(child));
+            }
+            flatten(classHierarchy);
+        }
+
+        function drawRuntimeSequence() {
+            const theme = getThemeColors();
+            ctx.fillStyle = theme.bg;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const sequence = runtimeSequences[Math.floor(runtimeStep / 120) % runtimeSequences.length];
+            const startX = 50;
+            const startY = 80;
+            const colWidth = (canvas.width - 100) / sequence.classes.length;
+
+            // Title
+            ctx.fillStyle = theme.text;
+            ctx.font = 'bold 14px Space+Mono';
+            ctx.textAlign = 'left';
+            ctx.fillText(sequence.event, startX, 30);
+
+            // Draw class columns
+            sequence.classes.forEach((className, i) => {
+                const x = startX + i * colWidth + colWidth / 2;
+
+                // Column line
+                ctx.strokeStyle = theme.secondary;
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(x, startY);
+                ctx.lineTo(x, canvas.height - 50);
+                ctx.stroke();
+
+                // Class box
+                ctx.fillStyle = theme.secondary + '33';
+                ctx.fillRect(x - colWidth / 2 + 5, startY - 25, colWidth - 10, 40);
+                ctx.fillStyle = theme.text;
+                ctx.font = '10px Space+Mono';
+                ctx.textAlign = 'center';
+                ctx.fillText(className, x, startY + 5);
+            });
+
+            // Animate message arrows
+            const phase = (runtimeStep % 120) / 120;
+            let msgY = startY + 60;
+            let fromIdx = 0;
+            let toIdx = 1;
+
+            if (sequence.classes.length > 1) {
+                const fromX = startX + fromIdx * colWidth + colWidth / 2;
+                const toX = startX + toIdx * colWidth + colWidth / 2;
+                const interpX = fromX + (toX - fromX) * phase;
+
+                ctx.strokeStyle = theme.accent;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(fromX, msgY);
+                ctx.lineTo(interpX, msgY);
+                ctx.stroke();
+
+                // Arrow head
+                ctx.beginPath();
+                ctx.moveTo(interpX, msgY);
+                ctx.lineTo(interpX - 8, msgY - 4);
+                ctx.lineTo(interpX - 8, msgY + 4);
+                ctx.closePath();
+                ctx.fillStyle = theme.accent;
+                ctx.fill();
+            }
+
+            // Description
+            ctx.fillStyle = theme.text;
+            ctx.font = '10px Space+Grotesk';
+            ctx.textAlign = 'left';
+            ctx.fillText(sequence.desc, startX, canvas.height - 20);
+
+            runtimeStep = (runtimeStep + 1) % 360;
+            requestAnimationFrame(drawRuntimeSequence);
+        }
+
+        function updateInfo() {
+            const info = document.getElementById('classInfo');
+            if (!selectedClass || !classDetails[selectedClass]) {
+                info.innerHTML = '<p style="color: var(--text-secondary);">Select a class</p>';
+                return;
+            }
+
+            const details = classDetails[selectedClass];
+            info.innerHTML = `
+                <div class="class-item selected">
+                    <strong>${selectedClass}</strong>
+                    <div class="responsibility">${details.responsibility}</div>
+                </div>
+                <div class="runtime-info">
+                    <strong>Runtime Role</strong>
+                    <p style="font-size: 0.85rem; margin-top: 0.5rem;">${details.desc}</p>
+                </div>
+            `;
+        }
+
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            const flatNodes = [];
+            function flatten(node) {
+                flatNodes.push(node);
+                node.children.forEach(child => flatten(child));
+            }
+            flatten(classHierarchy);
+
+            for (let node of flatNodes) {
+                if (Math.abs(x - node.x) < 60 && Math.abs(y - node.y) < 25) {
+                    selectedClass = node.name;
+                    updateInfo();
+                    drawHierarchy();
+                    break;
+                }
+            }
+        });
+
+        document.getElementById('hierarchyBtn').addEventListener('click', () => {
+            showRuntime = false;
+            document.getElementById('hierarchyBtn').classList.add('active');
+            document.getElementById('runtimeBtn').classList.remove('active');
+            drawHierarchy();
+        });
+
+        document.getElementById('runtimeBtn').addEventListener('click', () => {
+            showRuntime = true;
+            document.getElementById('runtimeBtn').classList.add('active');
+            document.getElementById('hierarchyBtn').classList.remove('active');
+            drawRuntimeSequence();
+        });
+
+        onThemeChange(() => {
+            if (showRuntime) {
+                drawRuntimeSequence();
+            } else {
+                drawHierarchy();
+            }
+        });
+
+        // Compute positions for all nodes
+        function positionNodes(node, x, y) {
+            node.x = x;
+            node.y = y;
+            const numChildren = node.children.length;
+            let childX = x - (numChildren - 1) * 140 / 2;
+            node.children.forEach(child => {
+                positionNodes(child, childX, y + 120);
+                childX += 140;
+            });
+        }
+        positionNodes(classHierarchy, canvas.width / 2, 50);
+
+        updateInfo();
+        drawHierarchy();
+    </script>
+</body>
+</html>

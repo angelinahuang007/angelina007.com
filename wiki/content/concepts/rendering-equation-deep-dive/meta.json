@@ -1,0 +1,19 @@
+{
+  "title": "The Rendering Equation - Deep Dive",
+  "category": "concepts",
+  "order": 5,
+  "tags": [
+    "rendering-equation",
+    "radiometry",
+    "BRDF",
+    "Monte-Carlo",
+    "importance-sampling"
+  ],
+  "description": "Complete technical breakdown of the rendering equation, radiometric foundations, BRDF/BTDF/BSSRDF, Monte Carlo methods, and variance reduction techniques underpinning all rendering algorithms.",
+  "related": [
+    "graphics-fundamentals/global-illumination",
+    "graphics-fundamentals/shading-models",
+    "graphics-fundamentals/pbr-rendering",
+    "graphics-fundamentals/ray-tracing-fundamentals"
+  ]
+}

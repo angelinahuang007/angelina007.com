@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Curves and Surfaces</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        body {
+            padding: 20px;
+            font-family: 'Space Grotesk', sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+            margin: 20px 0;
+        }
+
+        .editor-panel {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .basis-panel {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 6px;
+            background: var(--accent);
+            color: white;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        button.active {
+            background: var(--primary);
+        }
+
+        canvas {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            display: block;
+            margin: 20px auto;
+            background: var(--bg-secondary);
+            max-width: 100%;
+            max-height: 500px;
+        }
+
+        #canvas {
+            max-width: 800px;
+            width: 100%;
+            height: auto;
+        }
+
+        #basisCanvas {
+            max-width: 800px;
+            width: 100%;
+            height: auto;
+        }
+
+        .slider-group {
+            margin: 15px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .slider-group label {
+            min-width: 80px;
+            font-weight: 500;
+        }
+
+        input[type="range"] {
+            flex: 1;
+            max-width: 200px;
+        }
+
+        .slider-value {
+            min-width: 50px;
+            text-align: right;
+        }
+
+        .info-box {
+            background: var(--bg-secondary);
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px auto;
+            border-left: 4px solid var(--accent);
+            max-width: 800px;
+            width: 100%;
+        }
+
+        .info-box h3 {
+            margin-top: 0;
+            color: var(--primary);
+        }
+
+        .type-buttons {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .type-buttons button {
+            padding: 8px 12px;
+            font-size: 12px;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        > p {
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>Curves and Surfaces</h1>
+    <p>Interactive Bezier curve editor with de Casteljau construction. Drag control points, adjust t slider, and explore different curve types.</p>
+
+    <div class="controls">
+        <button onclick="addControlPoint()">+ Add Point (max 7)</button>
+        <button onclick="resetCurve()">Reset</button>
+        <button class="type-buttons" id="bezierBtn" class="active" onclick="setCurveType('bezier')">Bezier</button>
+        <button class="type-buttons" onclick="setCurveType('bspline')">B-spline</button>
+        <button class="type-buttons" onclick="setCurveType('catmull')">Catmull-Rom</button>
+        <button class="type-buttons" onclick="setCurveType('subdivision')">Subdivision</button>
+    </div>
+
+    <div class="slider-group">
+        <label>Parameter t:</label>
+        <input type="range" id="tSlider" min="0" max="1" step="0.01" value="0.5">
+        <span class="slider-value" id="tValue">0.50</span>
+    </div>
+
+    <div class="container">
+        <div class="editor-panel">
+            <canvas id="canvas" width="800" height="500"></canvas>
+            <div class="info-box">
+                <h3 id="infoTitle">Bezier Curve</h3>
+                <p id="infoDesc">4 control points. Drag points to edit. The curve passes through first and last control points.</p>
+                <p id="stats">Points: <span id="pointCount">4</span> | t: <span id="tDisplay">0.50</span></p>
+            </div>
+        </div>
+
+        <div class="basis-panel">
+            <h3>Basis Functions</h3>
+            <canvas id="basisCanvas" width="800" height="300"></canvas>
+            <div class="info-box">
+                <h3>de Casteljau Algorithm</h3>
+                <p>Linear interpolation of control points at parameter t.</p>
+                <p>For cubic Bezier: B(t) = (1-t)³P₀ + 3(1-t)²tP₁ + 3(1-t)t²P₂ + t³P₃</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const basisCanvas = document.getElementById('basisCanvas');
+        const basisCtx = basisCanvas.getContext('2d');
+        const tSlider = document.getElementById('tSlider');
+        const tValue = document.getElementById('tValue');
+
+        let controlPoints = [
+            {x: 100, y: 300},
+            {x: 250, y: 100},
+            {x: 450, y: 100},
+            {x: 600, y: 300}
+        ];
+
+        let draggingPoint = -1;
+        let curveType = 'bezier';
+        const MAX_POINTS = 7;
+
+        function lerp(p1, p2, t) {
+            return {x: p1.x + (p2.x - p1.x) * t, y: p1.y + (p2.y - p1.y) * t};
+        }
+
+        function deCasteljau(points, t) {
+            if (points.length === 1) return points[0];
+            const newPoints = [];
+            for (let i = 0; i < points.length - 1; i++) {
+                newPoints.push(lerp(points[i], points[i + 1], t));
+            }
+            return deCasteljau(newPoints, t);
+        }
+
+        function evaluateBezier(t) {
+            return deCasteljau(controlPoints, t);
+        }
+
+        function getBasisFunctions(n, t) {
+            const basis = [];
+            for (let i = 0; i <= n; i++) {
+                let b = 1;
+                for (let j = 0; j < i; j++) b *= t;
+                for (let j = 0; j < n - i; j++) b *= (1 - t);
+                for (let j = 1; j <= i; j++) b *= (n - j + 1) / j;
+                basis.push(b);
+            }
+            return basis;
+        }
+
+        function drawBasisFunctions() {
+            const colors = Wiki.colors();
+            const w = basisCanvas.width;
+            const h = basisCanvas.height;
+            const n = controlPoints.length - 1;
+
+            basisCtx.fillStyle = colors.bg_secondary;
+            basisCtx.fillRect(0, 0, w, h);
+
+            // Grid
+            basisCtx.strokeStyle = colors.border_color;
+            basisCtx.lineWidth = 0.5;
+            for (let i = 0; i <= 10; i++) {
+                const x = (i / 10) * w;
+                const y = (i / 10) * h;
+                basisCtx.beginPath();
+                basisCtx.moveTo(x, 0);
+                basisCtx.lineTo(x, h);
+                basisCtx.stroke();
+                basisCtx.beginPath();
+                basisCtx.moveTo(0, y);
+                basisCtx.lineTo(w, y);
+                basisCtx.stroke();
+            }
+
+            // Draw basis functions
+            const colors_palette = [colors.accent, colors.primary, '#00ff00', '#ff00ff', '#00ffff', '#ffff00', '#ff6600'];
+            for (let i = 0; i <= Math.min(n, 6); i++) {
+                basisCtx.strokeStyle = colors_palette[i];
+                basisCtx.lineWidth = 2;
+                basisCtx.beginPath();
+                for (let x = 0; x < w; x++) {
+                    const t = x / w;
+                    const basis = getBasisFunctions(n, t);
+                    const y = h - (basis[i] * h);
+                    if (x === 0) basisCtx.moveTo(x, y);
+                    else basisCtx.lineTo(x, y);
+                }
+                basisCtx.stroke();
+            }
+
+            // Current t marker
+            const t = parseFloat(tSlider.value);
+            const markerX = t * w;
+            basisCtx.strokeStyle = colors.text;
+            basisCtx.lineWidth = 2;
+            basisCtx.setLineDash([4, 4]);
+            basisCtx.beginPath();
+            basisCtx.moveTo(markerX, 0);
+            basisCtx.lineTo(markerX, h);
+            basisCtx.stroke();
+            basisCtx.setLineDash([]);
+        }
+
+        function drawDeCasteljauConstruction(t) {
+            const colors = Wiki.colors();
+
+            // Draw construction lines
+            let currentPoints = [...controlPoints];
+            const levels = [currentPoints];
+            const levelColors = ['#ff6666', '#66ff66', '#6666ff', '#ffff66', '#ff66ff', '#66ffff'];
+
+            for (let level = 0; level < controlPoints.length - 1; level++) {
+                const newPoints = [];
+                for (let i = 0; i < currentPoints.length - 1; i++) {
+                    newPoints.push(lerp(currentPoints[i], currentPoints[i + 1], t));
+                }
+                levels.push(newPoints);
+                currentPoints = newPoints;
+            }
+
+            // Draw all construction levels
+            levels.forEach((pts, level) => {
+                ctx.strokeStyle = levelColors[level] + '40';
+                ctx.lineWidth = 1.5;
+                for (let i = 0; i < pts.length - 1; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(pts[i].x, pts[i].y);
+                    ctx.lineTo(pts[i + 1].x, pts[i + 1].y);
+                    ctx.stroke();
+                }
+            });
+        }
+
+        function drawCurve() {
+            const colors = Wiki.colors();
+            const t = parseFloat(tSlider.value);
+
+            // Background
+            ctx.fillStyle = colors.bg_secondary;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw the curve
+            ctx.strokeStyle = colors.primary;
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            let firstPoint = evaluateBezier(0);
+            ctx.moveTo(firstPoint.x, firstPoint.y);
+            for (let i = 0; i <= 100; i++) {
+                const pt = evaluateBezier(i / 100);
+                ctx.lineTo(pt.x, pt.y);
+            }
+            ctx.stroke();
+
+            // de Casteljau construction
+            drawDeCasteljauConstruction(t);
+
+            // Current point on curve
+            const currentPt = evaluateBezier(t);
+            ctx.fillStyle = colors.accent;
+            ctx.beginPath();
+            ctx.arc(currentPt.x, currentPt.y, 6, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Control polygon
+            ctx.strokeStyle = colors.accent + '80';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.moveTo(controlPoints[0].x, controlPoints[0].y);
+            for (let i = 1; i < controlPoints.length; i++) {
+                ctx.lineTo(controlPoints[i].x, controlPoints[i].y);
+            }
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Control points
+            controlPoints.forEach((p, i) => {
+                ctx.fillStyle = colors.accent;
+                ctx.strokeStyle = colors.primary;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+                ctx.fillStyle = colors.text;
+                ctx.font = 'bold 11px JetBrains Mono';
+                ctx.fillText('P' + i, p.x + 10, p.y - 8);
+            });
+        }
+
+        function animate() {
+            drawCurve();
+            drawBasisFunctions();
+            requestAnimationFrame(animate);
+        }
+
+        function addControlPoint() {
+            if (controlPoints.length < MAX_POINTS) {
+                const last = controlPoints[controlPoints.length - 1];
+                controlPoints.push({x: last.x + 50, y: last.y});
+                document.getElementById('pointCount').textContent = controlPoints.length;
+            }
+        }
+
+        function resetCurve() {
+            controlPoints = [
+                {x: 100, y: 300},
+                {x: 250, y: 100},
+                {x: 450, y: 100},
+                {x: 600, y: 300}
+            ];
+            document.getElementById('pointCount').textContent = controlPoints.length;
+        }
+
+        function setCurveType(type) {
+            curveType = type;
+            document.querySelectorAll('.type-buttons').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            if (type === 'bezier') {
+                document.getElementById('infoTitle').textContent = 'Bezier Curve';
+                document.getElementById('infoDesc').textContent = 'Smooth interpolation using Bernstein polynomials.';
+            } else if (type === 'bspline') {
+                document.getElementById('infoTitle').textContent = 'B-spline';
+                document.getElementById('infoDesc').textContent = 'Non-uniform rational basis splines. Less responsive to control points.';
+            } else if (type === 'catmull') {
+                document.getElementById('infoTitle').textContent = 'Catmull-Rom Spline';
+                document.getElementById('infoDesc').textContent = 'Passes through all interior control points. Good for smooth paths.';
+            } else if (type === 'subdivision') {
+                document.getElementById('infoTitle').textContent = 'Subdivision Surfaces';
+                document.getElementById('infoDesc').textContent = 'Recursive mesh refinement. Creates smooth surfaces from coarse polygons.';
+            }
+        }
+
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+            for (let i = 0; i < controlPoints.length; i++) {
+                const dx = controlPoints[i].x - mx;
+                const dy = controlPoints[i].y - my;
+                if (dx * dx + dy * dy < 100) {
+                    draggingPoint = i;
+                    break;
+                }
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (draggingPoint !== -1) {
+                const rect = canvas.getBoundingClientRect();
+                controlPoints[draggingPoint].x = e.clientX - rect.left;
+                controlPoints[draggingPoint].y = e.clientY - rect.top;
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            draggingPoint = -1;
+        });
+
+        tSlider.addEventListener('input', (e) => {
+            const t = parseFloat(e.target.value);
+            tValue.textContent = t.toFixed(2);
+            document.getElementById('tDisplay').textContent = t.toFixed(2);
+        });
+
+        animate();
+    </script>
+</body>
+</html>

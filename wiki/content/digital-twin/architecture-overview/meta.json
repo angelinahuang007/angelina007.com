@@ -1,0 +1,17 @@
+{
+  "title": "Digital Twin Architecture Overview",
+  "category": "digital-twin",
+  "tags": [
+    "digital-twin",
+    "architecture",
+    "IoT",
+    "overview"
+  ],
+  "description": "Foundational concepts of digital twins, architectural layers from physical assets to analytics, industry standards, and vendor landscape.",
+  "related": [
+    "digital-twin/realtime-data-pipeline",
+    "digital-twin/3d-visualization",
+    "concepts/realtime-systems"
+  ],
+  "order": 1
+}

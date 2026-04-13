@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IoT Sensor Integration</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        body { background: var(--bg-dark); color: var(--fg-light); }
+        .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+        .controls { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+        button { padding: 8px 16px; background: var(--accent); color: var(--bg-dark); border: none; border-radius: 4px; cursor: pointer; font-family: 'Space Mono'; font-weight: 700; }
+        button.active { background: var(--accent-alt); }
+        button:hover { opacity: 0.8; }
+        #canvas { border: 1px solid var(--fg-dark); background: var(--bg-darker); display: block; margin: 0 auto; }
+        .info { font-size: 0.9em; color: var(--fg-muted); margin-top: 10px; font-family: 'Space Mono'; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>IoT Sensor Integration</h1>
+        <p>Interactive smart building floor plan with live sensor readings and data fusion.</p>
+
+        <div class="controls">
+            <button id="tempBtn" class="active">Temperature</button>
+            <button id="humidBtn">Humidity</button>
+            <button id="motionBtn">Motion</button>
+            <button id="comfortBtn">Comfort Index</button>
+            <button id="alertsBtn">Show Alerts</button>
+        </div>
+
+        <canvas id="canvas" width="800" height="500"></canvas>
+        <div class="info" id="info">Click sensors to view details. Data updates in real-time.</div>
+    </div>
+
+    <script>
+        const canvas = Wiki.createCanvas('canvas', 800, 500);
+        const ctx = canvas.getContext('2d');
+        let currentDisplay = 'temperature';
+        let showAlerts = false;
+        let time = 0;
+
+        // Sensor definitions with floor plan positions
+        const sensors = [
+            { id: 'T1', type: 'temp', name: 'Room A', x: 200, y: 150, baseValue: 22, variance: 2 },
+            { id: 'T2', type: 'temp', name: 'Room B', x: 600, y: 150, baseValue: 21, variance: 2 },
+            { id: 'H1', type: 'humidity', name: 'Room A', x: 250, y: 200, baseValue: 45, variance: 10 },
+            { id: 'H2', type: 'humidity', name: 'Room B', x: 650, y: 200, baseValue: 50, variance: 10 },
+            { id: 'M1', type: 'motion', name: 'Hallway', x: 400, y: 250, baseValue: 0, variance: 1 },
+            { id: 'C1', type: 'camera', name: 'Entrance', x: 400, y: 350, baseValue: 1, variance: 0 }
+        ];
+
+        function getValue(sensor) {
+            const wave = Math.sin(time / 30 + sensor.id.charCodeAt(0));
+            return sensor.baseValue + wave * sensor.variance;
+        }
+
+        function getComfort(tempReading, humidReading) {
+            let comfort = 100;
+            if (tempReading < 18 || tempReading > 25) comfort -= 20;
+            if (humidReading < 30 || humidReading > 60) comfort -= 15;
+            return Math.max(0, comfort);
+        }
+
+        function draw() {
+            ctx.fillStyle = Wiki.colors().bg;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw floor plan
+            ctx.strokeStyle = '#444';
+            ctx.lineWidth = 2;
+            // Room A
+            ctx.strokeRect(100, 80, 400, 250);
+            // Room B
+            ctx.strokeRect(500, 80, 300, 250);
+            // Hallway
+            ctx.strokeRect(100, 330, 700, 100);
+
+            // Room labels
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.font = '14px Space Grotesk';
+            ctx.fillText('Room A', 220, 115);
+            ctx.fillText('Room B', 620, 115);
+            ctx.fillText('Hallway', 350, 365);
+
+            time++;
+
+            // Draw sensors and values
+            sensors.forEach(sensor => {
+                let value = getValue(sensor);
+                let displayValue = Math.round(value * 10) / 10;
+                let color = '#666';
+
+                if (currentDisplay === 'temperature' && sensor.type === 'temp') {
+                    // Color gradient: cold (blue) to hot (red)
+                    const tempNorm = (value - 15) / 15; // Normalize 15-30C
+                    color = `hsl(${240 - tempNorm * 240}, 100%, 50%)`;
+                } else if (currentDisplay === 'humidity' && sensor.type === 'humidity') {
+                    const humidNorm = Math.min(1, value / 100);
+                    color = `hsl(200, 100%, ${30 + humidNorm * 40}%)`;
+                } else if (currentDisplay === 'motion' && sensor.type === 'motion') {
+                    color = value > 0.5 ? '#ff6b6b' : '#4ecdc4';
+                } else if (currentDisplay === 'comfort') {
+                    // Show comfort index
+                    const t = sensors.find(s => s.id === 'T1');
+                    const h = sensors.find(s => s.id === 'H1');
+                    const comfort = getComfort(getValue(t), getValue(h));
+                    color = `hsl(${comfort / 100 * 120}, 100%, 50%)`;
+                }
+
+                // Draw sensor icon
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.arc(sensor.x, sensor.y, 8, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 2;
+                ctx.strokeRect(sensor.x - 12, sensor.y - 12, 24, 24);
+
+                // Draw value label
+                ctx.fillStyle = color;
+                ctx.font = 'bold 11px Space Mono';
+                ctx.textAlign = 'center';
+                if (currentDisplay === 'temperature' && sensor.type === 'temp') {
+                    ctx.fillText(displayValue + '°C', sensor.x, sensor.y + 25);
+                } else if (currentDisplay === 'humidity' && sensor.type === 'humidity') {
+                    ctx.fillText(displayValue + '%', sensor.x, sensor.y + 25);
+                } else if (currentDisplay === 'motion' && sensor.type === 'motion') {
+                    ctx.fillText(value > 0.5 ? 'MOTION' : 'quiet', sensor.x, sensor.y + 25);
+                } else if (currentDisplay === 'comfort') {
+                    const t = sensors.find(s => s.id === 'T1');
+                    const h = sensors.find(s => s.id === 'H1');
+                    const comfort = getComfort(getValue(t), getValue(h));
+                    ctx.fillText(Math.round(comfort) + '%', sensor.x, sensor.y + 25);
+                }
+            });
+
+            // Draw alerts
+            if (showAlerts) {
+                const t1 = getValue(sensors[0]);
+                const h1 = getValue(sensors[2]);
+                ctx.fillStyle = 'rgba(255, 107, 107, 0.3)';
+                ctx.fillRect(20, 450, 860, 130);
+                ctx.strokeStyle = '#ff6b6b';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(20, 450, 860, 130);
+
+                ctx.fillStyle = '#ff6b6b';
+                ctx.font = 'bold 12px Space Grotesk';
+                ctx.textAlign = 'left';
+                ctx.fillText('SYSTEM ALERTS', 30, 470);
+
+                ctx.font = '11px Space Mono';
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                let alertY = 495;
+                if (t1 > 24) ctx.fillText('⚠ Room A: Temperature above threshold', 30, alertY);
+                alertY += 20;
+                if (h1 > 55) ctx.fillText('⚠ Room A: Humidity above threshold', 30, alertY);
+                alertY += 20;
+                if (Math.sin(time / 50) > 0.5) ctx.fillText('⚠ Hallway: Motion detected', 30, alertY);
+            }
+
+            ctx.strokeStyle = Wiki.colors().fg;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(0, 0, canvas.width, canvas.height);
+        }
+
+        document.getElementById('tempBtn').addEventListener('click', () => {
+            currentDisplay = 'temperature';
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('tempBtn').classList.add('active');
+        });
+
+        document.getElementById('humidBtn').addEventListener('click', () => {
+            currentDisplay = 'humidity';
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('humidBtn').classList.add('active');
+        });
+
+        document.getElementById('motionBtn').addEventListener('click', () => {
+            currentDisplay = 'motion';
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('motionBtn').classList.add('active');
+        });
+
+        document.getElementById('comfortBtn').addEventListener('click', () => {
+            currentDisplay = 'comfort';
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('comfortBtn').classList.add('active');
+        });
+
+        document.getElementById('alertsBtn').addEventListener('click', () => {
+            showAlerts = !showAlerts;
+            document.getElementById('alertsBtn').classList.toggle('active');
+        });
+
+        Wiki.animate(draw);
+    </script>
+</body>
+</html>

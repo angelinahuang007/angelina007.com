@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unity Architecture & Workflow</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        body { background: var(--bg-primary); color: var(--text-primary); font-family: 'Space+Grotesk', sans-serif; }
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        .controls { display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap; }
+        button { padding: 0.5rem 1rem; border: 2px solid var(--accent-primary); background: var(--bg-secondary); color: var(--text-primary); cursor: pointer; border-radius: 4px; font-weight: 600; transition: all 0.3s; }
+        button.active { background: var(--accent-primary); color: var(--bg-primary); }
+        button:hover { transform: translateY(-2px); }
+        .layout { display: grid; grid-template-columns: 1fr 1.2fr; gap: 2rem; }
+        #hierarchyCanvas, #lifecycleCanvas { border: 2px solid var(--accent-secondary); border-radius: 8px; background: var(--bg-secondary); cursor: pointer; }
+        .inspector { background: var(--bg-secondary); padding: 1.5rem; border-radius: 8px; border: 1px solid var(--accent-secondary); }
+        .inspector h3 { margin-top: 0; color: var(--accent-primary); }
+        .component-item { padding: 0.75rem; margin: 0.5rem 0; background: var(--bg-primary); border-left: 4px solid var(--accent-primary); border-radius: 4px; font-family: 'JetBrains+Mono', monospace; font-size: 0.9rem; }
+        .lifecycle-info { margin-top: 1rem; padding: 1rem; background: var(--bg-primary); border-radius: 4px; font-size: 0.85rem; }
+        @media (max-width: 768px) { .layout { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Unity Architecture & Workflow</h1>
+        <p>Interactive visualization of GameObject hierarchy, components, and MonoBehaviour lifecycle.</p>
+
+        <div class="controls">
+            <button id="architectureBtn" class="active">GameObject Hierarchy</button>
+            <button id="lifecycleBtn">MonoBehaviour Lifecycle</button>
+            <button id="ecsModeBtn">Toggle ECS Mode</button>
+        </div>
+
+        <div class="layout">
+            <div>
+                <canvas id="hierarchyCanvas" width="400" height="500"></canvas>
+                <p style="text-align: center; font-size: 0.85rem; margin-top: 0.5rem; color: var(--text-secondary);">Click GameObjects • Drag to rearrange</p>
+            </div>
+            <div>
+                <canvas id="lifecycleCanvas" width="500" height="500"></canvas>
+                <div class="inspector">
+                    <h3>Inspector</h3>
+                    <div id="inspectorContent">
+                        <p style="color: var(--text-secondary);">Select a GameObject</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { colors, onThemeChange } = Wiki;
+        let ecsMode = false;
+        let selectedGO = null;
+        let animationTime = 0;
+
+        // GameObject Hierarchy
+        const hierarchy = {
+            name: 'Scene Root',
+            components: ['Transform'],
+            children: [
+                {
+                    name: 'Camera',
+                    components: ['Transform', 'Camera', 'AudioListener'],
+                    children: []
+                },
+                {
+                    name: 'Player',
+                    components: ['Transform', 'Rigidbody', 'Collider', 'PlayerController'],
+                    children: [
+                        {
+                            name: 'Mesh',
+                            components: ['Transform', 'MeshRenderer', 'MeshFilter'],
+                            children: []
+                        }
+                    ]
+                },
+                {
+                    name: 'Enemy',
+                    components: ['Transform', 'Rigidbody', 'Collider', 'EnemyAI'],
+                    children: [
+                        {
+                            name: 'Mesh',
+                            components: ['Transform', 'MeshRenderer', 'MeshFilter'],
+                            children: []
+                        }
+                    ]
+                }
+            ]
+        };
+
+        // Lifecycle phases
+        const lifecyclePhases = [
+            { name: 'Load Scene', time: 0, duration: 0.1 },
+            { name: 'Awake()', time: 0.1, duration: 0.15, color: '#FF6B6B' },
+            { name: 'OnEnable()', time: 0.25, duration: 0.15, color: '#4ECDC4' },
+            { name: 'Start()', time: 0.4, duration: 0.15, color: '#45B7D1' },
+            { name: 'Update()', time: 0.55, duration: 0.2, color: '#95E1D3', loop: true },
+            { name: 'LateUpdate()', time: 0.75, duration: 0.15, color: '#F38181', loop: true },
+            { name: 'OnDestroy()', time: 0.9, duration: 0.1, color: '#AA96DA' }
+        ];
+
+        const hCanvas = document.getElementById('hierarchyCanvas');
+        const lCanvas = document.getElementById('lifecycleCanvas');
+        const hCtx = hCanvas.getContext('2d');
+        const lCtx = lCanvas.getContext('2d');
+
+        function getThemeColors() {
+            const theme = colors();
+            return {
+                bg: theme['bg-primary'],
+                text: theme['text-primary'],
+                accent: theme['accent-primary'],
+                secondary: theme['accent-secondary']
+            };
+        }
+
+        function drawHierarchy() {
+            const theme = getThemeColors();
+            hCtx.fillStyle = theme.bg;
+            hCtx.fillRect(0, 0, hCanvas.width, hCanvas.height);
+            hCtx.strokeStyle = theme.secondary;
+            hCtx.lineWidth = 1;
+            hCtx.strokeRect(0, 0, hCanvas.width, hCanvas.height);
+
+            function traverse(obj, x, y, depth) {
+                const isSelected = obj === selectedGO;
+                const nodeWidth = 140;
+                const nodeHeight = 32;
+                const xSpacing = 160;
+                const ySpacing = 60;
+
+                // Draw node
+                hCtx.fillStyle = isSelected ? theme.accent : theme.secondary;
+                hCtx.fillRect(x - nodeWidth/2, y - nodeHeight/2, nodeWidth, nodeHeight);
+                hCtx.fillStyle = theme.bg;
+                hCtx.fillRect(x - nodeWidth/2 + 2, y - nodeHeight/2 + 2, nodeWidth - 4, nodeHeight - 4);
+
+                hCtx.fillStyle = isSelected ? theme.accent : theme.text;
+                hCtx.font = isSelected ? 'bold 12px Space+Mono' : '11px Space+Mono';
+                hCtx.textAlign = 'center';
+                hCtx.textBaseline = 'middle';
+                hCtx.fillText(obj.name, x, y - 4);
+
+                // Draw children
+                let childX = x - (obj.children.length - 1) * xSpacing / 2;
+                obj.children.forEach(child => {
+                    hCtx.strokeStyle = theme.secondary;
+                    hCtx.lineWidth = 1;
+                    hCtx.beginPath();
+                    hCtx.moveTo(x, y + nodeHeight/2);
+                    hCtx.lineTo(childX, y + nodeHeight/2 + 20);
+                    hCtx.stroke();
+                    traverse(child, childX, y + ySpacing, depth + 1);
+                    childX += xSpacing;
+                });
+            }
+
+            traverse(hierarchy, hCanvas.width / 2, 40, 0);
+        }
+
+        function drawLifecycle() {
+            const theme = getThemeColors();
+            lCtx.fillStyle = theme.bg;
+            lCtx.fillRect(0, 0, lCanvas.width, lCanvas.height);
+            lCtx.strokeStyle = theme.secondary;
+            lCtx.lineWidth = 1;
+            lCtx.strokeRect(0, 0, lCanvas.width, lCanvas.height);
+
+            const startX = 50;
+            const startY = 100;
+            const blockHeight = 50;
+            const spacing = 60;
+
+            animationTime = (animationTime + 0.01) % 1.0;
+
+            lifecyclePhases.forEach((phase, i) => {
+                const x = startX + i * spacing;
+                const isActive = Math.abs(((animationTime - phase.time) % 1) - 0.5) < 0.25;
+                const alpha = isActive ? 1 : 0.3;
+
+                lCtx.fillStyle = phase.color + Math.floor(alpha * 255).toString(16).padStart(2, '0');
+                lCtx.fillRect(x - 20, startY, 40, blockHeight);
+                lCtx.strokeStyle = theme.secondary;
+                lCtx.lineWidth = 2;
+                lCtx.strokeRect(x - 20, startY, 40, blockHeight);
+
+                lCtx.fillStyle = theme.text;
+                lCtx.font = '9px Space+Mono';
+                lCtx.textAlign = 'center';
+                lCtx.save();
+                lCtx.translate(x, startY + blockHeight + 20);
+                lCtx.rotate(-Math.PI / 4);
+                lCtx.fillText(phase.name, 0, 0);
+                lCtx.restore();
+            });
+
+            // Timeline bar
+            lCtx.strokeStyle = theme.secondary;
+            lCtx.lineWidth = 2;
+            lCtx.beginPath();
+            lCtx.moveTo(startX - 20, startY + blockHeight + 50);
+            lCtx.lineTo(startX + lifecyclePhases.length * spacing - 40, startY + blockHeight + 50);
+            lCtx.stroke();
+
+            // Current position indicator
+            const indicator = startX - 20 + (lifecyclePhases.length * spacing - 40) * animationTime;
+            lCtx.fillStyle = theme.accent;
+            lCtx.beginPath();
+            lCtx.arc(indicator, startY + blockHeight + 50, 5, 0, Math.PI * 2);
+            lCtx.fill();
+
+            requestAnimationFrame(drawLifecycle);
+        }
+
+        hCanvas.addEventListener('click', (e) => {
+            const rect = hCanvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            function findGO(obj, px, py, depth) {
+                const nodeWidth = 140;
+                const nodeHeight = 32;
+                const xSpacing = 160;
+                const ySpacing = 60;
+                const ox = hCanvas.width / 2;
+                const oy = 40;
+
+                function traverse(o, ox, oy) {
+                    if (Math.abs(px - ox) < nodeWidth/2 && Math.abs(py - oy) < nodeHeight/2) {
+                        return o;
+                    }
+                    let childX = ox - (o.children.length - 1) * xSpacing / 2;
+                    for (let child of o.children) {
+                        const result = traverse(child, childX, oy + ySpacing);
+                        if (result) return result;
+                        childX += xSpacing;
+                    }
+                    return null;
+                }
+                return traverse(obj, ox, oy);
+            }
+
+            selectedGO = findGO(hierarchy, x, y, 0);
+            updateInspector();
+            drawHierarchy();
+        });
+
+        function updateInspector() {
+            const inspector = document.getElementById('inspectorContent');
+            if (!selectedGO) {
+                inspector.innerHTML = '<p style="color: var(--text-secondary);">Select a GameObject</p>';
+                return;
+            }
+
+            let html = `<strong>${selectedGO.name}</strong><div class="lifecycle-info"><strong>Components:</strong>`;
+            selectedGO.components.forEach(comp => {
+                html += `<div class="component-item">${comp}</div>`;
+            });
+            html += '</div>';
+            inspector.innerHTML = html;
+        }
+
+        document.getElementById('architectureBtn').addEventListener('click', () => {
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('architectureBtn').classList.add('active');
+            hCanvas.style.display = 'block';
+            lCanvas.style.display = 'none';
+        });
+
+        document.getElementById('lifecycleBtn').addEventListener('click', () => {
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('lifecycleBtn').classList.add('active');
+            hCanvas.style.display = 'none';
+            lCanvas.style.display = 'block';
+            drawLifecycle();
+        });
+
+        document.getElementById('ecsModeBtn').addEventListener('click', () => {
+            ecsMode = !ecsMode;
+            document.getElementById('ecsModeBtn').classList.toggle('active');
+            if (ecsMode) {
+                document.getElementById('ecsModeBtn').textContent = 'ECS Mode (Active)';
+            } else {
+                document.getElementById('ecsModeBtn').textContent = 'Toggle ECS Mode';
+            }
+        });
+
+        onThemeChange(() => {
+            drawHierarchy();
+            drawLifecycle();
+        });
+
+        drawHierarchy();
+        drawLifecycle();
+    </script>
+</body>
+</html>

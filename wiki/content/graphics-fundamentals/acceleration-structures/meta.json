@@ -1,0 +1,19 @@
+{
+  "title": "Acceleration Structures for Ray Tracing",
+  "category": "graphics-fundamentals",
+  "tags": [
+    "bvh",
+    "kdtree",
+    "acceleration",
+    "spatial-partitioning",
+    "gpu",
+    "performance"
+  ],
+  "description": "BVH construction (SAH, median split, binned), KD-trees, octrees, traversal algorithms, and GPU-friendly data structures for ray tracing performance.",
+  "related": [
+    "graphics-fundamentals/ray-tracing-fundamentals",
+    "algorithms/spatial-data-structures",
+    "algorithms/computational-geometry"
+  ],
+  "order": 6
+}

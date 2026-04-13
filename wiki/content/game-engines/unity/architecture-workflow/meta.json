@@ -1,0 +1,11 @@
+{
+  "title": "Unity Architecture & Workflow",
+  "category": "game-engines/unity",
+  "tags": ["unity", "architecture", "gameobjects", "components", "monobehaviour", "lifecycle", "ecs"],
+  "description": "Interactive visualization of GameObject hierarchy, components, and MonoBehaviour lifecycle. Explore the ECS architecture mode.",
+  "related": [
+    "game-engines/unity/performance-optimization",
+    "game-engines/unreal/architecture-blueprints"
+  ],
+  "order": 1
+}

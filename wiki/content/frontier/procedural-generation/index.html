@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Procedural Generation</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        body { background: var(--bg-dark); color: var(--fg-light); }
+        .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+        .controls { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; align-items: center; }
+        button { padding: 8px 16px; background: var(--accent); color: var(--bg-dark); border: none; border-radius: 4px; cursor: pointer; font-family: 'Space Mono'; font-weight: 700; }
+        button.active { background: var(--accent-alt); }
+        button:hover { opacity: 0.8; }
+        #canvas { border: 1px solid var(--fg-dark); background: var(--bg-darker); display: block; margin: 0 auto; }
+        .info { font-size: 0.9em; color: var(--fg-muted); margin-top: 10px; font-family: 'Space Mono'; }
+        .slider-group { display: flex; gap: 10px; align-items: center; }
+        input[type="range"] { min-width: 150px; }
+        .papers-section { margin-top: 40px; padding-top: 24px; border-top: 1px solid var(--border-strong, rgba(228,228,231,0.2)); }
+        .papers-section h2 { font-family: 'Space Mono', monospace; font-size: 1.1rem; color: var(--accent, #6366f1); margin-bottom: 16px; }
+        .paper-list { display: flex; flex-direction: column; gap: 12px; }
+        .paper-card { display: block; background: var(--bg-secondary, #1a1b27); border: 1px solid var(--border, rgba(228,228,231,0.1)); border-radius: 8px; padding: 16px; text-decoration: none; transition: border-color 0.2s; }
+        .paper-card:hover { border-color: var(--accent, #6366f1); }
+        .paper-title { font-family: 'Space Mono', monospace; font-size: 0.9rem; font-weight: 700; color: var(--text, #e4e4e7); margin-bottom: 4px; }
+        .paper-authors { font-size: 0.8rem; color: var(--text-muted, #a1a1aa); margin-bottom: 8px; }
+        .paper-desc { font-size: 0.85rem; color: var(--text-dim, #71717a); line-height: 1.5; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Procedural Generation</h1>
+        <p>Noise playground: Perlin/Simplex/Worley noise, terrain generation, and L-system vegetation.</p>
+
+        <div class="controls">
+            <button id="perlinBtn" class="active">Perlin Noise</button>
+            <button id="worleyBtn">Worley Noise</button>
+            <button id="terrainBtn">Terrain</button>
+            <button id="plantBtn">L-System</button>
+            <div class="slider-group">
+                <label>Frequency:</label>
+                <input type="range" id="freqSlider" min="0.1" max="5" value="1" step="0.1">
+                <span id="freqLabel">1.0</span>
+            </div>
+            <div class="slider-group">
+                <label>Octaves:</label>
+                <input type="range" id="octaveSlider" min="1" max="8" value="3">
+                <span id="octaveLabel">3</span>
+            </div>
+        </div>
+
+        <canvas id="canvas" width="800" height="500"></canvas>
+        <div class="info" id="info">Adjust noise parameters in real-time. Different noise types create different patterns.</div>
+    </div>
+
+    <script>
+        const canvas = Wiki.createCanvas('canvas', 800, 500);
+        const ctx = canvas.getContext('2d');
+        let noiseType = 'perlin';
+        let frequency = 1;
+        let octaves = 3;
+        let time = 0;
+
+        // Simple Perlin-like noise
+        function hash(x, y) {
+            let h = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+            return h - Math.floor(h);
+        }
+
+        function smoothstep(t) {
+            return t * t * (3 - 2 * t);
+        }
+
+        function perlinNoise(x, y) {
+            const xi = Math.floor(x);
+            const yi = Math.floor(y);
+            const xf = x - xi;
+            const yf = y - yi;
+
+            const n00 = hash(xi, yi);
+            const n10 = hash(xi + 1, yi);
+            const n01 = hash(xi, yi + 1);
+            const n11 = hash(xi + 1, yi + 1);
+
+            const sx = smoothstep(xf);
+            const sy = smoothstep(yf);
+
+            const nx0 = n00 + sx * (n10 - n00);
+            const nx1 = n01 + sx * (n11 - n01);
+            return nx0 + sy * (nx1 - nx0);
+        }
+
+        function worleyNoise(x, y) {
+            const xi = Math.floor(x);
+            const yi = Math.floor(y);
+
+            let minDist = 10;
+            for (let i = -1; i <= 1; i++) {
+                for (let j = -1; j <= 1; j++) {
+                    const px = xi + i + hash(xi + i, yi + j);
+                    const py = yi + j + hash(xi + j * 2, yi + i * 2);
+                    const dx = px - x;
+                    const dy = py - y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    minDist = Math.min(minDist, dist);
+                }
+            }
+            return minDist;
+        }
+
+        function fBm(x, y, noiseFunc) {
+            let value = 0;
+            let amplitude = 1;
+            let maxValue = 0;
+            let scale = frequency;
+
+            for (let i = 0; i < octaves; i++) {
+                value += noiseFunc(x * scale, y * scale) * amplitude;
+                maxValue += amplitude;
+                amplitude *= 0.5;
+                scale *= 2;
+            }
+
+            return value / maxValue;
+        }
+
+        function drawPerlin() {
+            const pixelSize = 4;
+            for (let y = 0; y < 600; y += pixelSize) {
+                for (let x = 0; x < 900; x += pixelSize) {
+                    const value = fBm((x / 900) * 5, (y / 600) * 5, perlinNoise);
+                    const brightness = Math.round(value * 255);
+                    ctx.fillStyle = `rgb(${brightness}, ${brightness}, ${brightness})`;
+                    ctx.fillRect(x, y, pixelSize, pixelSize);
+                }
+            }
+        }
+
+        function drawWorley() {
+            const pixelSize = 4;
+            for (let y = 0; y < 600; y += pixelSize) {
+                for (let x = 0; x < 900; x += pixelSize) {
+                    const value = fBm((x / 900) * 5, (y / 600) * 5, worleyNoise);
+                    const normalized = Math.max(0, 1 - value / 2);
+                    const brightness = Math.round(normalized * 255);
+                    ctx.fillStyle = `rgb(${brightness}, ${brightness}, ${brightness})`;
+                    ctx.fillRect(x, y, pixelSize, pixelSize);
+                }
+            }
+        }
+
+        function drawTerrain() {
+            const pixelSize = 3;
+            const colors = [
+                { height: 0.0, color: [50, 50, 150] },    // Water
+                { height: 0.35, color: [200, 180, 100] },  // Sand
+                { height: 0.55, color: [100, 150, 50] },   // Grass
+                { height: 0.75, color: [150, 100, 50] },   // Rock
+                { height: 1.0, color: [255, 255, 255] }    // Snow
+            ];
+
+            for (let y = 0; y < 600; y += pixelSize) {
+                for (let x = 0; x < 900; x += pixelSize) {
+                    const value = fBm((x / 900) * 4 + time / 100, (y / 600) * 4, perlinNoise);
+
+                    let color = colors[0].color;
+                    for (let i = 0; i < colors.length; i++) {
+                        if (value >= colors[i].height) {
+                            color = colors[i].color;
+                        }
+                    }
+
+                    ctx.fillStyle = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+                    ctx.fillRect(x, y, pixelSize, pixelSize);
+                }
+            }
+        }
+
+        function drawLSystem() {
+            // L-system tree
+            const axiom = 'F';
+            const rules = {
+                'F': 'FF+[+F-F-F]-[-F+F+F]',
+                '+': '+',
+                '-': '-',
+                '[': '[',
+                ']': ']'
+            };
+
+            let current = axiom;
+            const iterations = Math.floor(octaves);
+
+            for (let i = 0; i < iterations; i++) {
+                let next = '';
+                for (let j = 0; j < current.length; j++) {
+                    next += rules[current[j]] || current[j];
+                }
+                current = next;
+            }
+
+            // Draw
+            ctx.fillStyle = '#1a1a1a';
+            ctx.fillRect(0, 0, 900, 600);
+
+            const stack = [];
+            let x = 450, y = 550;
+            let angle = Math.PI / 2;
+            const length = 50 / Math.pow(1.5, iterations);
+
+            ctx.strokeStyle = '#4ecdc4';
+            ctx.lineWidth = 2;
+
+            for (let i = 0; i < current.length; i++) {
+                const cmd = current[i];
+
+                if (cmd === 'F') {
+                    const nx = x + Math.cos(angle) * length;
+                    const ny = y - Math.sin(angle) * length;
+
+                    ctx.beginPath();
+                    ctx.moveTo(x, y);
+                    ctx.lineTo(nx, ny);
+                    ctx.stroke();
+
+                    x = nx;
+                    y = ny;
+                } else if (cmd === '+') {
+                    angle += Math.PI / 5 * frequency;
+                } else if (cmd === '-') {
+                    angle -= Math.PI / 5 * frequency;
+                } else if (cmd === '[') {
+                    stack.push({ x, y, angle });
+                } else if (cmd === ']') {
+                    if (stack.length > 0) {
+                        const state = stack.pop();
+                        x = state.x;
+                        y = state.y;
+                        angle = state.angle;
+                    }
+                }
+            }
+
+            // Draw stats
+            ctx.fillStyle = '#4ecdc4';
+            ctx.font = 'bold 12px Space Mono';
+            ctx.fillText(`Iterations: ${iterations}`, 20, 30);
+            ctx.fillText(`String length: ${current.length}`, 20, 50);
+        }
+
+        function draw() {
+            ctx.fillStyle = Wiki.colors().bg;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            time++;
+
+            if (noiseType === 'perlin') {
+                drawPerlin();
+            } else if (noiseType === 'worley') {
+                drawWorley();
+            } else if (noiseType === 'terrain') {
+                drawTerrain();
+            } else if (noiseType === 'plant') {
+                drawLSystem();
+            }
+
+            // Info overlay
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+            ctx.fillRect(0, 0, 300, 80);
+
+            ctx.fillStyle = Wiki.colors().fg;
+            ctx.font = 'bold 12px Space Grotesk';
+            ctx.fillText(noiseType.toUpperCase(), 10, 25);
+
+            ctx.font = '11px Space Mono';
+            ctx.fillText(`Frequency: ${frequency.toFixed(1)}`, 10, 45);
+            ctx.fillText(`Octaves: ${octaves}`, 10, 60);
+            ctx.fillText(`Scale: ${(frequency * octaves).toFixed(1)}`, 10, 75);
+
+            ctx.strokeStyle = Wiki.colors().fg;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(0, 0, canvas.width, canvas.height);
+        }
+
+        document.getElementById('perlinBtn').addEventListener('click', () => {
+            noiseType = 'perlin';
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('perlinBtn').classList.add('active');
+        });
+
+        document.getElementById('worleyBtn').addEventListener('click', () => {
+            noiseType = 'worley';
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('worleyBtn').classList.add('active');
+        });
+
+        document.getElementById('terrainBtn').addEventListener('click', () => {
+            noiseType = 'terrain';
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('terrainBtn').classList.add('active');
+        });
+
+        document.getElementById('plantBtn').addEventListener('click', () => {
+            noiseType = 'plant';
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('plantBtn').classList.add('active');
+        });
+
+        document.getElementById('freqSlider').addEventListener('input', (e) => {
+            frequency = parseFloat(e.target.value);
+            document.getElementById('freqLabel').textContent = frequency.toFixed(1);
+        });
+
+        document.getElementById('octaveSlider').addEventListener('input', (e) => {
+            octaves = parseInt(e.target.value);
+            document.getElementById('octaveLabel').textContent = octaves;
+        });
+
+        Wiki.animate(draw);
+    </script>
+
+    <div class="container">
+        <section class="papers-section">
+            <h2>Key Papers</h2>
+            <div class="paper-list">
+                <a href="https://dl.acm.org/doi/10.1145/325165.325247" class="paper-card" target="_blank">
+                    <div class="paper-title">An Image Synthesizer (Perlin Noise)</div>
+                    <div class="paper-authors">Perlin — SIGGRAPH 1985</div>
+                    <div class="paper-desc">程序化生成的基石论文。提出 Perlin Noise 算法，通过梯度插值生成连续、自然的随机纹理。至今仍是地形生成、云层渲染、纹理合成的核心噪声函数，Perlin 凭此获得了奥斯卡技术成就奖。</div>
+                </a>
+                <a href="https://dl.acm.org/doi/10.1145/566654.566636" class="paper-card" target="_blank">
+                    <div class="paper-title">Improving Noise (Simplex Noise)</div>
+                    <div class="paper-authors">Perlin — SIGGRAPH 2002</div>
+                    <div class="paper-desc">Perlin 对自己 1985 年算法的改进。引入 Simplex Noise，将计算复杂度从 O(2^n) 降低到 O(n²)，减少了方向性伪影。在高维噪声生成中效率更高，广泛用于现代游戏的地形和特效。</div>
+                </a>
+                <a href="https://link.springer.com/book/10.1007/978-1-4613-8476-2" class="paper-card" target="_blank">
+                    <div class="paper-title">The Algorithmic Beauty of Plants</div>
+                    <div class="paper-authors">Prusinkiewicz, Lindenmayer — Springer 1990</div>
+                    <div class="paper-desc">L-System 的权威著作。系统阐述了如何用形式文法（Lindenmayer 系统）模拟植物的生长和分枝结构。从简单的重写规则出发，生成极其逼真的树木、花卉和藻类形态，是程序化植被生成的理论基础。</div>
+                </a>
+                <a href="https://dl.acm.org/doi/10.1145/1230100.1230119" class="paper-card" target="_blank">
+                    <div class="paper-title">Example-Based Model Synthesis</div>
+                    <div class="paper-authors">Merrell — I3D 2007</div>
+                    <div class="paper-desc">Wave Function Collapse (WFC) 算法的学术先驱。提出从小型示例模型自动生成大型 3D 结构的方法，将 2D 纹理合成的思想推广到 3D。Maxim Gumin 后来将此思路简化为开源的 WFC 算法，在游戏关卡生成中广泛应用。</div>
+                </a>
+                <a href="https://dl.acm.org/doi/10.1145/604471.604490" class="paper-card" target="_blank">
+                    <div class="paper-title">Real-Time Procedural Generation of 'Pseudo-Infinite' Cities</div>
+                    <div class="paper-authors">Greuter, Parker, Stewart, Leach — GRAPHITE 2003</div>
+                    <div class="paper-desc">实时程序化城市生成的早期重要论文。基于种子和规则系统在运行时生成无限延伸的城市环境，按需创建和销毁建筑物。为后来 No Man's Sky 等游戏的程序化世界生成提供了概念验证。</div>
+                </a>
+                <a href="https://dl.acm.org/doi/10.1145/3592787" class="paper-card" target="_blank">
+                    <div class="paper-title">Large-Scale Terrain Authoring through Interactive Erosion Simulation</div>
+                    <div class="paper-authors">Cordonnier, Galin, Gain, Benes, Guerin, Peytavie, Cani — SIGGRAPH 2023</div>
+                    <div class="paper-desc">将交互式水力侵蚀模拟应用于大规模地形创作。结合 GPU 加速的物理模拟与艺术家的笔刷工具，实现实时可控的地形侵蚀效果，在程序化地形与手工创作之间取得了平衡。</div>
+                </a>
+            </div>
+        </section>
+    </div>
+</body>
+</html>

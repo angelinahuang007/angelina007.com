@@ -1,0 +1,17 @@
+{
+  "title": "IoT Sensor Integration for Digital Twins",
+  "category": "digital-twin",
+  "tags": [
+    "IoT",
+    "sensors",
+    "MQTT",
+    "OPC-UA",
+    "sensor-fusion"
+  ],
+  "description": "Sensor types, communication protocols, sensor fusion techniques, calibration procedures, and data quality assurance for digital twin systems.",
+  "related": [
+    "digital-twin/realtime-data-pipeline",
+    "digital-twin/architecture-overview"
+  ],
+  "order": 3
+}

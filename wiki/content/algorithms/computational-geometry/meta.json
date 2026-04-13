@@ -1,0 +1,19 @@
+{
+  "title": "Computational Geometry Algorithms",
+  "category": "algorithms",
+  "tags": [
+    "algorithms",
+    "geometry",
+    "convex-hull",
+    "voronoi",
+    "delaunay",
+    "SDF"
+  ],
+  "description": "Fundamental computational geometry algorithms including convex hull, Delaunay triangulation, point-in-polygon tests, and signed distance fields.",
+  "related": [
+    "graphics-fundamentals/mesh-operations",
+    "graphics-fundamentals/curves-and-surfaces",
+    "algorithms/spatial-data-structures"
+  ],
+  "order": 2
+}

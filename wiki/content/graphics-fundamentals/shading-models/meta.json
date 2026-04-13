@@ -1,0 +1,20 @@
+{
+  "title": "Shading Models and BRDFs",
+  "category": "graphics-fundamentals",
+  "tags": [
+    "shading",
+    "brdf",
+    "pbr",
+    "lighting",
+    "blinn-phong",
+    "cook-torrance",
+    "microfacet"
+  ],
+  "description": "Comprehensive coverage from Lambert to PBR, including Blinn-Phong, Cook-Torrance BRDF, Fresnel equations, and microfacet theory with mathematical foundations.",
+  "related": [
+    "graphics-fundamentals/pbr-rendering",
+    "graphics-fundamentals/global-illumination",
+    "photography/lighting-theory"
+  ],
+  "order": 3
+}

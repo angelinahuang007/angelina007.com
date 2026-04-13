@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unity Shader Programming</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        body { background: var(--bg-primary); color: var(--text-primary); font-family: 'Space+Grotesk', sans-serif; }
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        .layout { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem; }
+        .panel { background: var(--bg-secondary); border: 1px solid var(--accent-secondary); border-radius: 8px; padding: 1.5rem; }
+        .panel h3 { margin-top: 0; color: var(--accent-primary); }
+        #nodeGraph { border: 2px solid var(--accent-primary); border-radius: 8px; cursor: crosshair; position: relative; overflow: hidden; }
+        .node { position: absolute; width: 100px; height: 60px; background: var(--bg-primary); border: 2px solid var(--accent-secondary); border-radius: 4px; cursor: move; padding: 4px; font-size: 11px; display: flex; flex-direction: column; align-items: center; justify-content: center; user-select: none; }
+        .node.selected { border-color: var(--accent-primary); box-shadow: 0 0 10px var(--accent-primary); }
+        .node-label { font-weight: 600; color: var(--text-primary); }
+        .port { width: 8px; height: 8px; background: var(--accent-primary); border-radius: 50%; position: absolute; cursor: pointer; }
+        .port-in { left: -4px; top: 50%; transform: translateY(-50%); }
+        .port-out { right: -4px; top: 50%; transform: translateY(-50%); }
+        #preview { border: 2px solid var(--accent-primary); border-radius: 8px; width: 100%; height: 250px; }
+        #shaderCode { background: var(--bg-primary); border: 1px solid var(--accent-secondary); border-radius: 4px; padding: 1rem; font-family: 'JetBrains+Mono', monospace; font-size: 9px; max-height: 300px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
+        @media (max-width: 1024px) { .layout { grid-template-columns: 1fr 1fr; } }
+        @media (max-width: 768px) { .layout { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Interactive Shader Node Graph</h1>
+        <p>Connect nodes to build shader graphs. Watch the preview and generated HLSL code update in real-time.</p>
+
+        <div class="layout">
+            <div class="panel">
+                <h3>Node Editor</h3>
+                <div id="nodeGraph" style="width: 100%; height: 400px;"></div>
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.5rem;">Drag nodes • Drag ports to connect</p>
+            </div>
+
+            <div class="panel">
+                <h3>Live Preview</h3>
+                <canvas id="preview"></canvas>
+                <div style="margin-top: 1rem; font-size: 0.9rem;">
+                    <label><input type="checkbox" id="rotatePreview" checked> Rotate Preview</label>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>Generated HLSL</h3>
+                <div id="shaderCode">// Connect nodes to generate shader</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { colors, onThemeChange } = Wiki;
+        const nodeGraph = document.getElementById('nodeGraph');
+        const preview = document.getElementById('preview');
+        const previewCtx = preview.getContext('2d');
+        let previewRotation = 0;
+
+        // Node types
+        const nodeTypes = {
+            color: { label: 'Color', outputs: 1, color: '#FF6B6B' },
+            texture: { label: 'Texture', outputs: 1, color: '#4ECDC4' },
+            normal: { label: 'Normal', outputs: 1, color: '#95E1D3' },
+            uv: { label: 'UV', outputs: 2, color: '#FFE66D' },
+            math: { label: 'Math', inputs: 2, outputs: 1, color: '#95E1D3' },
+            output: { label: 'Output', inputs: 3, outputs: 0, color: '#AA96DA' }
+        };
+
+        let nodes = [
+            { id: 'color1', type: 'color', x: 20, y: 50 },
+            { id: 'texture1', type: 'texture', x: 20, y: 140 },
+            { id: 'normal1', type: 'normal', x: 20, y: 230 },
+            { id: 'uv1', type: 'uv', x: 120, y: 140 },
+            { id: 'math1', type: 'math', x: 220, y: 80 },
+            { id: 'output1', type: 'output', x: 320, y: 140 }
+        ];
+
+        let connections = [];
+        let draggingNode = null;
+        let draggingConnection = null;
+
+        function getThemeColors() {
+            const theme = colors();
+            return {
+                bg: theme['bg-primary'],
+                text: theme['text-primary'],
+                accent: theme['accent-primary'],
+                secondary: theme['accent-secondary']
+            };
+        }
+
+        function drawGraph() {
+            const theme = getThemeColors();
+            const rect = nodeGraph.getBoundingClientRect();
+            const canvas = document.createElement('canvas');
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            const ctx = canvas.getContext('2d');
+
+            ctx.fillStyle = theme.bg;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw grid
+            ctx.strokeStyle = theme.secondary + '33';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < canvas.width; x += 20) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += 20) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+
+            // Draw connections
+            connections.forEach(conn => {
+                const fromNode = nodes.find(n => n.id === conn.from.nodeId);
+                const toNode = nodes.find(n => n.id === conn.to.nodeId);
+                if (fromNode && toNode) {
+                    ctx.strokeStyle = theme.accent;
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(fromNode.x + 100, fromNode.y + 30);
+                    ctx.quadraticCurveTo(
+                        (fromNode.x + toNode.x) / 2 + 50,
+                        (fromNode.y + toNode.y) / 2,
+                        toNode.x, toNode.y + 30
+                    );
+                    ctx.stroke();
+                }
+            });
+
+            // Draw dragging connection
+            if (draggingConnection) {
+                const fromNode = nodes.find(n => n.id === draggingConnection.nodeId);
+                if (fromNode) {
+                    ctx.strokeStyle = theme.secondary;
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([5, 5]);
+                    ctx.beginPath();
+                    ctx.moveTo(fromNode.x + 100, fromNode.y + 30);
+                    ctx.lineTo(draggingConnection.x, draggingConnection.y);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+            }
+
+            nodeGraph.innerHTML = '';
+            nodeGraph.appendChild(canvas);
+
+            // Draw node elements
+            nodes.forEach((node, i) => {
+                const nodeEl = document.createElement('div');
+                nodeEl.className = 'node';
+                nodeEl.style.left = node.x + 'px';
+                nodeEl.style.top = node.y + 'px';
+                nodeEl.style.backgroundColor = nodeTypes[node.type].color + '22';
+                nodeEl.style.borderColor = nodeTypes[node.type].color;
+                nodeEl.innerHTML = `<div class="node-label">${nodeTypes[node.type].label}</div>`;
+
+                // Input port
+                if (nodeTypes[node.type].inputs) {
+                    const portIn = document.createElement('div');
+                    portIn.className = 'port port-in';
+                    portIn.style.backgroundColor = nodeTypes[node.type].color;
+                    nodeEl.appendChild(portIn);
+                }
+
+                // Output port
+                if (nodeTypes[node.type].outputs) {
+                    const portOut = document.createElement('div');
+                    portOut.className = 'port port-out';
+                    portOut.style.backgroundColor = nodeTypes[node.type].color;
+                    portOut.addEventListener('mousedown', (e) => {
+                        draggingConnection = { nodeId: node.id, x: e.clientX - nodeGraph.getBoundingClientRect().left, y: e.clientY - nodeGraph.getBoundingClientRect().top };
+                    });
+                    nodeEl.appendChild(portOut);
+                }
+
+                nodeEl.addEventListener('mousedown', (e) => {
+                    if (!e.target.classList.contains('port')) {
+                        draggingNode = { node, offsetX: e.clientX - node.x - nodeGraph.getBoundingClientRect().left, offsetY: e.clientY - node.y - nodeGraph.getBoundingClientRect().top };
+                    }
+                });
+
+                nodeGraph.appendChild(nodeEl);
+            });
+        }
+
+        function updateShaderCode() {
+            let code = 'Shader "Custom/Generated" {\n';
+            code += '  Properties {\n';
+            nodes.forEach(node => {
+                if (node.type === 'color') code += '    _MainColor ("Color", Color) = (1,1,1,1)\n';
+                if (node.type === 'texture') code += '    _MainTex ("Texture", 2D) = "white" {}\n';
+            });
+            code += '  }\n  SubShader {\n    Pass {\n      HLSLPROGRAM\n';
+            code += '      #pragma vertex vert\n      #pragma fragment frag\n\n';
+            code += '      float4 vert(float4 pos : POSITION) : SV_POSITION {\n        return TransformObjectToHClip(pos);\n      }\n\n';
+            code += '      float4 frag() : SV_Target {\n';
+            code += '        float4 finalColor = _MainColor;\n';
+            connections.forEach(conn => {
+                code += '        finalColor *= tex2D(_MainTex, uv);\n';
+            });
+            code += '        return finalColor;\n      }\n';
+            code += '      ENDHLSL\n    }\n  }\n}\n';
+            document.getElementById('shaderCode').textContent = code;
+        }
+
+        function drawPreview() {
+            previewCtx.fillStyle = getThemeColors().bg;
+            previewCtx.fillRect(0, 0, preview.width, preview.height);
+
+            const theme = getThemeColors();
+            const centerX = preview.width / 2;
+            const centerY = preview.height / 2;
+            const radius = 60;
+
+            // Draw sphere
+            const gradient = previewCtx.createRadialGradient(centerX - 20, centerY - 20, 10, centerX, centerY, radius);
+
+            // Calculate color from connected nodes
+            let r = 0.7, g = 0.7, b = 0.7;
+            const colorNode = nodes.find(n => n.type === 'color');
+            if (colorNode && connections.some(c => c.from.nodeId === colorNode.id)) {
+                r = 1.0; g = 0.4; b = 0.4;
+            }
+
+            gradient.addColorStop(0, `rgba(${Math.floor(r*255)}, ${Math.floor(g*255)}, ${Math.floor(b*255)}, 1)`);
+            gradient.addColorStop(1, `rgba(${Math.floor(r*128)}, ${Math.floor(g*128)}, ${Math.floor(b*128)}, 0.8)`);
+
+            previewCtx.fillStyle = gradient;
+            previewCtx.save();
+            previewCtx.translate(centerX, centerY);
+            previewCtx.rotate(previewRotation);
+            previewCtx.beginPath();
+            previewCtx.arc(0, 0, radius, 0, Math.PI * 2);
+            previewCtx.fill();
+            previewCtx.restore();
+
+            // Highlight
+            previewCtx.fillStyle = `rgba(255, 255, 255, 0.3)`;
+            previewCtx.beginPath();
+            previewCtx.arc(centerX - 25, centerY - 25, 20, 0, Math.PI * 2);
+            previewCtx.fill();
+
+            if (document.getElementById('rotatePreview').checked) {
+                previewRotation += 0.02;
+            }
+            requestAnimationFrame(drawPreview);
+        }
+
+        document.addEventListener('mousemove', (e) => {
+            if (draggingNode) {
+                draggingNode.node.x = e.clientX - nodeGraph.getBoundingClientRect().left - draggingNode.offsetX;
+                draggingNode.node.y = e.clientY - nodeGraph.getBoundingClientRect().top - draggingNode.offsetY;
+                drawGraph();
+            }
+            if (draggingConnection) {
+                draggingConnection.x = e.clientX - nodeGraph.getBoundingClientRect().left;
+                draggingConnection.y = e.clientY - nodeGraph.getBoundingClientRect().top;
+                drawGraph();
+            }
+        });
+
+        document.addEventListener('mouseup', (e) => {
+            if (draggingConnection) {
+                const nodeEl = e.target.closest('.node');
+                if (nodeEl) {
+                    const toNode = nodes.find(n => n.id === nodeEl.getAttribute('data-id'));
+                    if (toNode && toNode.type === 'output') {
+                        connections.push({ from: { nodeId: draggingConnection.nodeId }, to: { nodeId: toNode.id } });
+                    }
+                }
+                draggingConnection = null;
+                drawGraph();
+            }
+            draggingNode = null;
+        });
+
+        nodeGraph.addEventListener('mousedown', (e) => {
+            const nodeEl = e.target.closest('.node');
+            if (nodeEl) {
+                nodes.forEach(n => {
+                    const el = document.querySelector(`[data-id="${n.id}"]`);
+                    if (el) el.classList.remove('selected');
+                });
+                nodeEl.classList.add('selected');
+                const selectedNode = nodes.find(n => n.id === nodeEl.getAttribute('data-id'));
+                nodeEl.setAttribute('data-id', selectedNode.id);
+            }
+        });
+
+        nodes.forEach(n => {
+            const nodeEl = document.querySelector(`[data-id="${n.id}"]`);
+            if (nodeEl) nodeEl.setAttribute('data-id', n.id);
+        });
+
+        onThemeChange(() => {
+            drawGraph();
+        });
+
+        drawGraph();
+        updateShaderCode();
+        drawPreview();
+    </script>
+</body>
+</html>

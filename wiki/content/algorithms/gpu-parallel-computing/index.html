@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPU Parallel Computing</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        body { background: var(--bg-dark); color: var(--fg-light); }
+        .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+        .controls { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; align-items: center; }
+        button { padding: 8px 16px; background: var(--accent); color: var(--bg-dark); border: none; border-radius: 4px; cursor: pointer; font-family: 'Space Mono'; font-weight: 700; }
+        button:hover { opacity: 0.8; }
+        #canvas { border: 1px solid var(--fg-dark); background: var(--bg-darker); display: block; margin: 0 auto; }
+        .info { font-size: 0.9em; color: var(--fg-muted); margin-top: 10px; font-family: 'Space Mono'; }
+        .slider-group { display: flex; gap: 10px; align-items: center; }
+        input[type="range"] { min-width: 200px; }
+        input[type="number"] { width: 80px; padding: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>GPU Parallel Computing</h1>
+        <p>Interactive visualization of parallel execution, thread divergence, reduction, and prefix sum algorithms.</p>
+
+        <div class="controls">
+            <button id="reductionBtn">Parallel Reduction</button>
+            <button id="divergenceBtn">Warp Divergence</button>
+            <button id="prefixBtn">Prefix Sum</button>
+            <button id="startBtn">Start Animation</button>
+            <div class="slider-group">
+                <label>Threads:</label>
+                <input type="range" id="threadSlider" min="4" max="512" value="64" step="4">
+                <input type="number" id="threadCount" value="64" disabled>
+            </div>
+        </div>
+
+        <canvas id="canvas" width="800" height="500"></canvas>
+        <div class="info" id="info">Parallel Reduction: Watch values combine level by level</div>
+    </div>
+
+    <script>
+        const canvas = Wiki.createCanvas('canvas', 800, 500);
+        const ctx = canvas.getContext('2d');
+        let numThreads = 64;
+        let currentMode = 'reduction';
+        let isAnimating = false;
+        let animationFrame = 0;
+        let threadValues = [];
+        let threadStates = [];
+
+        function initializeThreads() {
+            threadValues = Array(numThreads).fill().map(() => Math.floor(Math.random() * 100) + 1);
+            threadStates = Array(numThreads).fill('idle');
+        }
+
+        function drawThreads(x, y, width, height, values, states) {
+            const threadWidth = width / numThreads;
+            const maxVal = Math.max(...values);
+
+            values.forEach((val, i) => {
+                const px = x + i * threadWidth;
+                const threadHeight = (val / maxVal) * height * 0.7;
+                const py = y + height - threadHeight;
+
+                // Color by state
+                if (states[i] === 'active') {
+                    ctx.fillStyle = '#00d4ff';
+                } else if (states[i] === 'inactive') {
+                    ctx.fillStyle = '#666';
+                } else if (states[i] === 'done') {
+                    ctx.fillStyle = '#4ecdc4';
+                } else {
+                    ctx.fillStyle = '#ffe66d';
+                }
+
+                ctx.fillRect(px, py, threadWidth - 1, threadHeight);
+                ctx.fillStyle = '#333';
+                ctx.font = '8px Space Mono';
+                ctx.fillText(val, px + 2, py + 10);
+            });
+        }
+
+        function animateReduction() {
+            if (!isAnimating) return;
+
+            const steps = Math.log2(numThreads);
+            const step = Math.floor(animationFrame / 20) % (steps + 1);
+            const progress = (animationFrame % 20) / 20;
+
+            threadStates = Array(numThreads).fill('done');
+
+            if (step < steps) {
+                const stride = Math.pow(2, step);
+                for (let i = 0; i < numThreads; i += stride * 2) {
+                    if (i + stride < numThreads) {
+                        threadStates[i] = 'active';
+                        threadStates[i + stride] = 'active';
+                        const val1 = threadValues[i];
+                        const val2 = threadValues[i + stride];
+                        threadValues[i] = Math.round(val1 + (val2 - val1) * progress);
+                    }
+                }
+            }
+
+            animationFrame++;
+            if (animationFrame > steps * 20 + 40) {
+                animationFrame = 0;
+                initializeThreads();
+            }
+        }
+
+        function animateDivergence() {
+            if (!isAnimating) return;
+
+            const period = 60;
+            const phase = animationFrame % period;
+            const t = phase / period;
+
+            threadStates = Array(numThreads).fill('idle');
+
+            // First half takes different path
+            for (let i = 0; i < numThreads / 2; i++) {
+                threadStates[i] = 'active';
+                threadValues[i] = Math.round(threadValues[i] + Math.sin(t * Math.PI) * 10);
+            }
+            // Second half diverges
+            for (let i = numThreads / 2; i < numThreads; i++) {
+                threadStates[i] = 'inactive';
+            }
+
+            animationFrame++;
+            if (animationFrame > period * 3) {
+                animationFrame = 0;
+                initializeThreads();
+            }
+        }
+
+        function animatePrefixSum() {
+            if (!isAnimating) return;
+
+            const steps = Math.log2(numThreads);
+            const step = Math.floor(animationFrame / 20) % (steps + 1);
+            const progress = (animationFrame % 20) / 20;
+
+            threadStates = Array(numThreads).fill('done');
+
+            if (step < steps) {
+                const stride = Math.pow(2, step);
+                for (let i = stride; i < numThreads; i++) {
+                    threadStates[i] = 'active';
+                    const val = threadValues[i];
+                    const prevVal = i >= stride ? threadValues[i - stride] : 0;
+                    threadValues[i] = Math.round(val + (prevVal - val) * progress);
+                }
+            }
+
+            animationFrame++;
+            if (animationFrame > steps * 20 + 40) {
+                animationFrame = 0;
+                initializeThreads();
+            }
+        }
+
+        function draw() {
+            ctx.fillStyle = Wiki.colors().bg;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = Wiki.colors().fg;
+            ctx.font = 'bold 16px Space Grotesk';
+            ctx.fillText(`${currentMode.toUpperCase()} - ${numThreads} threads`, 20, 30);
+
+            if (currentMode === 'reduction') {
+                animateReduction();
+                ctx.fillStyle = Wiki.colors().fg;
+                ctx.font = '12px Space Mono';
+                ctx.fillText('Level-by-level summation of parallel values', 20, 70);
+                drawThreads(20, 100, 860, 400, threadValues, threadStates);
+            } else if (currentMode === 'divergence') {
+                animateDivergence();
+                ctx.fillStyle = Wiki.colors().fg;
+                ctx.font = '12px Space Mono';
+                ctx.fillText('Blue threads active, Gray threads stalled due to branch divergence', 20, 70);
+                drawThreads(20, 100, 860, 400, threadValues, threadStates);
+            } else if (currentMode === 'prefix') {
+                animatePrefixSum();
+                ctx.fillStyle = Wiki.colors().fg;
+                ctx.font = '12px Space Mono';
+                ctx.fillText('Inclusive prefix sum: each thread accumulates previous values', 20, 70);
+                drawThreads(20, 100, 860, 400, threadValues, threadStates);
+            }
+
+            ctx.strokeStyle = Wiki.colors().fg;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(0, 0, canvas.width, canvas.height);
+        }
+
+        document.getElementById('threadSlider').addEventListener('input', (e) => {
+            numThreads = parseInt(e.target.value);
+            if (numThreads % 4 !== 0) numThreads = Math.round(numThreads / 4) * 4;
+            document.getElementById('threadCount').value = numThreads;
+            threadValues = [];
+            threadStates = [];
+            initializeThreads();
+            draw();
+        });
+
+        document.getElementById('reductionBtn').addEventListener('click', () => {
+            currentMode = 'reduction';
+            initializeThreads();
+            animationFrame = 0;
+            document.getElementById('info').textContent = 'Parallel Reduction: values combine level by level';
+            draw();
+        });
+
+        document.getElementById('divergenceBtn').addEventListener('click', () => {
+            currentMode = 'divergence';
+            initializeThreads();
+            animationFrame = 0;
+            document.getElementById('info').textContent = 'Warp Divergence: some threads stall when branches differ';
+            draw();
+        });
+
+        document.getElementById('prefixBtn').addEventListener('click', () => {
+            currentMode = 'prefix';
+            initializeThreads();
+            animationFrame = 0;
+            document.getElementById('info').textContent = 'Prefix Sum: cumulative values with log(n) steps';
+            draw();
+        });
+
+        document.getElementById('startBtn').addEventListener('click', () => {
+            isAnimating = !isAnimating;
+            document.getElementById('startBtn').textContent = isAnimating ? 'Pause' : 'Resume';
+            if (isAnimating) {
+                Wiki.animate(draw);
+            }
+        });
+
+        initializeThreads();
+        draw();
+    </script>
+</body>
+</html>

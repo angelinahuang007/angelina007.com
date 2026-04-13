@@ -1,0 +1,17 @@
+{
+  "title": "Blender Modeling Workflow",
+  "category": "blender",
+  "order": 1,
+  "tags": [
+    "blender",
+    "modeling",
+    "mesh",
+    "retopology",
+    "hard-surface"
+  ],
+  "description": "Comprehensive guide to mesh modeling paradigms in Blender, including edit mode operations, modifier stacks, non-destructive workflows, and specialized hard-surface and organic modeling techniques.",
+  "related": [
+    "graphics-fundamentals/mesh-operations",
+    "graphics-fundamentals/curves-and-surfaces"
+  ]
+}

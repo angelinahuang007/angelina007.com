@@ -1,0 +1,10 @@
+{
+  "title": "Niagara Particles",
+  "category": "game-engines/unreal",
+  "tags": ["unreal", "niagara", "particles", "effects", "emitter", "gpu", "cpu"],
+  "description": "Interactive Niagara particle system emitter with live parameter controls. Switch between fire, snow, sparks, and smoke presets.",
+  "related": [
+    "game-engines/unreal/architecture-blueprints"
+  ],
+  "order": 4
+}

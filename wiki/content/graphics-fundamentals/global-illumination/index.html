@@ -1,0 +1,1216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global Illumination</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        body {
+            padding: 20px;
+            font-family: 'Space Grotesk', sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        h1 { margin-bottom: 10px; }
+        .intro-text { font-size: 14px; color: var(--text-secondary); margin-bottom: 30px; line-height: 1.6; }
+
+        /* ===== Comparison Section ===== */
+        .comparison-section {
+            margin: 40px 0;
+        }
+
+        .comparison-title {
+            text-align: center;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: var(--primary);
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .comparison-canvas-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .comparison-label {
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: var(--primary);
+        }
+
+        canvas.comparison-canvas {
+            display: block;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-secondary);
+            max-width: 100%;
+            height: auto;
+        }
+
+        .comparison-description {
+            font-size: 13px;
+            margin-top: 10px;
+            line-height: 1.5;
+            color: var(--text-secondary);
+        }
+
+        /* ===== Concept Diagrams ===== */
+        .concept-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 40px 0;
+        }
+
+        .concept-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .concept-card h3 {
+            margin-top: 0;
+            color: var(--primary);
+            font-size: 16px;
+        }
+
+        .concept-canvas {
+            display: block;
+            margin: 15px 0;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: var(--bg);
+        }
+
+        .concept-text {
+            font-size: 13px;
+            line-height: 1.5;
+            color: var(--text-secondary);
+            margin: 10px 0;
+        }
+
+        /* ===== Techniques Tabs ===== */
+        .techniques-section {
+            margin: 40px 0;
+        }
+
+        .technique-tabs {
+            display: flex;
+            gap: 10px;
+            border-bottom: 2px solid var(--border-color);
+            margin-bottom: 20px;
+            overflow-x: auto;
+        }
+
+        .technique-tab {
+            padding: 12px 20px;
+            background: none;
+            border: none;
+            border-bottom: 3px solid transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .technique-tab:hover {
+            color: var(--primary);
+        }
+
+        .technique-tab.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        .technique-content {
+            display: none;
+        }
+
+        .technique-content.active {
+            display: block;
+        }
+
+        .technique-main {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .technique-canvas-wrapper {
+            display: flex;
+            flex-direction: column;
+        }
+
+        canvas.technique-canvas {
+            display: block;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-secondary);
+            max-width: 100%;
+            height: auto;
+            margin-bottom: 10px;
+        }
+
+        .technique-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .info-card {
+            background: var(--bg-secondary);
+            border-left: 4px solid var(--accent);
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+        }
+
+        .info-card h4 {
+            margin-top: 0;
+            color: var(--primary);
+            font-size: 14px;
+        }
+
+        .info-card p {
+            margin: 8px 0;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .pros-cons {
+            font-size: 12px;
+        }
+
+        .pros-cons strong {
+            color: var(--accent);
+            display: block;
+            margin-top: 8px;
+        }
+
+        .control-group {
+            margin: 15px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .control-group label {
+            min-width: 120px;
+            font-weight: 500;
+            font-size: 13px;
+        }
+
+        .control-group input[type="range"] {
+            flex: 1;
+        }
+
+        .control-group span {
+            font-size: 12px;
+            min-width: 40px;
+            text-align: right;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .animation-status {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 10px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* ===== Responsive ===== */
+        @media (max-width: 768px) {
+            .comparison-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .concept-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .technique-main {
+                grid-template-columns: 1fr;
+            }
+
+            .technique-tabs {
+                gap: 5px;
+            }
+
+            .technique-tab {
+                padding: 10px 15px;
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Global Illumination</h1>
+    <p class="intro-text">
+        Global Illumination (GI) simulates how light bounces around a scene, creating realistic shadows, color bleeding, and ambient lighting.
+        Unlike direct lighting alone (which only shows light from the source), GI captures indirect light that reflects off surfaces,
+        making scenes feel more naturally lit and three-dimensional.
+    </p>
+
+    <!-- SECTION 1: Direct Lighting vs Global Illumination Comparison -->
+    <div class="comparison-section">
+        <div class="comparison-title">Direct Lighting vs Global Illumination</div>
+        <div class="comparison-grid">
+            <div class="comparison-canvas-wrapper">
+                <div class="comparison-label">Direct Lighting Only</div>
+                <canvas id="directCanvas" class="comparison-canvas" width="350" height="280"></canvas>
+                <div class="comparison-description">
+                    Hard shadows, no light bouncing between surfaces, dark corners without detail.
+                </div>
+            </div>
+            <div class="comparison-canvas-wrapper">
+                <div class="comparison-label">With Global Illumination</div>
+                <canvas id="giCanvas" class="comparison-canvas" width="350" height="280"></canvas>
+                <div class="comparison-description">
+                    Soft shadows, light color bleeding, illuminated corners, natural ambient lighting.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECTION 2: Core GI Concepts -->
+    <div class="concept-grid">
+        <div class="concept-card">
+            <h3>Color Bleeding (Light Bounces)</h3>
+            <canvas id="colorBleedCanvas" class="concept-canvas" width="100%" height="200"></canvas>
+            <p class="concept-text">
+                <strong>What it is:</strong> When light hits a colored surface (like a red wall), it bounces that color onto nearby surfaces.
+                A white object next to a red wall will receive a pinkish glow from the reflected light.
+            </p>
+            <p class="concept-text">
+                <strong>Why it matters:</strong> Creates realistic color interaction between objects and makes scenes feel cohesive and natural.
+            </p>
+        </div>
+
+        <div class="concept-card">
+            <h3>Ambient Occlusion</h3>
+            <canvas id="aoCanvas" class="concept-canvas" width="100%" height="200"></canvas>
+            <p class="concept-text">
+                <strong>What it is:</strong> Corners, crevices, and enclosed areas get darker because they receive less indirect light from all directions.
+            </p>
+            <p class="concept-text">
+                <strong>Why it matters:</strong> Adds depth and definition to scenes without complex light calculations.
+            </p>
+        </div>
+
+        <div class="concept-card">
+            <h3>Caustics</h3>
+            <canvas id="causticsCanvas" class="concept-canvas" width="100%" height="200"></canvas>
+            <p class="concept-text">
+                <strong>What it is:</strong> Light focused through glass or water creates bright, patterned shadows. Watch how light bends through a glass sphere.
+            </p>
+            <p class="concept-text">
+                <strong>Why it matters:</strong> Creates striking visual effects under water or through transparent objects.
+            </p>
+        </div>
+
+        <div class="concept-card">
+            <h3>Subsurface Scattering</h3>
+            <canvas id="sssCanvas" class="concept-canvas" width="100%" height="200"></canvas>
+            <p class="concept-text">
+                <strong>What it is:</strong> Light penetrates semi-transparent materials (like skin, wax, or marble) and scatters inside, then exits as a glow.
+            </p>
+            <p class="concept-text">
+                <strong>Why it matters:</strong> Essential for realistic skin, plants, and translucent materials.
+            </p>
+        </div>
+    </div>
+
+    <!-- SECTION 3: GI Techniques -->
+    <div class="techniques-section">
+        <h2>GI Techniques & Algorithms</h2>
+        <p style="color: var(--text-secondary); font-size: 14px;">
+            Different techniques balance quality, speed, and complexity. Choose the tabs below to explore each approach.
+        </p>
+
+        <div class="technique-tabs">
+            <button class="technique-tab active" data-technique="path-tracing">Path Tracing</button>
+            <button class="technique-tab" data-technique="radiosity">Radiosity</button>
+            <button class="technique-tab" data-technique="light-probes">Light Probes</button>
+            <button class="technique-tab" data-technique="screen-space-gi">Screen-Space GI</button>
+        </div>
+
+        <!-- Path Tracing Tab -->
+        <div id="path-tracing" class="technique-content active">
+            <div class="technique-main">
+                <div class="technique-canvas-wrapper">
+                    <canvas id="pathTracingCanvas" class="technique-canvas" width="100%" height="300"></canvas>
+                    <div class="control-group">
+                        <label>Samples:</label>
+                        <input type="range" id="ptSamplesSlider" min="1" max="256" step="1" value="64">
+                        <span id="ptSamplesValue">64</span>
+                    </div>
+                    <div class="control-group">
+                        <label>Max Bounces:</label>
+                        <input type="range" id="ptBouncesSlider" min="1" max="8" step="1" value="4">
+                        <span id="ptBouncesValue">4</span>
+                    </div>
+                    <div class="animation-status" id="ptStatus">Ready to render</div>
+                </div>
+
+                <div class="technique-info">
+                    <div class="info-card">
+                        <h4>How It Works</h4>
+                        <p>
+                            Traces light rays through a scene using Monte Carlo integration.
+                            For each pixel, multiple random paths are traced. Each path bounces off surfaces,
+                            accumulating color until it hits a light or escapes the scene. More samples = less noise.
+                        </p>
+                    </div>
+
+                    <div class="info-card">
+                        <h4>Convergence</h4>
+                        <p>
+                            As samples increase, random noise decreases and the image converges toward the mathematically correct solution.
+                            Noise roughly follows the square root of samples: 2x samples = sqrt(2) ≈ 1.4x less noise.
+                        </p>
+                    </div>
+
+                    <div class="info-card">
+                        <h4>Strengths & Weaknesses</h4>
+                        <p class="pros-cons">
+                            <strong>✓ Photo-realistic quality</strong>
+                            <strong>✓ Handles any material/geometry</strong>
+                            <strong>✓ Mathematically unbiased</strong>
+                            <strong>✗ Slow for interactive use</strong>
+                            <strong>✗ High noise at low samples</strong>
+                        </p>
+                    </div>
+
+                    <div class="info-card">
+                        <h4>Real-World Use</h4>
+                        <p>Film rendering (Pixar, ILM), architectural visualization, high-end game cinematics.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Radiosity Tab -->
+        <div id="radiosity" class="technique-content">
+            <div class="technique-main">
+                <div class="technique-canvas-wrapper">
+                    <canvas id="radiusityCanvas" class="technique-canvas" width="100%" height="300"></canvas>
+                    <div class="control-group">
+                        <label>Bounces:</label>
+                        <input type="range" id="radBouncesSlider" min="1" max="5" step="1" value="2">
+                        <span id="radBouncesValue">2</span>
+                    </div>
+                    <div class="animation-status" id="radStatus">Ready to render</div>
+                </div>
+
+                <div class="technique-info">
+                    <div class="info-card">
+                        <h4>How It Works</h4>
+                        <p>
+                            Divides surfaces into patches and calculates energy transfer between them.
+                            View-independent: computed once, then rendered from any angle instantly.
+                            Patch color accumulates light from all bounces.
+                        </p>
+                    </div>
+
+                    <div class="info-card">
+                        <h4>Key Advantage</h4>
+                        <p>
+                            Pre-computed results are view-independent, so you can rotate the camera without recalculation.
+                            No noise—deterministic, smooth results immediately.
+                        </p>
+                    </div>
+
+                    <div class="info-card">
+                        <h4>Strengths & Weaknesses</h4>
+                        <p class="pros-cons">
+                            <strong>✓ View-independent</strong>
+                            <strong>✓ No noise, smooth results</strong>
+                            <strong>✓ Fast interactive rendering</strong>
+                            <strong>✗ Complex math (form factors)</strong>
+                            <strong>✗ Poor with dynamic objects</strong>
+                        </p>
+                    </div>
+
+                    <div class="info-card">
+                        <h4>Real-World Use</h4>
+                        <p>Architectural pre-visualization, static game environments, pre-rendered cutscenes.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Light Probes Tab -->
+        <div id="light-probes" class="technique-content">
+            <div class="technique-main">
+                <div class="technique-canvas-wrapper">
+                    <canvas id="probsCanvas" class="technique-canvas" width="100%" height="300"></canvas>
+                    <div class="control-group">
+                        <label>Probes:</label>
+                        <input type="range" id="probeCountSlider" min="4" max="25" step="1" value="9">
+                        <span id="probeCountValue">9</span>
+                    </div>
+                    <div class="animation-status" id="probStatus">Ready to render</div>
+                </div>
+
+                <div class="technique-info">
+                    <div class="info-card">
+                        <h4>How It Works</h4>
+                        <p>
+                            Places invisible spheres throughout a scene that sample incoming light from all directions.
+                            Objects interpolate between nearby probes to estimate indirect lighting.
+                            Fast enough for real-time games.
+                        </p>
+                    </div>
+
+                    <div class="info-card">
+                        <h4>Probe Placement</h4>
+                        <p>
+                            Grid-based (simple, uniform), or adaptive (more in complex areas).
+                            Denser grids capture more detail but cost more memory and computation.
+                        </p>
+                    </div>
+
+                    <div class="info-card">
+                        <h4>Strengths & Weaknesses</h4>
+                        <p class="pros-cons">
+                            <strong>✓ Real-time performance</strong>
+                            <strong>✓ Supports dynamic objects</strong>
+                            <strong>✓ Good for games</strong>
+                            <strong>✗ Interpolation artifacts</strong>
+                            <strong>✗ Memory for many probes</strong>
+                        </p>
+                    </div>
+
+                    <div class="info-card">
+                        <h4>Real-World Use</h4>
+                        <p>Game engines (Unity, Unreal), VR, interactive experiences where speed matters.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Screen-Space GI Tab -->
+        <div id="screen-space-gi" class="technique-content">
+            <div class="technique-main">
+                <div class="technique-canvas-wrapper">
+                    <canvas id="ssgiCanvas" class="technique-canvas" width="100%" height="300"></canvas>
+                    <div class="control-group">
+                        <label>Intensity:</label>
+                        <input type="range" id="ssgiIntensitySlider" min="0.1" max="2" step="0.1" value="1">
+                        <span id="ssgiIntensityValue">1.0</span>
+                    </div>
+                    <div class="animation-status" id="ssgiStatus">Ready to render</div>
+                </div>
+
+                <div class="technique-info">
+                    <div class="info-card">
+                        <h4>How It Works</h4>
+                        <p>
+                            Uses existing depth buffer from the rendered scene to approximate occlusion.
+                            No pre-computation needed—works on already-rendered pixels.
+                            Fast but can only see screen-space geometry.
+                        </p>
+                    </div>
+
+                    <div class="info-card">
+                        <h4>Screen-Space Limitation</h4>
+                        <p>
+                            Only geometry visible on screen contributes. Off-screen objects and complex bounces are missed.
+                            Best combined with other GI techniques for better results.
+                        </p>
+                    </div>
+
+                    <div class="info-card">
+                        <h4>Strengths & Weaknesses</h4>
+                        <p class="pros-cons">
+                            <strong>✓ Very fast (GPU-friendly)</strong>
+                            <strong>✓ No pre-computation</strong>
+                            <strong>✓ Works with dynamic geometry</strong>
+                            <strong>✗ Artifacts at screen edges</strong>
+                            <strong>✗ No off-screen occlusion</strong>
+                        </p>
+                    </div>
+
+                    <div class="info-card">
+                        <h4>Real-World Use</h4>
+                        <p>Real-time ray tracing (RTX), modern game engines (mainly for ambient occlusion), VR.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const colors = Wiki.colors();
+
+        // ===== COMPARISON CANVASES =====
+        function drawDirectLighting() {
+            const canvas = document.getElementById('directCanvas');
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width, h = canvas.height;
+
+            // Background
+            ctx.fillStyle = colors.bg;
+            ctx.fillRect(0, 0, w, h);
+
+            // Ground
+            ctx.fillStyle = '#888';
+            ctx.fillRect(0, h - 80, w, 80);
+
+            // Wall
+            ctx.fillStyle = '#aaa';
+            ctx.fillRect(0, 0, w, h - 80);
+
+            // Light source
+            ctx.fillStyle = '#ffff00';
+            ctx.beginPath();
+            ctx.arc(w * 0.3, 40, 15, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Objects
+            ctx.fillStyle = Wiki.colors().text;
+            ctx.fillRect(w * 0.5, h - 120, 40, 40);
+            ctx.beginPath();
+            ctx.arc(w * 0.75, h - 100, 25, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Hard shadows
+            ctx.fillStyle = 'rgba(0,0,0,0.4)';
+            ctx.fillRect(w * 0.5 + 15, h - 80, 30, 15);
+            ctx.beginPath();
+            ctx.arc(w * 0.75 + 12, h - 80, 18, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function drawWithGI() {
+            const canvas = document.getElementById('giCanvas');
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width, h = canvas.height;
+
+            // Background (darker walls receive some color bleeding)
+            ctx.fillStyle = colors.bg;
+            ctx.fillRect(0, 0, w, h);
+
+            // Ground with gradient
+            const groundGrad = ctx.createLinearGradient(0, h - 80, 0, h);
+            groundGrad.addColorStop(0, '#999');
+            groundGrad.addColorStop(1, '#777');
+            ctx.fillStyle = groundGrad;
+            ctx.fillRect(0, h - 80, w, 80);
+
+            // Wall with color bleeding (slight warmth from light)
+            const wallGrad = ctx.createLinearGradient(w * 0.2, 0, w, 0);
+            wallGrad.addColorStop(0, '#c9a9a0');
+            wallGrad.addColorStop(1, '#a9a9a9');
+            ctx.fillStyle = wallGrad;
+            ctx.fillRect(0, 0, w, h - 80);
+
+            // Light source
+            ctx.fillStyle = '#ffff00';
+            ctx.beginPath();
+            ctx.arc(w * 0.3, 40, 15, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Objects
+            ctx.fillStyle = Wiki.colors().text;
+            ctx.fillRect(w * 0.5, h - 120, 40, 40);
+            ctx.beginPath();
+            ctx.arc(w * 0.75, h - 100, 25, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Soft shadows with ambient occlusion
+            const shadowGrad1 = ctx.createRadialGradient(w * 0.5 + 20, h - 80, 0, w * 0.5 + 20, h - 80, 40);
+            shadowGrad1.addColorStop(0, 'rgba(0,0,0,0.3)');
+            shadowGrad1.addColorStop(1, 'rgba(0,0,0,0.1)');
+            ctx.fillStyle = shadowGrad1;
+            ctx.fillRect(w * 0.35, h - 100, 60, 25);
+
+            const shadowGrad2 = ctx.createRadialGradient(w * 0.75 + 15, h - 80, 0, w * 0.75 + 15, h - 80, 50);
+            shadowGrad2.addColorStop(0, 'rgba(0,0,0,0.25)');
+            shadowGrad2.addColorStop(1, 'rgba(0,0,0,0.05)');
+            ctx.fillStyle = shadowGrad2;
+            ctx.beginPath();
+            ctx.arc(w * 0.75 + 15, h - 75, 30, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Glow in corner (ambient occlusion darker at corner)
+            const aoGrad = ctx.createRadialGradient(0, h, 0, 0, h, 150);
+            aoGrad.addColorStop(0, 'rgba(0,0,0,0.25)');
+            aoGrad.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = aoGrad;
+            ctx.fillRect(0, h - 100, 100, 100);
+        }
+
+        // ===== CONCEPT CANVASES =====
+        function drawColorBleed() {
+            const canvas = document.getElementById('colorBleedCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width, h = canvas.height;
+
+            ctx.fillStyle = colors.bg;
+            ctx.fillRect(0, 0, w, h);
+
+            // Red wall
+            ctx.fillStyle = '#d94545';
+            ctx.fillRect(10, 10, 80, h - 20);
+
+            // Arrow from wall
+            ctx.strokeStyle = colors.accent;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(90, h / 2);
+            ctx.lineTo(120, h / 2);
+            ctx.stroke();
+
+            // Light bouncing (simplified ray)
+            ctx.strokeStyle = '#ff9999';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.moveTo(50, h / 2 - 30);
+            ctx.lineTo(50, h / 2);
+            ctx.lineTo(120, h / 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // White surface receiving pink glow
+            ctx.fillStyle = Wiki.colors().text;
+            ctx.fillRect(120, 10, 80, h - 20);
+
+            // Pink glow on white surface
+            const pinkGlow = ctx.createLinearGradient(120, h / 2, 200, h / 2);
+            pinkGlow.addColorStop(0, 'rgba(200, 100, 100, 0.4)');
+            pinkGlow.addColorStop(1, 'rgba(200, 100, 100, 0)');
+            ctx.fillStyle = pinkGlow;
+            ctx.fillRect(120, 10, 80, h - 20);
+
+            // Labels
+            ctx.fillStyle = colors.text;
+            ctx.font = '11px JetBrains Mono';
+            ctx.fillText('Red Wall', 25, h - 5);
+            ctx.fillText('Color Bleed', 130, h - 5);
+        }
+
+        function drawAO() {
+            const canvas = document.getElementById('aoCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width, h = canvas.height;
+
+            ctx.fillStyle = colors.bg;
+            ctx.fillRect(0, 0, w, h);
+
+            // Ground
+            ctx.fillStyle = '#888';
+            ctx.fillRect(0, h - 60, w, 60);
+
+            // Box on ground
+            ctx.fillStyle = '#ccc';
+            ctx.fillRect(60, h - 130, 120, 70);
+
+            // Corner darkness (AO)
+            const aoCorner = ctx.createLinearGradient(60, h - 60, 80, h - 60);
+            aoCorner.addColorStop(0, 'rgba(0,0,0,0.5)');
+            aoCorner.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = aoCorner;
+            ctx.fillRect(60, h - 60, 20, 20);
+
+            const aoCorner2 = ctx.createLinearGradient(180, h - 60, 200, h - 60);
+            aoCorner2.addColorStop(0, 'rgba(0,0,0,0)');
+            aoCorner2.addColorStop(1, 'rgba(0,0,0,0.5)');
+            ctx.fillStyle = aoCorner2;
+            ctx.fillRect(180, h - 60, 20, 20);
+
+            // Crevice darkness
+            const aoGrad = ctx.createRadialGradient(120, h - 60, 0, 120, h - 60, 40);
+            aoGrad.addColorStop(0, 'rgba(0,0,0,0.6)');
+            aoGrad.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = aoGrad;
+            ctx.fillRect(80, h - 70, 80, 20);
+
+            // Light direction arrow
+            ctx.strokeStyle = colors.accent;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(w * 0.5, 20);
+            ctx.lineTo(w * 0.5, 50);
+            ctx.stroke();
+            ctx.fillStyle = colors.text;
+            ctx.font = '11px JetBrains Mono';
+            ctx.fillText('Light →', 10, 15);
+            ctx.fillText('Darker in corners', 180, h - 20);
+        }
+
+        function drawCaustics() {
+            const canvas = document.getElementById('causticsCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width, h = canvas.height;
+
+            ctx.fillStyle = colors.bg;
+            ctx.fillRect(0, 0, w, h);
+
+            // Ground
+            ctx.fillStyle = '#7db3d4';
+            ctx.fillRect(0, h - 80, w, 80);
+
+            // Glass sphere
+            ctx.strokeStyle = '#aaddff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(w * 0.35, h * 0.4, 35, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Caustic patterns on ground
+            ctx.fillStyle = '#ffff99';
+            ctx.globalAlpha = 0.6;
+
+            // Caustic blob 1
+            ctx.beginPath();
+            ctx.ellipse(w * 0.35, h - 40, 50, 30, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Caustic blob 2 (wavy pattern)
+            ctx.beginPath();
+            for (let i = 0; i < 20; i++) {
+                const angle = (i / 20) * Math.PI * 2;
+                const r = 30 + Math.sin(angle * 3) * 10;
+                const x = w * 0.35 + Math.cos(angle) * r;
+                const y = h - 60 + Math.sin(angle) * 15;
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.globalAlpha = 1;
+
+            // Light ray
+            ctx.strokeStyle = colors.accent;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.moveTo(w * 0.35, 10);
+            ctx.lineTo(w * 0.35, 35);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            ctx.fillStyle = colors.text;
+            ctx.font = '11px JetBrains Mono';
+            ctx.fillText('Light', 10, 25);
+            ctx.fillText('Caustic patterns', 150, h - 15);
+        }
+
+        function drawSSS() {
+            const canvas = document.getElementById('sssCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width, h = canvas.height;
+
+            ctx.fillStyle = colors.bg;
+            ctx.fillRect(0, 0, w, h);
+
+            // Wax or marble sphere
+            ctx.fillStyle = '#e8d4c8';
+            ctx.beginPath();
+            ctx.arc(w * 0.4, h * 0.5, 40, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Light from left
+            ctx.strokeStyle = colors.accent;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.moveTo(10, h * 0.5);
+            ctx.lineTo(50, h * 0.5);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Scattering glow on right side (light inside material)
+            const scatterGrad = ctx.createRadialGradient(w * 0.4 + 40, h * 0.5, 0, w * 0.4 + 40, h * 0.5, 50);
+            scatterGrad.addColorStop(0, 'rgba(255, 180, 120, 0.6)');
+            scatterGrad.addColorStop(1, 'rgba(255, 180, 120, 0)');
+            ctx.fillStyle = scatterGrad;
+            ctx.beginPath();
+            ctx.arc(w * 0.4, h * 0.5, 40, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Rim light
+            ctx.strokeStyle = 'rgba(255, 200, 150, 0.8)';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(w * 0.4, h * 0.5, 40, -Math.PI * 0.5, Math.PI * 0.5);
+            ctx.stroke();
+
+            ctx.fillStyle = colors.text;
+            ctx.font = '11px JetBrains Mono';
+            ctx.fillText('Light penetrates & scatters', 150, h - 15);
+        }
+
+        // ===== PATH TRACING ANIMATION =====
+        let ptAnimationId = null;
+        let ptRays = [];
+        let ptAccumulated = {};
+
+        function initPathTracing() {
+            const canvas = document.getElementById('pathTracingCanvas');
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width, h = canvas.height;
+
+            ctx.fillStyle = colors.bg_secondary;
+            ctx.fillRect(0, 0, w, h);
+
+            // Simple room
+            ctx.strokeStyle = colors.border_color;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(30, 30, w - 60, h - 90);
+
+            // Light
+            ctx.fillStyle = '#ffff00';
+            ctx.beginPath();
+            ctx.arc(w * 0.5, 50, 12, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Sample spheres
+            ctx.fillStyle = '#ff8888';
+            ctx.beginPath();
+            ctx.arc(w * 0.3, h - 50, 20, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#8888ff';
+            ctx.beginPath();
+            ctx.arc(w * 0.7, h - 50, 20, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function animatePathTracing() {
+            const canvas = document.getElementById('pathTracingCanvas');
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width, h = canvas.height;
+            const samples = parseInt(document.getElementById('ptSamplesSlider').value);
+            const bounces = parseInt(document.getElementById('ptBouncesSlider').value);
+
+            // Reinit scene
+            ctx.fillStyle = colors.bg_secondary;
+            ctx.fillRect(0, 0, w, h);
+
+            ctx.strokeStyle = colors.border_color;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(30, 30, w - 60, h - 90);
+
+            // Light
+            ctx.fillStyle = '#ffff00';
+            ctx.beginPath();
+            ctx.arc(w * 0.5, 50, 12, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Spheres
+            ctx.fillStyle = '#ff8888';
+            ctx.beginPath();
+            ctx.arc(w * 0.3, h - 50, 20, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#8888ff';
+            ctx.beginPath();
+            ctx.arc(w * 0.7, h - 50, 20, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Draw rays
+            for (let i = 0; i < Math.min(samples / 4, 5); i++) {
+                const angle = (i / 5) * Math.PI * 2;
+                const sx = w * 0.5 + Math.cos(angle) * 60;
+                const sy = h - 100 + Math.sin(angle) * 40;
+
+                // Trace a path
+                let x = sx, y = sy;
+                ctx.strokeStyle = `hsl(${(i * 70) % 360}, 80%, 50%)`;
+                ctx.lineWidth = 1;
+
+                for (let b = 0; b < bounces; b++) {
+                    const nextAngle = Math.random() * Math.PI * 2;
+                    const len = 40 + Math.random() * 30;
+                    const nx = x + Math.cos(nextAngle) * len;
+                    const ny = y + Math.sin(nextAngle) * len;
+
+                    ctx.beginPath();
+                    ctx.moveTo(x, y);
+                    ctx.lineTo(nx, ny);
+                    ctx.stroke();
+
+                    x = nx;
+                    y = ny;
+
+                    if (x < 30 || x > w - 30 || y < 30 || y > h - 60) break;
+                }
+            }
+
+            document.getElementById('ptStatus').textContent = `Rendering with ${samples} samples, ${bounces} bounces...`;
+        }
+
+        // ===== RADIOSITY ANIMATION =====
+        function drawRadiosity() {
+            const canvas = document.getElementById('radiusityCanvas');
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width, h = canvas.height;
+            const bounces = parseInt(document.getElementById('radBouncesSlider').value);
+
+            ctx.fillStyle = colors.bg_secondary;
+            ctx.fillRect(0, 0, w, h);
+
+            // Patches (grid of rectangles)
+            const patchSize = 25;
+            const cols = Math.floor((w - 60) / patchSize);
+            const rows = Math.floor((h - 90) / patchSize);
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const x = 30 + c * patchSize;
+                    const y = 30 + r * patchSize;
+
+                    // Energy based on distance from light and bounces
+                    const distToLight = Math.sqrt(Math.pow(x - w * 0.5, 2) + Math.pow(y - 50, 2));
+                    let energy = Math.max(0, 1 - distToLight / 300);
+                    energy = Math.pow(energy, 0.7);
+
+                    // Add some bounce complexity
+                    if (bounces > 1) energy = Math.min(1, energy * 1.3);
+
+                    const brightness = Math.floor(energy * 255);
+                    ctx.fillStyle = `rgb(${brightness}, ${brightness}, ${brightness * 0.8})`;
+                    ctx.fillRect(x, y, patchSize - 1, patchSize - 1);
+                }
+            }
+
+            // Light source
+            ctx.fillStyle = '#ffff00';
+            ctx.beginPath();
+            ctx.arc(w * 0.5, 50, 12, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Energy transfer arrows (simplified)
+            ctx.strokeStyle = 'rgba(255, 255, 0, 0.3)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([2, 2]);
+            for (let i = 0; i < 3; i++) {
+                ctx.beginPath();
+                ctx.moveTo(w * 0.5, 50 + 15);
+                const angle = (i / 3) * Math.PI * 2;
+                ctx.lineTo(w * 0.5 + Math.cos(angle) * 80, 50 + 15 + Math.sin(angle) * 80);
+                ctx.stroke();
+            }
+            ctx.setLineDash([]);
+
+            document.getElementById('radStatus').textContent = `Radiosity with ${bounces} bounce${bounces > 1 ? 's' : ''} (view-independent)`;
+        }
+
+        // ===== LIGHT PROBES ANIMATION =====
+        function drawLightProbes() {
+            const canvas = document.getElementById('probsCanvas');
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width, h = canvas.height;
+            const probeCount = parseInt(document.getElementById('probeCountSlider').value);
+
+            ctx.fillStyle = colors.bg_secondary;
+            ctx.fillRect(0, 0, w, h);
+
+            // Room
+            ctx.strokeStyle = colors.border_color;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(30, 30, w - 60, h - 90);
+
+            // Light
+            ctx.fillStyle = '#ffff00';
+            ctx.beginPath();
+            ctx.arc(w * 0.5, 50, 12, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Grid of probes
+            const gridSize = Math.ceil(Math.sqrt(probeCount));
+            const spacing = (w - 60) / (gridSize + 1);
+
+            for (let i = 0; i < probeCount && i < gridSize * gridSize; i++) {
+                const row = Math.floor(i / gridSize);
+                const col = i % gridSize;
+                const px = 30 + (col + 1) * spacing;
+                const py = 30 + (row + 1) * (h - 90) / gridSize;
+
+                // Probe sphere
+                ctx.fillStyle = 'rgba(100, 200, 255, 0.4)';
+                ctx.beginPath();
+                ctx.arc(px, py, 8, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Probe outline
+                ctx.strokeStyle = 'rgba(100, 200, 255, 0.8)';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+
+                // Direction arrows (sample directions)
+                ctx.strokeStyle = 'rgba(100, 200, 255, 0.5)';
+                ctx.lineWidth = 0.5;
+                for (let d = 0; d < 4; d++) {
+                    const angle = (d / 4) * Math.PI * 2;
+                    ctx.beginPath();
+                    ctx.moveTo(px, py);
+                    ctx.lineTo(px + Math.cos(angle) * 8, py + Math.sin(angle) * 8);
+                    ctx.stroke();
+                }
+            }
+
+            document.getElementById('probStatus').textContent = `${probeCount} light probes sampling indirect light`;
+        }
+
+        // ===== SCREEN-SPACE GI ANIMATION =====
+        function drawScreenSpaceGI() {
+            const canvas = document.getElementById('ssgiCanvas');
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width, h = canvas.height;
+            const intensity = parseFloat(document.getElementById('ssgiIntensitySlider').value);
+
+            // Depth buffer visualization
+            ctx.fillStyle = colors.bg_secondary;
+            ctx.fillRect(0, 0, w, h);
+
+            // Room
+            ctx.strokeStyle = colors.border_color;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(30, 30, w - 60, h - 90);
+
+            // Spheres (with depth shading)
+            ctx.fillStyle = '#ff8888';
+            ctx.beginPath();
+            ctx.arc(w * 0.3, h - 50, 20, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#8888ff';
+            ctx.beginPath();
+            ctx.arc(w * 0.7, h - 50, 20, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Screen-space occlusion darkening
+            const aoAlpha = Math.min(1, intensity * 0.5);
+
+            // Edges get darker (occlusion)
+            const edgeGrad1 = ctx.createRadialGradient(w * 0.3, h - 50, 0, w * 0.3, h - 50, 40);
+            edgeGrad1.addColorStop(0, `rgba(0,0,0,0)`);
+            edgeGrad1.addColorStop(1, `rgba(0,0,0,${aoAlpha})`);
+            ctx.fillStyle = edgeGrad1;
+            ctx.beginPath();
+            ctx.arc(w * 0.3, h - 50, 25, 0, Math.PI * 2);
+            ctx.fill();
+
+            const edgeGrad2 = ctx.createRadialGradient(w * 0.7, h - 50, 0, w * 0.7, h - 50, 40);
+            edgeGrad2.addColorStop(0, `rgba(0,0,0,0)`);
+            edgeGrad2.addColorStop(1, `rgba(0,0,0,${aoAlpha})`);
+            ctx.fillStyle = edgeGrad2;
+            ctx.beginPath();
+            ctx.arc(w * 0.7, h - 50, 25, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Ground plane AO
+            const groundAO = ctx.createLinearGradient(0, h - 70, 0, h - 60);
+            groundAO.addColorStop(0, `rgba(0,0,0,${aoAlpha * 0.5})`);
+            groundAO.addColorStop(1, `rgba(0,0,0,0)`);
+            ctx.fillStyle = groundAO;
+            ctx.fillRect(30, h - 70, w - 60, 40);
+
+            document.getElementById('ssgiStatus').textContent = `Screen-space GI with intensity ${intensity.toFixed(1)}`;
+        }
+
+        // ===== INITIALIZATION & EVENT LISTENERS =====
+        function init() {
+            // Draw initial comparison
+            drawDirectLighting();
+            drawWithGI();
+
+            // Draw concept diagrams
+            drawColorBleed();
+            drawAO();
+            drawCaustics();
+            drawSSS();
+
+            // Initialize technique canvases
+            initPathTracing();
+            drawRadiosity();
+            drawLightProbes();
+            drawScreenSpaceGI();
+
+            // Tab switching
+            document.querySelectorAll('.technique-tab').forEach(tab => {
+                tab.addEventListener('click', (e) => {
+                    const technique = e.target.dataset.technique;
+
+                    // Update active tab
+                    document.querySelectorAll('.technique-tab').forEach(t => t.classList.remove('active'));
+                    e.target.classList.add('active');
+
+                    // Update active content
+                    document.querySelectorAll('.technique-content').forEach(c => c.classList.remove('active'));
+                    document.getElementById(technique).classList.add('active');
+
+                    // Redraw relevant canvas
+                    if (technique === 'path-tracing') {
+                        animatePathTracing();
+                    } else if (technique === 'radiosity') {
+                        drawRadiosity();
+                    } else if (technique === 'light-probes') {
+                        drawLightProbes();
+                    } else if (technique === 'screen-space-gi') {
+                        drawScreenSpaceGI();
+                    }
+                });
+            });
+
+            // Path tracing controls
+            document.getElementById('ptSamplesSlider').addEventListener('input', (e) => {
+                document.getElementById('ptSamplesValue').textContent = e.target.value;
+                animatePathTracing();
+            });
+
+            document.getElementById('ptBouncesSlider').addEventListener('input', (e) => {
+                document.getElementById('ptBouncesValue').textContent = e.target.value;
+                animatePathTracing();
+            });
+
+            // Radiosity controls
+            document.getElementById('radBouncesSlider').addEventListener('input', (e) => {
+                document.getElementById('radBouncesValue').textContent = e.target.value;
+                drawRadiosity();
+            });
+
+            // Light probes controls
+            document.getElementById('probeCountSlider').addEventListener('input', (e) => {
+                document.getElementById('probeCountValue').textContent = e.target.value;
+                drawLightProbes();
+            });
+
+            // Screen-space GI controls
+            document.getElementById('ssgiIntensitySlider').addEventListener('input', (e) => {
+                document.getElementById('ssgiIntensityValue').textContent = e.target.value;
+                drawScreenSpaceGI();
+            });
+        }
+
+        // Start when page loads
+        init();
+    </script>
+</body>
+</html>

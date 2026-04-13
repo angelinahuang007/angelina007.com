@@ -1,0 +1,11 @@
+{
+  "title": "Architecture & Blueprints",
+  "category": "game-engines/unreal",
+  "tags": ["unreal", "architecture", "blueprints", "class-hierarchy", "gamemode", "pawn", "controller"],
+  "description": "Interactive class hierarchy diagram showing Unreal's architecture. Click classes to see responsibilities and runtime communication.",
+  "related": [
+    "game-engines/unreal/materials-nanite",
+    "game-engines/unity/architecture-workflow"
+  ],
+  "order": 1
+}

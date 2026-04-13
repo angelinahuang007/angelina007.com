@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lightroom Tone Curve Editor</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        .lightroom-container {
+            display: flex; flex-wrap: wrap;
+            gap: 20px;
+            height: 100%;
+        }
+        .editor-area {
+            flex: 1;
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            overflow-y: auto;
+        }
+        .curve-editor {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            aspect-ratio: 1;
+            position: relative;
+        }
+        .curve-canvas {
+            width: 100%;
+            height: 100%;
+        }
+        .photo-preview {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+            height: 200px;
+        }
+        .photo-preview canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        .comparison-slider {
+            position: relative;
+            width: 100%;
+            height: 60px;
+            background: var(--border);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+            cursor: col-resize;
+        }
+        .comparison-slider canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        .slider-handle {
+            position: absolute;
+            width: 3px;
+            height: 100%;
+            background: var(--accent);
+            top: 0;
+            left: 50%;
+            z-index: 10;
+            cursor: col-resize;
+        }
+        .slider-handle::before {
+            content: '';
+            position: absolute;
+            left: -4px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 12px;
+            height: 12px;
+            background: var(--accent);
+            border-radius: 50%;
+        }
+        .info-text {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-align: center;
+            padding-top: 8px;
+        }
+        .control-panel {
+            width: 280px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 16px;
+            overflow-y: auto;
+            color: var(--text);
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 13px;
+        }
+        .control-group {
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        .control-group h4 {
+            margin: 0 0 8px 0;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: var(--accent);
+            letter-spacing: 0.5px;
+        }
+        .slider-row {
+            margin-bottom: 10px;
+        }
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+            font-size: 11px;
+        }
+        input[type="range"] {
+            width: 100%;
+            height: 4px;
+            border-radius: 2px;
+            background: var(--border-strong);
+            outline: none;
+            -webkit-appearance: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--accent);
+            border: none;
+            cursor: pointer;
+        }
+        .tab-buttons {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 6px;
+            background: var(--border);
+            border: 1px solid var(--border-strong);
+            color: var(--text);
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 10px;
+            transition: all 0.2s;
+        }
+        .tab-btn:hover {
+            background: var(--border-strong);
+        }
+        .tab-btn.active {
+            background: var(--accent);
+            color: var(--bg-secondary);
+            border-color: var(--accent);
+        }
+        .color-picker {
+            width: 100%;
+            height: 30px;
+            border-radius: 4px;
+            border: 1px solid var(--border-strong);
+            cursor: pointer;
+            margin: 4px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="lightroom-container">
+        <div class="editor-area">
+            <div class="curve-editor">
+                <canvas id="curveCanvas" class="curve-canvas"></canvas>
+            </div>
+
+            <div class="photo-preview">
+                <canvas id="photoCanvas"></canvas>
+            </div>
+
+            <div class="comparison-slider" id="comparisonSlider">
+                <canvas id="beforeCanvas"></canvas>
+                <canvas id="afterCanvas"></canvas>
+                <div class="slider-handle"></div>
+            </div>
+
+            <div class="info-text">Click and drag on the curve to adjust tones. Left = shadows, Right = highlights.</div>
+        </div>
+
+        <div class="control-panel">
+            <div class="control-group">
+                <h4>Curve Adjustment</h4>
+                <div class="tab-buttons">
+                    <button class="tab-btn active" data-channel="all">All</button>
+                    <button class="tab-btn" data-channel="r">Red</button>
+                    <button class="tab-btn" data-channel="g">Green</button>
+                    <button class="tab-btn" data-channel="b">Blue</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h4>HSL Sliders</h4>
+                <div class="slider-row">
+                    <div class="slider-label"><span>Reds Hue</span><span id="redHue">0</span></div>
+                    <input type="range" id="redHueSlider" min="-50" max="50" value="0">
+                </div>
+                <div class="slider-row">
+                    <div class="slider-label"><span>Greens Sat</span><span id="greenSat">0</span></div>
+                    <input type="range" id="greenSatSlider" min="-100" max="100" value="0">
+                </div>
+                <div class="slider-row">
+                    <div class="slider-label"><span>Blues Lum</span><span id="blueLum">0</span></div>
+                    <input type="range" id="blueLumSlider" min="-100" max="100" value="0">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h4>Split Toning</h4>
+                <div style="margin-bottom: 8px;">
+                    <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">Shadows</div>
+                    <input type="color" class="color-picker" id="shadowColor" value="#a85c4e">
+                </div>
+                <div>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">Highlights</div>
+                    <input type="color" class="color-picker" id="highlightColor" value="#5ba8c0">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h4>Info</h4>
+                <div style="font-size: 11px; line-height: 1.6; color: var(--text);">
+                    <strong style="color: #16a085;">Curve:</strong> S-curve for contrast, inverted for compression.
+                    <br/><br/>
+                    <strong style="color: #16a085;">Split Toning:</strong> Color different tonal ranges.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class ToneCurveEditor {
+            constructor() {
+                this.curveCanvas = document.getElementById('curveCanvas');
+                this.curveCtx = this.curveCanvas.getContext('2d');
+                this.photoCanvas = document.getElementById('photoCanvas');
+                this.photoCtx = this.photoCanvas.getContext('2d');
+                this.beforeCanvas = document.getElementById('beforeCanvas');
+                this.beforeCtx = this.beforeCanvas.getContext('2d');
+                this.afterCanvas = document.getElementById('afterCanvas');
+                this.afterCtx = this.afterCanvas.getContext('2d');
+
+                // Curve control points
+                this.curvePoints = [
+                    { x: 0, y: 0 },
+                    { x: 0.33, y: 0.33 },
+                    { x: 0.67, y: 0.67 },
+                    { x: 1, y: 1 }
+                ];
+
+                this.channel = 'all';
+                this.draggedPoint = null;
+                this.shadowColor = { h: 10, s: 40, l: 45 };
+                this.highlightColor = { h: 200, s: 40, l: 55 };
+
+                this.resizeCanvases();
+                window.addEventListener('resize', () => this.resizeCanvases());
+                this.setupEvents();
+                this.render();
+            }
+
+            resizeCanvases() {
+                this.curveCanvas.width = this.curveCanvas.parentElement.offsetWidth - 40;
+                this.curveCanvas.height = this.curveCanvas.offsetHeight;
+
+                const rect = this.photoCanvas.parentElement.getBoundingClientRect();
+                this.photoCanvas.width = rect.width;
+                this.photoCanvas.height = rect.height;
+
+                this.beforeCanvas.width = this.beforeCanvas.parentElement.offsetWidth;
+                this.beforeCanvas.height = this.beforeCanvas.offsetHeight;
+                this.afterCanvas.width = this.beforeCanvas.width;
+                this.afterCanvas.height = this.beforeCanvas.height;
+
+                this.render();
+            }
+
+            setupEvents() {
+                document.querySelectorAll('[data-channel]').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        document.querySelectorAll('[data-channel]').forEach(b => b.classList.remove('active'));
+                        e.target.classList.add('active');
+                        this.channel = e.target.dataset.channel;
+                        this.render();
+                    });
+                });
+
+                document.getElementById('shadowColor').addEventListener('input', (e) => {
+                    const hex = e.target.value;
+                    const rgb = this.hexToHsl(hex);
+                    this.shadowColor = rgb;
+                    this.render();
+                });
+
+                document.getElementById('highlightColor').addEventListener('input', (e) => {
+                    const hex = e.target.value;
+                    const rgb = this.hexToHsl(hex);
+                    this.highlightColor = rgb;
+                    this.render();
+                });
+
+                ['redHueSlider', 'greenSatSlider', 'blueLumSlider'].forEach(id => {
+                    document.getElementById(id).addEventListener('input', () => this.render());
+                });
+
+                this.curveCanvas.addEventListener('mousedown', (e) => this.onMouseDown(e));
+                this.curveCanvas.addEventListener('mousemove', (e) => this.onMouseMove(e));
+                this.curveCanvas.addEventListener('mouseup', () => this.onMouseUp());
+
+                document.getElementById('comparisonSlider').addEventListener('mousemove', (e) => {
+                    const rect = document.getElementById('comparisonSlider').getBoundingClientRect();
+                    const percent = (e.clientX - rect.left) / rect.width;
+                    document.querySelector('.slider-handle').style.left = (percent * 100) + '%';
+                    this.renderComparison(percent);
+                });
+            }
+
+            hexToHsl(hex) {
+                const r = parseInt(hex.substr(1, 2), 16) / 255;
+                const g = parseInt(hex.substr(3, 2), 16) / 255;
+                const b = parseInt(hex.substr(5, 2), 16) / 255;
+
+                const max = Math.max(r, g, b);
+                const min = Math.min(r, g, b);
+                let h, s, l = (max + min) / 2;
+
+                if (max === min) {
+                    h = s = 0;
+                } else {
+                    const d = max - min;
+                    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+                    switch (max) {
+                        case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                        case g: h = (b - r) / d + 2; break;
+                        case b: h = (r - g) / d + 4; break;
+                    }
+                    h /= 6;
+                }
+
+                return { h: h * 360, s: s * 100, l: l * 100 };
+            }
+
+            onMouseDown(e) {
+                const rect = this.curveCanvas.getBoundingClientRect();
+                const x = (e.clientX - rect.left) / this.curveCanvas.width;
+                const y = 1 - (e.clientY - rect.top) / this.curveCanvas.height;
+
+                for (let i = 1; i < this.curvePoints.length - 1; i++) {
+                    const dist = Math.hypot(this.curvePoints[i].x - x, this.curvePoints[i].y - y);
+                    if (dist < 0.05) {
+                        this.draggedPoint = i;
+                        break;
+                    }
+                }
+
+                if (this.draggedPoint === null && x > 0 && x < 1 && y > 0 && y < 1) {
+                    this.curvePoints.push({ x, y });
+                    this.curvePoints.sort((a, b) => a.x - b.x);
+                    this.draggedPoint = this.curvePoints.findIndex(p => Math.abs(p.x - x) < 0.01);
+                }
+            }
+
+            onMouseMove(e) {
+                if (this.draggedPoint !== null) {
+                    const rect = this.curveCanvas.getBoundingClientRect();
+                    const x = (e.clientX - rect.left) / this.curveCanvas.width;
+                    const y = 1 - (e.clientY - rect.top) / this.curveCanvas.height;
+
+                    if (this.draggedPoint > 0 && this.draggedPoint < this.curvePoints.length - 1) {
+                        this.curvePoints[this.draggedPoint].x = Math.max(this.curvePoints[this.draggedPoint - 1].x, Math.min(x, this.curvePoints[this.draggedPoint + 1].x));
+                        this.curvePoints[this.draggedPoint].y = Math.max(0, Math.min(1, y));
+                    }
+                    this.render();
+                }
+            }
+
+            onMouseUp() {
+                this.draggedPoint = null;
+            }
+
+            evaluateCurve(x) {
+                if (x <= 0) return this.curvePoints[0].y;
+                if (x >= 1) return this.curvePoints[this.curvePoints.length - 1].y;
+
+                let i = 0;
+                while (i < this.curvePoints.length && this.curvePoints[i].x < x) i++;
+
+                const p0 = this.curvePoints[i - 1];
+                const p1 = this.curvePoints[i];
+                const t = (x - p0.x) / (p1.x - p0.x);
+
+                return p0.y + t * (p1.y - p0.y);
+            }
+
+            render() {
+                this.renderCurve();
+                this.renderPhoto();
+                this.renderComparison(0.5);
+            }
+
+            renderCurve() {
+                const w = this.curveCanvas.width;
+                const h = this.curveCanvas.height;
+
+                this.curveCtx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+                this.curveCtx.fillRect(0, 0, w, h);
+
+                // Grid
+                this.curveCtx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--border').trim();
+                this.curveCtx.lineWidth = 1;
+                for (let i = 0; i <= 4; i++) {
+                    const pos = (i / 4) * w;
+                    this.curveCtx.beginPath();
+                    this.curveCtx.moveTo(pos, 0);
+                    this.curveCtx.lineTo(pos, h);
+                    this.curveCtx.stroke();
+                }
+
+                // Diagonal
+                this.curveCtx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--border-strong').trim();
+                this.curveCtx.setLineDash([3, 3]);
+                this.curveCtx.beginPath();
+                this.curveCtx.moveTo(0, h);
+                this.curveCtx.lineTo(w, 0);
+                this.curveCtx.stroke();
+                this.curveCtx.setLineDash([]);
+
+                // Curve
+                this.curveCtx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+                this.curveCtx.lineWidth = 2;
+                this.curveCtx.beginPath();
+                for (let i = 0; i <= 100; i++) {
+                    const x = i / 100;
+                    const y = this.evaluateCurve(x);
+                    const px = x * w;
+                    const py = h - y * h;
+                    if (i === 0) this.curveCtx.moveTo(px, py);
+                    else this.curveCtx.lineTo(px, py);
+                }
+                this.curveCtx.stroke();
+
+                // Control points
+                this.curvePoints.forEach((pt, idx) => {
+                    const px = pt.x * w;
+                    const py = h - pt.y * h;
+
+                    this.curveCtx.fillStyle = idx === 0 || idx === this.curvePoints.length - 1 ? getComputedStyle(document.documentElement).getPropertyValue('--text-dim').trim() : getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+                    this.curveCtx.beginPath();
+                    this.curveCtx.arc(px, py, 5, 0, Math.PI * 2);
+                    this.curveCtx.fill();
+                });
+            }
+
+            renderPhoto() {
+                const w = this.photoCanvas.width;
+                const h = this.photoCanvas.height;
+
+                // Original gradient
+                const grad = this.photoCtx.createLinearGradient(0, 0, w, 0);
+                for (let i = 0; i <= 100; i++) {
+                    const x = i / 100;
+                    const y = this.evaluateCurve(x);
+                    const col = Math.round(y * 255);
+                    grad.addColorStop(x, `rgb(${col}, ${col}, ${col})`);
+                }
+
+                this.photoCtx.fillStyle = grad;
+                this.photoCtx.fillRect(0, 0, w, h);
+
+                // Colored shapes
+                this.photoCtx.fillStyle = 'rgba(231, 76, 60, 0.5)';
+                this.photoCtx.fillRect(20, 20, 80, 80);
+
+                this.photoCtx.fillStyle = 'rgba(46, 204, 113, 0.5)';
+                this.photoCtx.beginPath();
+                this.photoCtx.arc(w - 50, h / 2, 40, 0, Math.PI * 2);
+                this.photoCtx.fill();
+
+                this.photoCtx.fillStyle = 'rgba(52, 152, 219, 0.5)';
+                this.photoCtx.fillRect(w - 100, h - 60, 80, 40);
+            }
+
+            renderComparison(percent) {
+                const w = this.beforeCanvas.width;
+                const h = this.beforeCanvas.height;
+
+                // Draw before
+                const grad1 = this.beforeCtx.createLinearGradient(0, 0, w, 0);
+                for (let i = 0; i <= 100; i++) {
+                    const col = Math.round((i / 100) * 255);
+                    grad1.addColorStop(i / 100, `rgb(${col}, ${col}, ${col})`);
+                }
+                this.beforeCtx.fillStyle = grad1;
+                this.beforeCtx.fillRect(0, 0, w, h);
+
+                // Draw after
+                const grad2 = this.afterCtx.createLinearGradient(0, 0, w, 0);
+                for (let i = 0; i <= 100; i++) {
+                    const x = i / 100;
+                    const y = this.evaluateCurve(x);
+                    const col = Math.round(y * 255);
+                    grad2.addColorStop(x, `rgb(${col}, ${col}, ${col})`);
+                }
+                this.afterCtx.fillStyle = grad2;
+                this.afterCtx.fillRect(0, 0, w, h);
+
+                // Clip right canvas to show only right side
+                this.afterCtx.clearRect(w * percent, 0, w * (1 - percent), h);
+            }
+        }
+
+        const editor = new ToneCurveEditor();
+    </script>
+</body>
+</html>

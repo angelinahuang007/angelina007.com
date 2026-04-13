@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acceleration Structures</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        body {
+            padding: 20px;
+            font-family: 'Space Grotesk', sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        canvas {
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-secondary);
+            display: block;
+            width: 100%;
+            max-width: 800px;
+            height: auto;
+            margin: 0 auto;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            background: var(--bg-secondary);
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        .control-section h3 {
+            margin-top: 0;
+            margin-bottom: 12px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .structure-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        button {
+            padding: 10px 12px;
+            border: 2px solid var(--border-color);
+            background: transparent;
+            color: var(--text);
+            cursor: pointer;
+            font-weight: 500;
+            font-family: 'Space Grotesk', sans-serif;
+            border-radius: 4px;
+            transition: all 0.2s;
+            font-size: 13px;
+        }
+
+        button.active {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+        }
+
+        .slider-group {
+            margin-bottom: 15px;
+        }
+
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        input[type="range"] {
+            width: 100%;
+        }
+
+        .info-box {
+            background: var(--bg-secondary);
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .legend {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            font-size: 12px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 2px;
+            border: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+
+        .stats-box {
+            background: var(--bg-secondary);
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 6px 0;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .stat-label {
+            font-weight: 500;
+        }
+
+        .stat-value {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .action-btn {
+            flex: 1;
+            min-width: 100px;
+            padding: 10px 12px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            font-size: 13px;
+        }
+
+        .action-btn:hover {
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <h1>Acceleration Structures</h1>
+    <p>Spatial acceleration structures optimize ray-object intersection tests. Click on the canvas to shoot a ray and see how each structure minimizes the number of objects tested. Compare efficiency across brute force, BVH, grid, and KD-tree approaches.</p>
+
+    <div class="wrapper">
+        <canvas id="canvas" width="800" height="500"></canvas>
+
+        <div class="controls">
+            <div class="control-section">
+                <h3>Structure Type</h3>
+                <div class="structure-buttons">
+                    <button class="active" data-structure="brute">Brute Force</button>
+                    <button data-structure="bvh">BVH</button>
+                    <button data-structure="grid">Uniform Grid</button>
+                    <button data-structure="kdtree">KD-Tree</button>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <h3>Scene Control</h3>
+                <div class="action-buttons">
+                    <button class="action-btn" id="reset-btn">Reset Scene</button>
+                    <button class="action-btn" id="new-ray-btn">Shoot Ray</button>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <h3>Ray Control</h3>
+                <div class="slider-group">
+                    <div class="slider-label">
+                        <span>Angle</span>
+                        <span id="val-angle">30°</span>
+                    </div>
+                    <input type="range" id="ray-angle" min="0" max="360" value="30" step="5">
+                </div>
+            </div>
+
+            <div class="control-section">
+                <h3>Legend</h3>
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #45b7d1; border: none;"></div>
+                        <span>Objects</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: transparent; border: 2px solid #4ecdc4;"></div>
+                        <span>Tested (Structure)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: transparent; border: 2px solid #f39c12;"></div>
+                        <span>Ray Path</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #2ecc71; border: none;"></div>
+                        <span>Hit Object</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-box">
+            <div class="stat-row">
+                <span class="stat-label">Total Objects:</span>
+                <span class="stat-value" id="stat-total">0</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Objects Tested:</span>
+                <span class="stat-value" id="stat-tested">0</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Efficiency:</span>
+                <span class="stat-value" id="stat-efficiency">—</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Ray Hit:</span>
+                <span class="stat-value" id="stat-hit">—</span>
+            </div>
+        </div>
+
+        <div class="info-box">
+            <strong>How to use:</strong> Click on the canvas to shoot a ray from the left side, or use the "Shoot Ray" button. The angle slider rotates the ray direction. Switch between structure types to see how each method reduces the number of tested objects. Brute force tests all objects; others use spatial partitioning to skip irrelevant regions.
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let colors = Wiki.colors();
+
+        let currentStructure = 'brute';
+        let rayAngle = 30;
+        let objects = [];
+        let accelStructure = null;
+        let lastRaycast = null;
+
+        // Ray origin (left side, middle)
+        const rayOrigin = { x: 40, y: 250 };
+
+        class Circle {
+            constructor(x, y, r = 10) {
+                this.x = x;
+                this.y = y;
+                this.r = r;
+            }
+
+            intersect(ox, oy, dx, dy) {
+                const fx = ox - this.x;
+                const fy = oy - this.y;
+                const a = dx * dx + dy * dy;
+                const b = 2 * (fx * dx + fy * dy);
+                const c = fx * fx + fy * fy - this.r * this.r;
+                const disc = b * b - 4 * a * c;
+                if (disc < 0) return null;
+                const sqrtDisc = Math.sqrt(disc);
+                const t1 = (-b - sqrtDisc) / (2 * a);
+                const t2 = (-b + sqrtDisc) / (2 * a);
+                const t = t1 > 0.01 ? t1 : t2 > 0.01 ? t2 : null;
+                return t !== null ? { t, x: ox + dx * t, y: oy + dy * t } : null;
+            }
+
+            getBBox() {
+                return {
+                    minX: this.x - this.r,
+                    maxX: this.x + this.r,
+                    minY: this.y - this.r,
+                    maxY: this.y + this.r
+                };
+            }
+        }
+
+        // === BVH Implementation ===
+        class BVHNode {
+            constructor(objects, depth = 0) {
+                if (objects.length === 1) {
+                    this.leaf = true;
+                    this.object = objects[0];
+                    this.bbox = objects[0].getBBox();
+                } else {
+                    this.leaf = false;
+                    this.bbox = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
+
+                    objects.forEach(obj => {
+                        const bbox = obj.getBBox();
+                        this.bbox.minX = Math.min(this.bbox.minX, bbox.minX);
+                        this.bbox.maxX = Math.max(this.bbox.maxX, bbox.maxX);
+                        this.bbox.minY = Math.min(this.bbox.minY, bbox.minY);
+                        this.bbox.maxY = Math.max(this.bbox.maxY, bbox.maxY);
+                    });
+
+                    const axis = depth % 2 === 0 ? 'x' : 'y';
+                    const mid = objects.length >> 1;
+                    objects.sort((a, b) => {
+                        const aVal = axis === 'x' ? a.x : a.y;
+                        const bVal = axis === 'x' ? b.x : b.y;
+                        return aVal - bVal;
+                    });
+
+                    this.left = new BVHNode(objects.slice(0, mid), depth + 1);
+                    this.right = new BVHNode(objects.slice(mid), depth + 1);
+                }
+            }
+        }
+
+        // === KD-Tree Implementation ===
+        class KDNode {
+            constructor(objects, depth = 0, bounds) {
+                this.depth = depth;
+                this.axis = depth % 2 === 0 ? 'x' : 'y';
+
+                if (!bounds) {
+                    bounds = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
+                    objects.forEach(obj => {
+                        const bbox = obj.getBBox();
+                        bounds.minX = Math.min(bounds.minX, bbox.minX);
+                        bounds.maxX = Math.max(bounds.maxX, bbox.maxX);
+                        bounds.minY = Math.min(bounds.minY, bbox.minY);
+                        bounds.maxY = Math.max(bounds.maxY, bbox.maxY);
+                    });
+                }
+                this.bounds = bounds;
+
+                if (objects.length <= 3) {
+                    this.leaf = true;
+                    this.objects = objects;
+                } else {
+                    this.leaf = false;
+                    const mid = objects.length >> 1;
+                    const axis = this.axis;
+                    objects.sort((a, b) => {
+                        const aVal = axis === 'x' ? a.x : a.y;
+                        const bVal = axis === 'x' ? b.x : b.y;
+                        return aVal - bVal;
+                    });
+
+                    const medianVal = axis === 'x' ? objects[mid].x : objects[mid].y;
+
+                    const leftBounds = { ...bounds };
+                    const rightBounds = { ...bounds };
+                    if (axis === 'x') {
+                        leftBounds.maxX = medianVal;
+                        rightBounds.minX = medianVal;
+                    } else {
+                        leftBounds.maxY = medianVal;
+                        rightBounds.minY = medianVal;
+                    }
+
+                    this.left = new KDNode(objects.slice(0, mid), depth + 1, leftBounds);
+                    this.right = new KDNode(objects.slice(mid), depth + 1, rightBounds);
+                    this.splitValue = medianVal;
+                }
+            }
+        }
+
+        // === Uniform Grid Implementation ===
+        function buildGrid(objects) {
+            const cellSize = 60;
+            const grid = {};
+            const bounds = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
+
+            objects.forEach(obj => {
+                const bbox = obj.getBBox();
+                bounds.minX = Math.min(bounds.minX, bbox.minX);
+                bounds.maxX = Math.max(bounds.maxX, bbox.maxX);
+                bounds.minY = Math.min(bounds.minY, bbox.minY);
+                bounds.maxY = Math.max(bounds.maxY, bbox.maxY);
+            });
+
+            objects.forEach(obj => {
+                const bbox = obj.getBBox();
+                const x1 = Math.floor(bbox.minX / cellSize);
+                const x2 = Math.floor(bbox.maxX / cellSize);
+                const y1 = Math.floor(bbox.minY / cellSize);
+                const y2 = Math.floor(bbox.maxY / cellSize);
+
+                for (let gx = x1; gx <= x2; gx++) {
+                    for (let gy = y1; gy <= y2; gy++) {
+                        const key = gx + ',' + gy;
+                        if (!grid[key]) grid[key] = [];
+                        grid[key].push(obj);
+                    }
+                }
+            });
+
+            return { type: 'grid', cellSize, grid, bounds };
+        }
+
+        // === Raycast Functions ===
+        function rayBoxIntersect(ox, oy, dx, dy, bbox) {
+            let tmin = -Infinity, tmax = Infinity;
+            const eps = 0.001;
+
+            if (Math.abs(dx) > eps) {
+                const t1 = (bbox.minX - ox) / dx;
+                const t2 = (bbox.maxX - ox) / dx;
+                tmin = Math.max(tmin, Math.min(t1, t2));
+                tmax = Math.min(tmax, Math.max(t1, t2));
+            }
+
+            if (Math.abs(dy) > eps) {
+                const t1 = (bbox.minY - oy) / dy;
+                const t2 = (bbox.maxY - oy) / dy;
+                tmin = Math.max(tmin, Math.min(t1, t2));
+                tmax = Math.min(tmax, Math.max(t1, t2));
+            }
+
+            return tmin < tmax && tmax > eps;
+        }
+
+        function raycastBrute(ox, oy, dx, dy) {
+            const tested = new Set();
+            let hitObject = null;
+            let minT = Infinity;
+
+            objects.forEach((obj, idx) => {
+                tested.add(idx);
+                const result = obj.intersect(ox, oy, dx, dy);
+                if (result && result.t < minT) {
+                    minT = result.t;
+                    hitObject = { obj, ...result };
+                }
+            });
+
+            return {
+                type: 'brute',
+                tested: Array.from(tested),
+                testedBoxes: [],
+                hitObject
+            };
+        }
+
+        function raycastBVH(node, ox, oy, dx, dy, tested, idx = 0) {
+            if (!node) return [];
+            const localTested = [idx];
+            const testedBoxes = [{ bbox: node.bbox, isLeaf: node.leaf }];
+
+            if (!rayBoxIntersect(ox, oy, dx, dy, node.bbox)) {
+                return [];
+            }
+
+            if (node.leaf) {
+                tested.add(objects.indexOf(node.object));
+                return testedBoxes;
+            }
+
+            const leftBoxes = raycastBVH(node.left, ox, oy, dx, dy, tested, idx * 2 + 1);
+            const rightBoxes = raycastBVH(node.right, ox, oy, dx, dy, tested, idx * 2 + 2);
+
+            return testedBoxes.concat(leftBoxes).concat(rightBoxes);
+        }
+
+        function raycastKDTree(node, ox, oy, dx, dy, tested) {
+            if (!node) return [];
+            const testedBoxes = [{ bounds: node.bounds, isLeaf: node.leaf, axis: node.axis }];
+
+            if (!rayBoxIntersect(ox, oy, dx, dy, {
+                minX: node.bounds.minX,
+                maxX: node.bounds.maxX,
+                minY: node.bounds.minY,
+                maxY: node.bounds.maxY
+            })) {
+                return [];
+            }
+
+            if (node.leaf) {
+                node.objects.forEach(obj => {
+                    tested.add(objects.indexOf(obj));
+                });
+                return testedBoxes;
+            }
+
+            const leftBoxes = raycastKDTree(node.left, ox, oy, dx, dy, tested);
+            const rightBoxes = raycastKDTree(node.right, ox, oy, dx, dy, tested);
+
+            return testedBoxes.concat(leftBoxes).concat(rightBoxes);
+        }
+
+        function raycastGrid(ox, oy, dx, dy, grid, cellSize) {
+            const tested = new Set();
+            const testedCells = [];
+            const maxDist = 1000;
+            let t = 0;
+
+            while (t < maxDist) {
+                const x = ox + dx * t;
+                const y = oy + dy * t;
+                const gx = Math.floor(x / cellSize);
+                const gy = Math.floor(y / cellSize);
+                const key = gx + ',' + gy;
+
+                const cellBbox = {
+                    minX: gx * cellSize,
+                    maxX: (gx + 1) * cellSize,
+                    minY: gy * cellSize,
+                    maxY: (gy + 1) * cellSize
+                };
+
+                if (!testedCells.some(c => c.minX === cellBbox.minX && c.minY === cellBbox.minY)) {
+                    testedCells.push(cellBbox);
+                }
+
+                if (grid.grid[key]) {
+                    grid.grid[key].forEach(obj => {
+                        tested.add(objects.indexOf(obj));
+                    });
+                }
+
+                if (x < 0 || x > canvas.width || y < 0 || y > canvas.height) break;
+                t += cellSize * 0.5;
+            }
+
+            return { tested: Array.from(tested), testedBoxes: testedCells };
+        }
+
+        function shootRay() {
+            const rad = (rayAngle * Math.PI) / 180;
+            const dx = Math.cos(rad);
+            const dy = Math.sin(rad);
+
+            let result;
+
+            if (currentStructure === 'brute') {
+                result = raycastBrute(rayOrigin.x, rayOrigin.y, dx, dy);
+            } else if (currentStructure === 'bvh') {
+                const tested = new Set();
+                const testedBoxes = raycastBVH(accelStructure, rayOrigin.x, rayOrigin.y, dx, dy, tested);
+                result = { type: 'bvh', tested: Array.from(tested), testedBoxes, hitObject: null };
+            } else if (currentStructure === 'kdtree') {
+                const tested = new Set();
+                const testedBoxes = raycastKDTree(accelStructure, rayOrigin.x, rayOrigin.y, dx, dy, tested);
+                result = { type: 'kdtree', tested: Array.from(tested), testedBoxes, hitObject: null };
+            } else if (currentStructure === 'grid') {
+                const gridResult = raycastGrid(rayOrigin.x, rayOrigin.y, dx, dy, accelStructure, accelStructure.cellSize);
+                result = { type: 'grid', tested: gridResult.tested, testedBoxes: gridResult.testedBoxes, hitObject: null };
+            }
+
+            // Find actual hit
+            let hitObject = null;
+            let minT = Infinity;
+            result.tested.forEach(idx => {
+                const obj = objects[idx];
+                const hit = obj.intersect(rayOrigin.x, rayOrigin.y, dx, dy);
+                if (hit && hit.t < minT) {
+                    minT = hit.t;
+                    hitObject = { obj, ...hit };
+                }
+            });
+
+            lastRaycast = { ...result, hitObject, rayAngle, dx, dy };
+
+            updateStats();
+            draw();
+        }
+
+        function updateStats() {
+            if (!lastRaycast) {
+                document.getElementById('stat-total').textContent = objects.length;
+                document.getElementById('stat-tested').textContent = '—';
+                document.getElementById('stat-efficiency').textContent = '—';
+                document.getElementById('stat-hit').textContent = '—';
+                return;
+            }
+
+            document.getElementById('stat-total').textContent = objects.length;
+            document.getElementById('stat-tested').textContent = lastRaycast.tested.length + ' / ' + objects.length;
+
+            const efficiency = ((objects.length - lastRaycast.tested.length) / objects.length * 100).toFixed(0);
+            document.getElementById('stat-efficiency').textContent = efficiency + '% skipped';
+
+            document.getElementById('stat-hit').textContent = lastRaycast.hitObject ? 'Yes' : 'No';
+        }
+
+        function resetScene() {
+            objects = [];
+            generateRandomScene();
+            rebuildStructure();
+            lastRaycast = null;
+            updateStats();
+        }
+
+        function generateRandomScene() {
+            const numObjects = 25 + Math.floor(Math.random() * 8);
+            for (let i = 0; i < numObjects; i++) {
+                const x = 100 + Math.random() * (canvas.width - 140);
+                const y = 50 + Math.random() * (canvas.height - 100);
+                const r = 8 + Math.random() * 12;
+                objects.push(new Circle(x, y, r));
+            }
+        }
+
+        function rebuildStructure() {
+            if (currentStructure === 'bvh') {
+                accelStructure = new BVHNode([...objects]);
+            } else if (currentStructure === 'kdtree') {
+                accelStructure = new KDNode([...objects]);
+            } else if (currentStructure === 'grid') {
+                accelStructure = buildGrid(objects);
+            }
+        }
+
+        function draw() {
+            ctx.fillStyle = colors.bg_secondary;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw grid if enabled
+            if (currentStructure === 'grid' && accelStructure) {
+                ctx.strokeStyle = colors.text;
+                ctx.globalAlpha = 0.1;
+                ctx.lineWidth = 1;
+                const cellSize = accelStructure.cellSize;
+                for (let x = 0; x < canvas.width; x += cellSize) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, canvas.height);
+                    ctx.stroke();
+                }
+                for (let y = 0; y < canvas.height; y += cellSize) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(canvas.width, y);
+                    ctx.stroke();
+                }
+                ctx.globalAlpha = 1;
+            }
+
+            // Draw tested bounding boxes / cells
+            if (lastRaycast && lastRaycast.testedBoxes) {
+                ctx.strokeStyle = '#4ecdc4';
+                ctx.lineWidth = 2;
+                ctx.globalAlpha = 0.4;
+
+                lastRaycast.testedBoxes.forEach(entry => {
+                    const bbox = entry.bbox || entry.bounds;
+                    ctx.strokeRect(bbox.minX, bbox.minY, bbox.maxX - bbox.minX, bbox.maxY - bbox.minY);
+                });
+                ctx.globalAlpha = 1;
+            }
+
+            // Draw all objects
+            objects.forEach((obj, idx) => {
+                const isTested = lastRaycast && lastRaycast.tested.includes(idx);
+                const isHit = lastRaycast && lastRaycast.hitObject && lastRaycast.hitObject.obj === obj;
+
+                if (isHit) {
+                    ctx.fillStyle = '#2ecc71';
+                } else if (isTested) {
+                    ctx.fillStyle = colors.accent;
+                } else {
+                    ctx.fillStyle = '#45b7d1';
+                }
+
+                ctx.beginPath();
+                ctx.arc(obj.x, obj.y, obj.r, 0, Math.PI * 2);
+                ctx.fill();
+
+                if (isTested && !isHit) {
+                    ctx.strokeStyle = '#4ecdc4';
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+                }
+            });
+
+            // Draw ray
+            if (lastRaycast) {
+                const maxDist = 800;
+                ctx.strokeStyle = '#f39c12';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(rayOrigin.x, rayOrigin.y);
+                ctx.lineTo(rayOrigin.x + lastRaycast.dx * maxDist, rayOrigin.y + lastRaycast.dy * maxDist);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                if (lastRaycast.hitObject) {
+                    ctx.fillStyle = '#f39c12';
+                    ctx.beginPath();
+                    ctx.arc(lastRaycast.hitObject.x, lastRaycast.hitObject.y, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            // Draw ray origin
+            ctx.fillStyle = colors.accent;
+            ctx.beginPath();
+            ctx.arc(rayOrigin.x, rayOrigin.y, 5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Event listeners
+        document.querySelectorAll('[data-structure]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('[data-structure]').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                currentStructure = e.target.dataset.structure;
+                rebuildStructure();
+                lastRaycast = null;
+                updateStats();
+                draw();
+            });
+        });
+
+        document.getElementById('ray-angle').addEventListener('input', (e) => {
+            rayAngle = parseInt(e.target.value);
+            document.getElementById('val-angle').textContent = rayAngle + '°';
+            if (lastRaycast || objects.length > 0) shootRay();
+        });
+
+        document.getElementById('reset-btn').addEventListener('click', resetScene);
+        document.getElementById('new-ray-btn').addEventListener('click', shootRay);
+
+        canvas.addEventListener('click', shootRay);
+
+        // Update colors on theme change
+        window.addEventListener('themechange', () => {
+            colors = Wiki.colors();
+            draw();
+        });
+
+        // Initialize
+        generateRandomScene();
+        rebuildStructure();
+        updateStats();
+        draw();
+    </script>
+</body>
+</html>

@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ray Tracing Fundamentals</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        body {
+            padding: 20px;
+            font-family: 'Space Grotesk', sans-serif;
+            line-height: 1.6;
+        }
+
+        .article-container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .visualization-wrapper {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 30px 0;
+        }
+
+        .canvas-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        canvas {
+            border: 2px solid var(--border-color);
+            border-radius: 4px;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            display: block;
+            max-width: 100%;
+            height: auto;
+            cursor: crosshair;
+        }
+
+        .controls-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .control-section {
+            background: var(--bg-primary);
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+
+        .control-section h4 {
+            margin: 0 0 10px 0;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            letter-spacing: 0.5px;
+        }
+
+        .toggle-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            user-select: none;
+        }
+
+        input[type="checkbox"] {
+            cursor: pointer;
+        }
+
+        .slider-control {
+            margin-bottom: 12px;
+        }
+
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            margin-bottom: 6px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 4px;
+            border-radius: 2px;
+            background: var(--border-color);
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            background: var(--primary);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            border: none;
+            transition: background 0.2s;
+        }
+
+        input[type="range"]::-moz-range-thumb:hover {
+            background: var(--primary);
+        }
+
+        button {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 6px;
+            background: var(--accent);
+            color: white;
+            cursor: pointer;
+            font-weight: 500;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .button-group button {
+            flex: 1;
+            min-width: 100px;
+        }
+
+        .info-panel {
+            background: var(--bg-primary);
+            border-left: 3px solid var(--primary);
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 15px;
+        }
+
+        .info-panel h4 {
+            margin: 0 0 8px 0;
+            font-size: 13px;
+            color: var(--accent);
+        }
+
+        .step-description {
+            font-size: 13px;
+            line-height: 1.5;
+            color: var(--text-primary);
+            margin: 0;
+        }
+
+        .legend {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+            flex-shrink: 0;
+        }
+
+        .article-text {
+            margin: 30px 0;
+            font-size: 14px;
+            line-height: 1.7;
+        }
+
+        h1 {
+            margin-top: 0;
+            font-size: 28px;
+            color: var(--text-primary);
+        }
+
+        h2 {
+            font-size: 18px;
+            color: var(--text-primary);
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+
+        p {
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <div class="article-container">
+        <h1>Ray Tracing Fundamentals</h1>
+
+        <div class="article-text">
+            <p>Ray tracing is a rendering technique that simulates the path of light rays as they bounce around a scene. This interactive visualization shows the core concept: tracing rays from the camera through pixels, finding intersections with objects, and computing shadows and reflections.</p>
+        </div>
+
+        <div class="visualization-wrapper">
+            <div class="canvas-container">
+                <canvas id="canvas" width="700" height="500"></canvas>
+            </div>
+
+            <div class="controls-grid">
+                <div class="control-section">
+                    <h4>Ray Display</h4>
+                    <div class="toggle-group">
+                        <label>
+                            <input type="checkbox" id="showPrimary" checked>
+                            <span>Primary Rays</span>
+                        </label>
+                        <label>
+                            <input type="checkbox" id="showShadow" checked>
+                            <span>Shadow Rays</span>
+                        </label>
+                        <label>
+                            <input type="checkbox" id="showReflection" checked>
+                            <span>Reflection Rays</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="control-section">
+                    <h4>Ray Count</h4>
+                    <div class="slider-control">
+                        <div class="slider-label">
+                            <span>Rays</span>
+                            <span id="rayCountValue">10</span>
+                        </div>
+                        <input type="range" id="rayCount" min="5" max="30" value="10" step="1">
+                    </div>
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button onclick="traceMultipleRays()">Trace Rays</button>
+                <button onclick="singleRayMode()">Step-by-Step</button>
+                <button onclick="resetVisualization()">Reset</button>
+            </div>
+
+            <div class="info-panel">
+                <h4 id="stepTitle">Ready to trace</h4>
+                <p class="step-description" id="stepDescription">Click "Trace Rays" to shoot rays from the camera through the scene, or use "Step-by-Step" to trace one ray at a time.</p>
+            </div>
+
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #3b82f6;"></div>
+                    <span>Primary Rays</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #f59e0b;"></div>
+                    <span>Shadow Rays</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #10b981;"></div>
+                    <span>Reflection Rays</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #60a5fa;"></div>
+                    <span>Camera (blue circle)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #fbbf24;"></div>
+                    <span>Light (yellow circle)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #a78bfa;"></div>
+                    <span>Objects (spheres)</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="article-text">
+            <h2>How Ray Tracing Works</h2>
+            <p><strong>1. Cast primary rays:</strong> For each pixel on the screen, a ray is shot from the camera through that pixel into the scene. This ray is the primary ray.</p>
+            <p><strong>2. Find intersections:</strong> The ray travels through space until it hits an object. The intersection point is calculated using geometric math (ray-sphere or ray-plane equations).</p>
+            <p><strong>3. Compute surface normal:</strong> At the hit point, we calculate the surface normal (perpendicular direction). This tells us the orientation of the surface.</p>
+            <p><strong>4. Cast shadow ray:</strong> From the hit point, a ray is cast toward the light source (shadow ray). If this ray reaches the light unobstructed, the point is lit. If blocked by another object, it's in shadow.</p>
+            <p><strong>5. Cast reflection ray:</strong> Using the surface normal and incoming ray direction, we compute a reflection ray using the law of reflection: angle in = angle out. This ray continues tracing into the scene.</p>
+            <p><strong>6. Recursive bounces:</strong> The reflection ray can hit another object, where we repeat steps 3-5. This creates realistic reflections and indirect lighting.</p>
+
+            <h2>Interactive Controls</h2>
+            <p><strong>Trace Rays:</strong> Shoots 5-30 rays from the camera (configurable). Watch as primary rays hit objects, shadow rays check for occlusion, and reflection rays bounce off surfaces.</p>
+            <p><strong>Step-by-Step:</strong> Traces a single ray with detailed annotation of each stage: ray origin, intersection, normal computation, shadow test, and reflection.</p>
+            <p><strong>Toggle displays:</strong> Show or hide different ray types to focus on specific concepts.</p>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Color constants
+        const COLORS = {
+            primary: '#3b82f6',      // Blue
+            shadow: '#f59e0b',       // Yellow/Orange
+            reflection: '#10b981',   // Green
+            camera: '#60a5fa',       // Light blue
+            light: '#fbbf24',        // Light yellow
+            object: '#a78bfa',       // Purple
+            normal: '#ec4899'        // Pink for normals
+        };
+
+        // Scene state
+        const scene = {
+            camera: { x: 80, y: 250 },
+            light: { x: 650, y: 80 },
+            objects: [
+                { type: 'sphere', x: 200, y: 250, r: 50 },
+                { type: 'sphere', x: 400, y: 300, r: 45 },
+                { type: 'sphere', x: 550, y: 180, r: 55 }
+            ]
+        };
+
+        let state = {
+            showPrimary: true,
+            showShadow: true,
+            showReflection: true,
+            rayCount: 10,
+            drawnRays: [],
+            currentStep: 0,
+            totalSteps: 0,
+            stepMode: false
+        };
+
+        // Update ray count display
+        document.getElementById('rayCount').addEventListener('input', (e) => {
+            state.rayCount = parseInt(e.target.value);
+            document.getElementById('rayCountValue').textContent = e.target.value;
+            draw();
+        });
+
+        document.getElementById('showPrimary').addEventListener('change', (e) => {
+            state.showPrimary = e.target.checked;
+            draw();
+        });
+
+        document.getElementById('showShadow').addEventListener('change', (e) => {
+            state.showShadow = e.target.checked;
+            draw();
+        });
+
+        document.getElementById('showReflection').addEventListener('change', (e) => {
+            state.showReflection = e.target.checked;
+            draw();
+        });
+
+        function rayVsSphere(ox, oy, dx, dy, sphere) {
+            // Ray-sphere intersection
+            const fx = ox - sphere.x;
+            const fy = oy - sphere.y;
+            const a = dx * dx + dy * dy;
+            const b = 2 * (fx * dx + fy * dy);
+            const c = fx * fx + fy * fy - sphere.r * sphere.r;
+            const disc = b * b - 4 * a * c;
+
+            if (disc < 0) return null;
+
+            const t1 = (-b - Math.sqrt(disc)) / (2 * a);
+            const t2 = (-b + Math.sqrt(disc)) / (2 * a);
+            const t = t1 > 0.01 ? t1 : (t2 > 0.01 ? t2 : null);
+
+            if (t === null) return null;
+
+            const ix = ox + dx * t;
+            const iy = oy + dy * t;
+            const nx = (ix - sphere.x) / sphere.r;
+            const ny = (iy - sphere.y) / sphere.r;
+
+            return { t, ix, iy, nx, ny };
+        }
+
+        function castRay(ox, oy, dx, dy) {
+            // Normalize direction
+            const len = Math.sqrt(dx * dx + dy * dy);
+            dx /= len;
+            dy /= len;
+
+            let closest = null;
+            let closestObj = null;
+
+            // Test against all objects
+            for (let obj of scene.objects) {
+                const hit = rayVsSphere(ox, oy, dx, dy, obj);
+                if (hit && (!closest || hit.t < closest.t)) {
+                    closest = hit;
+                    closestObj = obj;
+                }
+            }
+
+            return { hit: closest, obj: closestObj, dx, dy };
+        }
+
+        function traceMultipleRays() {
+            state.drawnRays = [];
+
+            // Generate rays from camera through viewport
+            const rayCount = state.rayCount;
+            const startY = 50;
+            const endY = canvas.height - 50;
+            const viewportX = 200; // Right side of viewport
+
+            for (let i = 0; i < rayCount; i++) {
+                const t = rayCount > 1 ? i / (rayCount - 1) : 0.5;
+                const targetY = startY + t * (endY - startY);
+                const targetX = viewportX;
+
+                // Primary ray
+                const dx = targetX - scene.camera.x;
+                const dy = targetY - scene.camera.y;
+                const result = castRay(scene.camera.x, scene.camera.y, dx, dy);
+
+                if (state.showPrimary && result.hit) {
+                    state.drawnRays.push({
+                        type: 'primary',
+                        ox: scene.camera.x,
+                        oy: scene.camera.y,
+                        ix: result.hit.ix,
+                        iy: result.hit.iy,
+                        color: COLORS.primary,
+                        hit: result.hit,
+                        obj: result.obj
+                    });
+
+                    // Shadow ray
+                    if (state.showShadow && result.obj) {
+                        const sx = scene.light.x - result.hit.ix;
+                        const sy = scene.light.y - result.hit.iy;
+                        const slen = Math.sqrt(sx * sx + sy * sy);
+                        const shadowResult = castRay(
+                            result.hit.ix + result.hit.nx * 2,
+                            result.hit.iy + result.hit.ny * 2,
+                            sx,
+                            sy
+                        );
+
+                        state.drawnRays.push({
+                            type: 'shadow',
+                            ox: result.hit.ix + result.hit.nx * 2,
+                            oy: result.hit.iy + result.hit.ny * 2,
+                            ix: scene.light.x,
+                            iy: scene.light.y,
+                            color: COLORS.shadow,
+                            blocked: shadowResult.hit !== null && shadowResult.hit.t < slen * 0.95
+                        });
+                    }
+
+                    // Reflection ray
+                    if (state.showReflection && result.obj) {
+                        const d_dot_n = result.dx * result.hit.nx + result.dy * result.hit.ny;
+                        const rx = result.dx - 2 * d_dot_n * result.hit.nx;
+                        const ry = result.dy - 2 * d_dot_n * result.hit.ny;
+
+                        const reflectResult = castRay(
+                            result.hit.ix + result.hit.nx * 2,
+                            result.hit.iy + result.hit.ny * 2,
+                            rx,
+                            ry
+                        );
+
+                        if (reflectResult.hit) {
+                            state.drawnRays.push({
+                                type: 'reflection',
+                                ox: result.hit.ix + result.hit.nx * 2,
+                                oy: result.hit.iy + result.hit.ny * 2,
+                                ix: reflectResult.hit.ix,
+                                iy: reflectResult.hit.iy,
+                                color: COLORS.reflection
+                            });
+                        }
+                    }
+                }
+            }
+
+            updateInfoPanel('Rays Traced', `Traced ${state.rayCount} rays through the scene. Blue rays are primary, yellow are shadows, green are reflections.`);
+            draw();
+        }
+
+        function singleRayMode() {
+            state.drawnRays = [];
+            state.stepMode = true;
+            state.currentStep = 0;
+
+            // Trace a single ray from center of viewport
+            const targetY = canvas.height / 2;
+            const targetX = 250;
+            const dx = targetX - scene.camera.x;
+            const dy = targetY - scene.camera.y;
+
+            // Step 1: Show ray origin
+            state.totalSteps = 5;
+            state.currentStep = 1;
+            updateInfoPanel(
+                'Step 1: Ray Origin',
+                'A ray begins at the camera and travels toward the scene. This is the primary ray.'
+            );
+
+            // Draw just the ray direction
+            state.drawnRays = [{
+                type: 'primary',
+                ox: scene.camera.x,
+                oy: scene.camera.y,
+                ix: scene.camera.x + dx * 3,
+                iy: scene.camera.y + dy * 3,
+                color: COLORS.primary,
+                isStep: true
+            }];
+
+            draw();
+        }
+
+        function updateInfoPanel(title, description) {
+            document.getElementById('stepTitle').textContent = title;
+            document.getElementById('stepDescription').textContent = description;
+        }
+
+        function resetVisualization() {
+            state.drawnRays = [];
+            state.stepMode = false;
+            state.currentStep = 0;
+            updateInfoPanel('Ready to trace', 'Click "Trace Rays" to shoot rays from the camera through the scene, or use "Step-by-Step" to trace one ray at a time.');
+            draw();
+        }
+
+        function draw() {
+            // Dark background
+            ctx.fillStyle = Wiki.colors().bgSecondary;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Grid
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < canvas.width; x += 50) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += 50) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+
+            // Viewport indicator
+            ctx.strokeStyle = 'rgba(100, 150, 255, 0.3)';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(180, 30, 40, canvas.height - 60);
+            ctx.fillStyle = 'rgba(100, 150, 255, 0.05)';
+            ctx.fillRect(180, 30, 40, canvas.height - 60);
+            ctx.fillStyle = 'rgba(100, 150, 255, 0.5)';
+            ctx.font = '10px monospace';
+            ctx.fillText('viewport', 145, 25);
+
+            // Draw rays
+            for (let ray of state.drawnRays) {
+                ctx.strokeStyle = ray.color;
+                ctx.lineWidth = 2;
+                ctx.setLineDash([4, 4]);
+                ctx.beginPath();
+                ctx.moveTo(ray.ox, ray.oy);
+                ctx.lineTo(ray.ix, ray.iy);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Ray head (arrowhead)
+                const dx = ray.ix - ray.ox;
+                const dy = ray.iy - ray.oy;
+                const len = Math.sqrt(dx * dx + dy * dy);
+                if (len > 0) {
+                    const ndx = dx / len;
+                    const ndy = dy / len;
+                    const arrowSize = 8;
+                    ctx.fillStyle = ray.color;
+                    ctx.beginPath();
+                    ctx.arc(ray.ix, ray.iy, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            // Draw scene objects
+            for (let obj of scene.objects) {
+                ctx.fillStyle = COLORS.object;
+                ctx.beginPath();
+                ctx.arc(obj.x, obj.y, obj.r, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+
+            // Draw light source
+            ctx.fillStyle = COLORS.light;
+            ctx.beginPath();
+            ctx.arc(scene.light.x, scene.light.y, 8, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Light rays to show direction
+            ctx.strokeStyle = 'rgba(251, 191, 36, 0.3)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([2, 2]);
+            for (let i = 0; i < 4; i++) {
+                const angle = (i / 4) * Math.PI * 2;
+                const dx = Math.cos(angle) * 20;
+                const dy = Math.sin(angle) * 20;
+                ctx.beginPath();
+                ctx.moveTo(scene.light.x, scene.light.y);
+                ctx.lineTo(scene.light.x + dx, scene.light.y + dy);
+                ctx.stroke();
+            }
+            ctx.setLineDash([]);
+
+            ctx.fillStyle = COLORS.light;
+            ctx.font = '11px monospace';
+            ctx.fillText('light', scene.light.x - 15, scene.light.y - 12);
+
+            // Draw camera
+            ctx.fillStyle = COLORS.camera;
+            ctx.beginPath();
+            ctx.arc(scene.camera.x, scene.camera.y, 6, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Camera direction indicator
+            ctx.strokeStyle = COLORS.camera;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(scene.camera.x, scene.camera.y);
+            ctx.lineTo(scene.camera.x + 40, scene.camera.y);
+            ctx.stroke();
+
+            ctx.fillStyle = COLORS.camera;
+            ctx.font = '11px monospace';
+            ctx.fillText('camera', scene.camera.x - 25, scene.camera.y + 15);
+        }
+
+        // Initial draw
+        resetVisualization();
+    </script>
+</body>
+</html>

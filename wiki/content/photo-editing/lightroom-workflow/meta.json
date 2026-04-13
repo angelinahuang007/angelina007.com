@@ -1,0 +1,18 @@
+{
+  "title": "Lightroom Classic Workflow",
+  "category": "photo-editing",
+  "tags": [
+    "lightroom",
+    "workflow",
+    "editing",
+    "RAW",
+    "catalog"
+  ],
+  "description": "Master Lightroom Classic's catalog management, import strategies, rating systems, and develop module techniques for efficient photo editing workflows.",
+  "related": [
+    "photo-editing/raw-processing",
+    "photo-editing/color-grading",
+    "photography/exposure-fundamentals"
+  ],
+  "order": 1
+}

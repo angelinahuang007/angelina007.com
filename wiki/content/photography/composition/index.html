@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Composition & Framing</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        .composition-container {
+            display: flex; flex-wrap: wrap;
+            gap: 20px;
+            height: 100%;
+        }
+        .canvas-area {
+            flex: 1;
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, #16213e 100%);
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .canvas-wrapper {
+            flex: 1;
+            background: var(--canvas-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+            min-height: 250px;
+        }
+        .canvas-wrapper canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+        }
+        .canvas-wrapper canvas:active {
+            cursor: grabbing;
+        }
+        .score-display {
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 6px;
+            padding: 12px;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 12px;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 12px;
+            color: var(--text);
+        }
+        .score-item {
+            text-align: center;
+        }
+        .score-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 16px;
+            font-weight: bold;
+            color: #16a085;
+        }
+        .score-label {
+            font-size: 10px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .control-panel {
+            width: 280px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 16px;
+            overflow-y: auto;
+            color: var(--text);
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 13px;
+        }
+        .control-group {
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        .control-group h4 {
+            margin: 0 0 8px 0;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #16a085;
+            letter-spacing: 0.5px;
+        }
+        .overlay-button {
+            display: block;
+            width: 100%;
+            padding: 8px 12px;
+            margin-bottom: 6px;
+            background: rgba(233, 236, 239, 0.1);
+            border: 1px solid rgba(233, 236, 239, 0.2);
+            color: var(--text);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-family: 'Space Grotesk', sans-serif;
+            transition: all 0.2s;
+            text-align: left;
+        }
+        .overlay-button:hover {
+            background: rgba(22, 160, 133, 0.3);
+            border-color: #16a085;
+        }
+        .overlay-button.active {
+            background: #16a085;
+            color: var(--bg-secondary);
+            border-color: #16a085;
+        }
+        .control-subgroup {
+            background: rgba(233, 236, 239, 0.05);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 8px;
+            margin-top: 8px;
+            font-size: 11px;
+        }
+        .element-item {
+            padding: 4px 6px;
+            margin: 2px 0;
+            background: rgba(22, 160, 133, 0.2);
+            border-left: 2px solid rgba(22, 160, 133, 0.5);
+            border-radius: 2px;
+            cursor: pointer;
+        }
+        .element-item:hover {
+            background: rgba(22, 160, 133, 0.35);
+        }
+        .info-text {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 12px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="composition-container">
+        <div class="canvas-area">
+            <div class="canvas-wrapper">
+                <canvas id="compositionCanvas"></canvas>
+            </div>
+
+            <div class="score-display">
+                <div class="score-item">
+                    <div class="score-label">Alignment</div>
+                    <div class="score-value" id="alignmentScore">0%</div>
+                </div>
+                <div class="score-item">
+                    <div class="score-label">Balance</div>
+                    <div class="score-value" id="balanceScore">0%</div>
+                </div>
+                <div class="score-item">
+                    <div class="score-label">Overall</div>
+                    <div class="score-value" id="overallScore">0%</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="control-panel">
+            <div class="control-group">
+                <h4>Overlay Guides</h4>
+                <button class="overlay-button active" data-overlay="thirds">
+                    📐 Rule of Thirds
+                </button>
+                <button class="overlay-button" data-overlay="golden">
+                    ⭐ Golden Ratio
+                </button>
+                <button class="overlay-button" data-overlay="diagonal">
+                    ↗ Diagonal Lines
+                </button>
+                <button class="overlay-button" data-overlay="center">
+                    ◯ Center Weight
+                </button>
+            </div>
+
+            <div class="control-group">
+                <h4>Scene Elements</h4>
+                <div class="control-subgroup" id="elementsList">
+                    <div class="element-item" data-element="0">Foreground (Red)</div>
+                    <div class="element-item" data-element="1">Subject (Green)</div>
+                    <div class="element-item" data-element="2">Background (Blue)</div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h4>Tips</h4>
+                <div style="font-size: 11px; line-height: 1.6; color: var(--text);">
+                    <strong style="color: #16a085;">Rule of Thirds:</strong> Place key elements at intersections.
+                    <br/><br/>
+                    <strong style="color: #16a085;">Golden Ratio:</strong> Natural composition guide (1.618:1).
+                    <br/><br/>
+                    <strong style="color: #16a085;">Diagonal Lines:</strong> Create dynamic movement.
+                </div>
+            </div>
+
+            <div class="info-text">
+                Drag scene elements to reposition them. The score shows how well they align with composition guides.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class CompositionGuide {
+            constructor() {
+                this.canvas = document.getElementById('compositionCanvas');
+                this.ctx = this.canvas.getContext('2d');
+
+                this.activeOverlays = new Set(['thirds']);
+                this.elements = [
+                    { x: 100, y: 300, width: 80, height: 100, color: '#e74c3c', name: 'Foreground' },
+                    { x: 400, y: 250, width: 60, height: 80, color: '#27ae60', name: 'Subject' },
+                    { x: 600, y: 200, width: 120, height: 150, color: '#3498db', name: 'Background' }
+                ];
+
+                this.draggedElement = null;
+                this.dragOffset = { x: 0, y: 0 };
+
+                this.resizeCanvas();
+                window.addEventListener('resize', () => this.resizeCanvas());
+                this.setupEvents();
+                this.render();
+            }
+
+            resizeCanvas() {
+                const rect = this.canvas.parentElement.getBoundingClientRect();
+                this.canvas.width = rect.width;
+                this.canvas.height = rect.height;
+                this.render();
+            }
+
+            setupEvents() {
+                document.querySelectorAll('[data-overlay]').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const overlay = e.target.dataset.overlay;
+                        if (this.activeOverlays.has(overlay)) {
+                            this.activeOverlays.delete(overlay);
+                            e.target.classList.remove('active');
+                        } else {
+                            this.activeOverlays.add(overlay);
+                            e.target.classList.add('active');
+                        }
+                        this.render();
+                    });
+                });
+
+                this.canvas.addEventListener('mousedown', (e) => this.onMouseDown(e));
+                this.canvas.addEventListener('mousemove', (e) => this.onMouseMove(e));
+                this.canvas.addEventListener('mouseup', () => this.onMouseUp());
+            }
+
+            onMouseDown(e) {
+                const rect = this.canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                for (let i = this.elements.length - 1; i >= 0; i--) {
+                    const el = this.elements[i];
+                    if (x >= el.x && x <= el.x + el.width && y >= el.y && y <= el.y + el.height) {
+                        this.draggedElement = i;
+                        this.dragOffset.x = x - el.x;
+                        this.dragOffset.y = y - el.y;
+                        break;
+                    }
+                }
+            }
+
+            onMouseMove(e) {
+                if (this.draggedElement !== null) {
+                    const rect = this.canvas.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+
+                    const el = this.elements[this.draggedElement];
+                    el.x = Math.max(0, Math.min(this.canvas.width - el.width, x - this.dragOffset.x));
+                    el.y = Math.max(0, Math.min(this.canvas.height - el.height, y - this.dragOffset.y));
+
+                    this.render();
+                }
+            }
+
+            onMouseUp() {
+                this.draggedElement = null;
+            }
+
+            renderThirdGrid() {
+                const w = this.canvas.width;
+                const h = this.canvas.height;
+
+                this.ctx.strokeStyle = 'rgba(22, 160, 133, 0.4)';
+                this.ctx.lineWidth = 2;
+
+                // Vertical lines
+                for (let i = 1; i < 3; i++) {
+                    const x = (w / 3) * i;
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(x, 0);
+                    this.ctx.lineTo(x, h);
+                    this.ctx.stroke();
+                }
+
+                // Horizontal lines
+                for (let i = 1; i < 3; i++) {
+                    const y = (h / 3) * i;
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(0, y);
+                    this.ctx.lineTo(w, y);
+                    this.ctx.stroke();
+                }
+
+                // Highlight intersections
+                this.ctx.fillStyle = 'rgba(22, 160, 133, 0.3)';
+                for (let i = 1; i < 3; i++) {
+                    for (let j = 1; j < 3; j++) {
+                        this.ctx.beginPath();
+                        this.ctx.arc((w / 3) * i, (h / 3) * j, 8, 0, Math.PI * 2);
+                        this.ctx.fill();
+                    }
+                }
+            }
+
+            renderGoldenRatio() {
+                const w = this.canvas.width;
+                const h = this.canvas.height;
+                const phi = 1.618;
+
+                this.ctx.strokeStyle = 'rgba(52, 152, 219, 0.4)';
+                this.ctx.lineWidth = 2;
+
+                const spiralX = w * (1 / phi);
+                const spiralY = h * (1 / phi);
+
+                // Golden spiral approximation
+                this.ctx.beginPath();
+                this.ctx.arc(spiralX, spiralY, Math.min(w, h) / 3, 0, Math.PI * 2);
+                this.ctx.stroke();
+
+                // Golden lines
+                this.ctx.beginPath();
+                this.ctx.moveTo(spiralX, 0);
+                this.ctx.lineTo(spiralX, h);
+                this.ctx.stroke();
+
+                this.ctx.beginPath();
+                this.ctx.moveTo(0, spiralY);
+                this.ctx.lineTo(w, spiralY);
+                this.ctx.stroke();
+            }
+
+            renderDiagonals() {
+                const w = this.canvas.width;
+                const h = this.canvas.height;
+
+                this.ctx.strokeStyle = 'rgba(155, 89, 182, 0.4)';
+                this.ctx.lineWidth = 2;
+
+                // Main diagonal
+                this.ctx.beginPath();
+                this.ctx.moveTo(0, 0);
+                this.ctx.lineTo(w, h);
+                this.ctx.stroke();
+
+                // Anti-diagonal
+                this.ctx.beginPath();
+                this.ctx.moveTo(w, 0);
+                this.ctx.lineTo(0, h);
+                this.ctx.stroke();
+            }
+
+            renderCenterWeight() {
+                const w = this.canvas.width;
+                const h = this.canvas.height;
+                const cx = w / 2;
+                const cy = h / 2;
+
+                this.ctx.strokeStyle = 'rgba(241, 196, 15, 0.3)';
+                this.ctx.lineWidth = 1;
+                this.ctx.setLineDash([4, 4]);
+
+                for (let r = 50; r < Math.max(w, h); r += 50) {
+                    this.ctx.beginPath();
+                    this.ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                    this.ctx.stroke();
+                }
+
+                this.ctx.setLineDash([]);
+                this.ctx.fillStyle = 'rgba(241, 196, 15, 0.2)';
+                this.ctx.beginPath();
+                this.ctx.arc(cx, cy, 100, 0, Math.PI * 2);
+                this.ctx.fill();
+            }
+
+            render() {
+                const w = this.canvas.width;
+                const h = this.canvas.height;
+
+                // Background
+                this.ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--canvas-bg').trim();
+                this.ctx.fillRect(0, 0, w, h);
+
+                // Draw overlays
+                if (this.activeOverlays.has('thirds')) this.renderThirdGrid();
+                if (this.activeOverlays.has('golden')) this.renderGoldenRatio();
+                if (this.activeOverlays.has('diagonal')) this.renderDiagonals();
+                if (this.activeOverlays.has('center')) this.renderCenterWeight();
+
+                // Draw elements
+                this.elements.forEach((el, idx) => {
+                    this.ctx.fillStyle = el.color;
+                    this.ctx.fillRect(el.x, el.y, el.width, el.height);
+
+                    this.ctx.strokeStyle = 'rgba(233, 236, 239, 0.5)';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.strokeRect(el.x, el.y, el.width, el.height);
+
+                    // Label
+                    this.ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text').trim();
+                    this.ctx.font = 'bold 12px "Space Mono"';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText(el.name, el.x + el.width / 2, el.y + el.height / 2);
+                });
+
+                this.updateScore();
+            }
+
+            updateScore() {
+                const w = this.canvas.width;
+                const h = this.canvas.height;
+
+                // Alignment score: how well elements align with thirds
+                let alignmentScore = 0;
+                const thirdVerts = [w / 3, (2 * w) / 3];
+                const thirdHoriz = [h / 3, (2 * h) / 3];
+
+                this.elements.forEach(el => {
+                    const centerX = el.x + el.width / 2;
+                    const centerY = el.y + el.height / 2;
+
+                    thirdVerts.forEach(x => {
+                        if (Math.abs(centerX - x) < 50) alignmentScore += 0.3;
+                    });
+
+                    thirdHoriz.forEach(y => {
+                        if (Math.abs(centerY - y) < 50) alignmentScore += 0.3;
+                    });
+                });
+
+                alignmentScore = Math.min(100, alignmentScore);
+
+                // Balance score: spread of elements
+                const positions = this.elements.map(el => el.x + el.width / 2);
+                const avgPos = positions.reduce((a, b) => a + b) / positions.length;
+                const variance = positions.reduce((sum, pos) => sum + Math.abs(pos - avgPos), 0) / positions.length;
+                const balanceScore = Math.min(100, variance / (w / 6) * 100);
+
+                const overallScore = (alignmentScore * 0.6 + balanceScore * 0.4);
+
+                document.getElementById('alignmentScore').textContent = Math.round(alignmentScore) + '%';
+                document.getElementById('balanceScore').textContent = Math.round(balanceScore) + '%';
+                document.getElementById('overallScore').textContent = Math.round(overallScore) + '%';
+            }
+        }
+
+        const guide = new CompositionGuide();
+    </script>
+</body>
+</html>

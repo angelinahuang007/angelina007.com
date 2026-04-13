@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rendering Equation Deep Dive</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        body {
+            background: var(--bg-dark);
+            color: var(--fg-light);
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        .article-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            font-size: 1.1em;
+            color: var(--fg-muted);
+            margin-bottom: 40px;
+            font-family: 'Space Grotesk';
+        }
+
+        /* Rendering Equation Section */
+        .equation-section {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 30px;
+            margin-bottom: 40px;
+        }
+
+        .equation-section h2 {
+            font-size: 1.4em;
+            margin-bottom: 20px;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .rendering-equation {
+            background: rgba(0, 0, 0, 0.3);
+            border-left: 4px solid var(--accent);
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            overflow-x: auto;
+        }
+
+        .equation-display {
+            font-size: 1.2em;
+            line-height: 1.8;
+            color: var(--text);
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .equation-display span.var {
+            color: #4ecdc4;
+            font-weight: 700;
+        }
+
+        .equation-display span.op {
+            color: #ffe66d;
+        }
+
+        .equation-display span.integral {
+            font-size: 1.4em;
+            margin: 0 5px;
+        }
+
+        .terms-explanation {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .term-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Space Mono', monospace;
+            font-size: 0.9em;
+        }
+
+        .term-card strong {
+            color: var(--accent);
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .term-card p {
+            margin: 0;
+            line-height: 1.5;
+            color: var(--fg-muted);
+        }
+
+        /* BRDF Models Section */
+        .brdf-section {
+            margin-top: 40px;
+        }
+
+        .brdf-section h2 {
+            font-size: 1.4em;
+            margin-bottom: 20px;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .brdf-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .brdf-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .brdf-card:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: var(--accent);
+            transform: translateY(-2px);
+        }
+
+        .brdf-card.active {
+            background: rgba(78, 205, 196, 0.1);
+            border-color: var(--accent);
+        }
+
+        .brdf-card h3 {
+            font-size: 1.2em;
+            margin: 0 0 10px 0;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .brdf-card p {
+            font-size: 0.9em;
+            color: var(--fg-muted);
+            margin: 0;
+            line-height: 1.5;
+        }
+
+        .brdf-details {
+            display: none;
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+        }
+
+        .brdf-details.active {
+            display: block;
+        }
+
+        .brdf-details h3 {
+            font-size: 1.2em;
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: var(--accent);
+            font-weight: 700;
+        }
+
+        .formula {
+            background: rgba(255, 255, 255, 0.03);
+            border-left: 4px solid var(--accent);
+            padding: 15px;
+            margin: 15px 0;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.95em;
+            overflow-x: auto;
+            border-radius: 4px;
+        }
+
+        .parameters {
+            margin-top: 20px;
+        }
+
+        .parameters h4 {
+            font-size: 1em;
+            margin: 15px 0 10px 0;
+            color: var(--accent);
+            font-weight: 700;
+        }
+
+        .param-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .param-list li {
+            padding: 8px 0;
+            font-size: 0.9em;
+            color: var(--fg-muted);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            font-family: 'Space Mono', monospace;
+        }
+
+        .param-list li:last-child {
+            border-bottom: none;
+        }
+
+        .canvas-container {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        canvas {
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 4px;
+            max-width: 100%;
+            height: auto;
+        }
+
+        .controls-group {
+            margin-top: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .slider-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .slider-group label {
+            font-family: 'Space Mono', monospace;
+            font-size: 0.9em;
+            color: var(--fg-muted);
+        }
+
+        .slider-group input[type="range"] {
+            width: 150px;
+        }
+
+        .slider-group span {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9em;
+            color: var(--accent);
+            min-width: 50px;
+        }
+
+        button {
+            padding: 8px 16px;
+            background: var(--accent);
+            color: var(--bg-dark);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: 'Space Mono', monospace;
+            font-weight: 700;
+            transition: all 0.2s ease;
+        }
+
+        button:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .info-text {
+            font-size: 0.9em;
+            color: var(--fg-muted);
+            margin-top: 15px;
+            font-family: 'Space Mono', monospace;
+            line-height: 1.6;
+        }
+
+        @media (max-width: 768px) {
+            .brdf-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .terms-explanation {
+                grid-template-columns: 1fr;
+            }
+
+            .equation-display {
+                font-size: 1em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="article-container">
+        <h1>Rendering Equation Deep Dive</h1>
+        <p class="subtitle">Understanding the fundamental equation of computer graphics and how different BRDF models approximate light reflection.</p>
+
+        <!-- Rendering Equation Display -->
+        <section class="equation-section">
+            <h2>The Rendering Equation</h2>
+            <div class="rendering-equation">
+                <div class="equation-display">
+                    <span class="var">L<sub>o</sub></span><span class="op">(</span><span class="var">x, ω<sub>o</sub></span><span class="op">) = </span><span class="var">L<sub>e</sub></span><span class="op">(</span><span class="var">x, ω<sub>o</sub></span><span class="op">) +</span>
+                    <span class="integral">∫</span><span class="var"><sub>Ω</sub></span><span class="op"> </span><span class="var">f<sub>r</sub></span><span class="op">(</span><span class="var">x, ω<sub>i</sub>, ω<sub>o</sub></span><span class="op">)</span><span class="var"> L<sub>i</sub></span><span class="op">(</span><span class="var">x, ω<sub>i</sub></span><span class="op">)</span><span class="op"> (</span><span class="var">ω<sub>i</sub></span><span class="op"> · </span><span class="var">n</span><span class="op">) </span><span class="var">dω<sub>i</sub></span>
+                </div>
+            </div>
+
+            <h3 style="font-size: 1.1em; margin-top: 25px; color: var(--accent); font-weight: 700;">Term Definitions</h3>
+            <div class="terms-explanation">
+                <div class="term-card">
+                    <strong>L<sub>o</sub>(x, ω<sub>o</sub>)</strong>
+                    <p>Outgoing radiance from point x in direction ω<sub>o</sub>. This is what the camera sees.</p>
+                </div>
+                <div class="term-card">
+                    <strong>L<sub>e</sub>(x, ω<sub>o</sub>)</strong>
+                    <p>Emitted radiance directly from the surface itself (e.g., self-luminous materials).</p>
+                </div>
+                <div class="term-card">
+                    <strong>f<sub>r</sub>(x, ω<sub>i</sub>, ω<sub>o</sub>)</strong>
+                    <p>BRDF (Bidirectional Reflectance Distribution Function). Describes how the surface reflects light from ω<sub>i</sub> to ω<sub>o</sub>.</p>
+                </div>
+                <div class="term-card">
+                    <strong>L<sub>i</sub>(x, ω<sub>i</sub>)</strong>
+                    <p>Incoming radiance from direction ω<sub>i</sub>. Light arriving at the surface.</p>
+                </div>
+                <div class="term-card">
+                    <strong>ω<sub>i</sub> · n</strong>
+                    <p>Cosine of the angle between incoming light direction and surface normal. Accounts for foreshortening.</p>
+                </div>
+                <div class="term-card">
+                    <strong>Ω (hemisphere)</strong>
+                    <p>Integration domain: all directions above the surface (2π steradians).</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- BRDF Models Section -->
+        <section class="brdf-section">
+            <h2>Classic BRDF Models</h2>
+            <p style="color: var(--fg-muted); margin-bottom: 20px;">Click a card to explore different surface reflection models and see them rendered in real-time.</p>
+
+            <div class="brdf-grid">
+                <div class="brdf-card" data-model="lambert">
+                    <h3>Lambert</h3>
+                    <p>Ideal diffuse reflection. Light scatters uniformly in all directions equally.</p>
+                </div>
+                <div class="brdf-card" data-model="blinn-phong">
+                    <h3>Blinn-Phong</h3>
+                    <p>Specular + diffuse. Creates glossy highlights, computationally efficient.</p>
+                </div>
+                <div class="brdf-card" data-model="cook-torrance">
+                    <h3>Cook-Torrance</h3>
+                    <p>Microfacet-based PBR. Physically plausible for metals and rough dielectrics.</p>
+                </div>
+                <div class="brdf-card" data-model="oren-nayar">
+                    <h3>Oren-Nayar</h3>
+                    <p>Rough diffuse surfaces. More realistic than Lambert for non-smooth materials.</p>
+                </div>
+            </div>
+
+            <!-- Lambert Details -->
+            <div class="brdf-details" data-model="lambert">
+                <h3>Lambert (Diffuse Reflection)</h3>
+                <div class="formula">
+                    f<sub>r</sub> = c / π
+                </div>
+                <p style="color: var(--fg-muted); font-size: 0.9em; margin-bottom: 15px;">
+                    The simplest BRDF model. Light is scattered equally in all directions above the surface. The 1/π normalization ensures energy conservation. Commonly used for matte surfaces like paper or fabric.
+                </p>
+                <div class="canvas-container">
+                    <canvas id="canvas-lambert" width="400" height="400"></canvas>
+                </div>
+                <div class="controls-group">
+                    <div class="slider-group">
+                        <label>Light X:</label>
+                        <input type="range" class="light-x" min="-1" max="1" value="0.5" step="0.05">
+                        <span class="light-x-val">0.50</span>
+                    </div>
+                    <div class="slider-group">
+                        <label>Light Y:</label>
+                        <input type="range" class="light-y" min="0" max="1" value="0.8" step="0.05">
+                        <span class="light-y-val">0.80</span>
+                    </div>
+                </div>
+                <div class="parameters">
+                    <h4>Parameters</h4>
+                    <ul class="param-list">
+                        <li><strong>c (albedo):</strong> Surface color/reflectance (0–1 for each channel)</li>
+                        <li><strong>No roughness:</strong> Diffuse always looks the same regardless of viewing angle</li>
+                        <li><strong>Best for:</strong> Matte surfaces, unpolished wood, paper, fabric</li>
+                    </ul>
+                </div>
+                <div class="info-text">
+                    <strong>Note:</strong> Lambert looks flat under all lighting conditions. It doesn't capture the subtle directional variation that Oren-Nayar provides for rough surfaces.
+                </div>
+            </div>
+
+            <!-- Blinn-Phong Details -->
+            <div class="brdf-details" data-model="blinn-phong">
+                <h3>Blinn-Phong (Specular + Diffuse)</h3>
+                <div class="formula">
+                    f<sub>r</sub> = c<sub>d</sub> / π + c<sub>s</sub> (n + 2) / (2π) (h · n)<sup>n</sup>
+                </div>
+                <p style="color: var(--fg-muted); font-size: 0.9em; margin-bottom: 15px;">
+                    Combines diffuse and specular components. The specular term creates a glossy highlight that moves with the viewing angle. The exponent n controls the size of the highlight—higher values = sharper, smaller highlights (more polished).
+                </p>
+                <div class="canvas-container">
+                    <canvas id="canvas-blinn-phong" width="400" height="400"></canvas>
+                </div>
+                <div class="controls-group">
+                    <div class="slider-group">
+                        <label>Light X:</label>
+                        <input type="range" class="light-x" min="-1" max="1" value="0.5" step="0.05">
+                        <span class="light-x-val">0.50</span>
+                    </div>
+                    <div class="slider-group">
+                        <label>Light Y:</label>
+                        <input type="range" class="light-y" min="0" max="1" value="0.8" step="0.05">
+                        <span class="light-y-val">0.80</span>
+                    </div>
+                    <div class="slider-group">
+                        <label>Roughness:</label>
+                        <input type="range" class="roughness" min="0.1" max="1" value="0.5" step="0.05">
+                        <span class="roughness-val">0.50</span>
+                    </div>
+                </div>
+                <div class="parameters">
+                    <h4>Parameters</h4>
+                    <ul class="param-list">
+                        <li><strong>c<sub>d</sub> (diffuse):</strong> Matte base color</li>
+                        <li><strong>c<sub>s</sub> (specular):</strong> Highlight color/intensity</li>
+                        <li><strong>n (exponent):</strong> Shininess. High n = sharp highlight, n=1 = very rough</li>
+                        <li><strong>h:</strong> Half-vector between light and view direction</li>
+                        <li><strong>Best for:</strong> Plastic, lacquered surfaces, quick approximations</li>
+                    </ul>
+                </div>
+                <div class="info-text">
+                    <strong>Note:</strong> Fast to compute and intuitive to control, but not physically based. Does not conserve energy and breaks down at grazing angles.
+                </div>
+            </div>
+
+            <!-- Cook-Torrance Details -->
+            <div class="brdf-details" data-model="cook-torrance">
+                <h3>Cook-Torrance (Microfacet PBR)</h3>
+                <div class="formula">
+                    f<sub>r</sub> = c<sub>d</sub> / π + c<sub>s</sub> DFG / (4(ω<sub>o</sub>·n)(ω<sub>i</sub>·n))
+                </div>
+                <p style="color: var(--fg-muted); font-size: 0.9em; margin-bottom: 15px;">
+                    Physically based model treating surfaces as collections of tiny microfacets. D = roughness distribution, F = Fresnel reflection, G = geometric attenuation. Industry standard for realistic metal and material rendering.
+                </p>
+                <div class="canvas-container">
+                    <canvas id="canvas-cook-torrance" width="400" height="400"></canvas>
+                </div>
+                <div class="controls-group">
+                    <div class="slider-group">
+                        <label>Light X:</label>
+                        <input type="range" class="light-x" min="-1" max="1" value="0.5" step="0.05">
+                        <span class="light-x-val">0.50</span>
+                    </div>
+                    <div class="slider-group">
+                        <label>Light Y:</label>
+                        <input type="range" class="light-y" min="0" max="1" value="0.8" step="0.05">
+                        <span class="light-y-val">0.80</span>
+                    </div>
+                    <div class="slider-group">
+                        <label>Roughness:</label>
+                        <input type="range" class="roughness" min="0.01" max="1" value="0.3" step="0.05">
+                        <span class="roughness-val">0.30</span>
+                    </div>
+                </div>
+                <div class="parameters">
+                    <h4>Parameters</h4>
+                    <ul class="param-list">
+                        <li><strong>roughness (α):</strong> Surface roughness (0=mirror smooth, 1=very rough)</li>
+                        <li><strong>metallic:</strong> 0 = dielectric, 1 = conductor (controls base reflectance)</li>
+                        <li><strong>D (GGX):</strong> Trowbridge-Reitz distribution for microfacet slopes</li>
+                        <li><strong>F (Schlick):</strong> Fresnel effect—reflectance increases at grazing angles</li>
+                        <li><strong>G (SmithGGX):</strong> Self-shadowing of microfacets</li>
+                        <li><strong>Best for:</strong> All surfaces, metals, ceramics, realistic materials</li>
+                    </ul>
+                </div>
+                <div class="info-text">
+                    <strong>Note:</strong> Physically plausible and energy-conserving. Used in game engines (PBR workflow) and offline renderers. More complex but produces realistic results.
+                </div>
+            </div>
+
+            <!-- Oren-Nayar Details -->
+            <div class="brdf-details" data-model="oren-nayar">
+                <h3>Oren-Nayar (Rough Diffuse)</h3>
+                <div class="formula">
+                    f<sub>r</sub> = c / π (A + B cos(φ<sub>i</sub> - φ<sub>o</sub>) sin(α) tan(β))
+                </div>
+                <p style="color: var(--fg-muted); font-size: 0.9em; margin-bottom: 15px;">
+                    Extends Lambert for rough diffuse surfaces. Surfaces appear brighter when viewing angle aligns with light direction. Better matches real-world materials like concrete, sand, and unpolished wood.
+                </p>
+                <div class="canvas-container">
+                    <canvas id="canvas-oren-nayar" width="400" height="400"></canvas>
+                </div>
+                <div class="controls-group">
+                    <div class="slider-group">
+                        <label>Light X:</label>
+                        <input type="range" class="light-x" min="-1" max="1" value="0.5" step="0.05">
+                        <span class="light-x-val">0.50</span>
+                    </div>
+                    <div class="slider-group">
+                        <label>Light Y:</label>
+                        <input type="range" class="light-y" min="0" max="1" value="0.8" step="0.05">
+                        <span class="light-y-val">0.80</span>
+                    </div>
+                    <div class="slider-group">
+                        <label>Roughness:</label>
+                        <input type="range" class="roughness" min="0" max="1" value="0.5" step="0.05">
+                        <span class="roughness-val">0.50</span>
+                    </div>
+                </div>
+                <div class="parameters">
+                    <h4>Parameters</h4>
+                    <ul class="param-list">
+                        <li><strong>σ (roughness):</strong> RMS slope of microfacets (0=smooth diffuse, 1=very rough)</li>
+                        <li><strong>A, B:</strong> Coefficients derived from roughness for the Oren-Nayar formula</li>
+                        <li><strong>φ, α, β:</strong> Azimuthal angles and elevation angles in hemispheric coordinates</li>
+                        <li><strong>Best for:</strong> Rough diffuse surfaces, concrete, sand, rough plaster, fabric</li>
+                    </ul>
+                </div>
+                <div class="info-text">
+                    <strong>Note:</strong> More accurate than Lambert for rough surfaces but less complex than Cook-Torrance. Good compromise between realism and computational cost.
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        // Initialize canvas renderers for each BRDF model
+        const models = {
+            lambert: {
+                canvas: null,
+                ctx: null,
+                lightX: 0.5,
+                lightY: 0.8,
+                roughness: 0.5
+            },
+            'blinn-phong': {
+                canvas: null,
+                ctx: null,
+                lightX: 0.5,
+                lightY: 0.8,
+                roughness: 0.5
+            },
+            'cook-torrance': {
+                canvas: null,
+                ctx: null,
+                lightX: 0.5,
+                lightY: 0.8,
+                roughness: 0.3
+            },
+            'oren-nayar': {
+                canvas: null,
+                ctx: null,
+                lightX: 0.5,
+                lightY: 0.8,
+                roughness: 0.5
+            }
+        };
+
+        // Initialize canvases
+        Object.keys(models).forEach(modelName => {
+            const canvasId = `canvas-${modelName}`;
+            const canvas = document.getElementById(canvasId);
+            if (canvas) {
+                models[modelName].canvas = canvas;
+                models[modelName].ctx = canvas.getContext('2d');
+            }
+        });
+
+        // BRDF Model Functions
+        function lambertBRDF(lightDir, viewDir, normal, albedo) {
+            const diffuse = Math.max(0, lightDir.dot(normal));
+            return albedo * diffuse / Math.PI;
+        }
+
+        function blinnPhongBRDF(lightDir, viewDir, normal, albedo, roughness) {
+            const diffuse = Math.max(0, lightDir.dot(normal));
+            const halfVec = lightDir.add(viewDir).normalize();
+            const specExponent = Math.pow(2, (1 - roughness) * 8);
+            const specular = Math.pow(Math.max(0, halfVec.dot(normal)), specExponent) * (specExponent + 2) / (2 * Math.PI);
+            return (albedo * diffuse + specular) / Math.PI;
+        }
+
+        function cookTorranceBRDF(lightDir, viewDir, normal, albedo, roughness) {
+            const NdotL = Math.max(0.001, lightDir.dot(normal));
+            const NdotV = Math.max(0.001, viewDir.dot(normal));
+            if (NdotL < 0 || NdotV < 0) return 0;
+
+            const halfVec = lightDir.add(viewDir).normalize();
+            const NdotH = Math.max(0.001, halfVec.dot(normal));
+            const alpha = roughness * roughness;
+            const alphaSq = alpha * alpha;
+
+            // GGX Distribution
+            const denomD = NdotH * NdotH * (alphaSq - 1) + 1;
+            const D = alphaSq / (Math.PI * denomD * denomD);
+
+            // Schlick Fresnel
+            const LdotH = Math.max(0.001, lightDir.dot(halfVec));
+            const F = 0.04 + 0.96 * Math.pow(1 - LdotH, 5);
+
+            // SmithGGX Geometry
+            const k = alpha / 2;
+            const G1V = NdotV / (NdotV * (1 - k) + k);
+            const G1L = NdotL / (NdotL * (1 - k) + k);
+            const G = G1V * G1L;
+
+            const specular = D * F * G / (4 * NdotL * NdotV);
+            const diffuse = (albedo / Math.PI) * NdotL * (1 - F);
+            return diffuse + specular;
+        }
+
+        function orenNayarBRDF(lightDir, viewDir, normal, albedo, roughness) {
+            const NdotL = Math.max(0, lightDir.dot(normal));
+            const NdotV = Math.max(0, viewDir.dot(normal));
+            if (NdotL < 0 || NdotV < 0) return 0;
+
+            const sigma = roughness * Math.PI / 2;
+            const sigmaSq = sigma * sigma;
+            const A = 1 - 0.5 * sigmaSq / (sigmaSq + 0.33);
+            const B = 0.45 * sigmaSq / (sigmaSq + 0.09);
+
+            const sinAlpha = Math.sqrt(1 - NdotL * NdotL);
+            const tanBeta = Math.sqrt(1 - NdotV * NdotV) / Math.max(0.001, NdotV);
+            const cosDiff = Math.cos(Math.atan2(lightDir.y, lightDir.x) - Math.atan2(viewDir.y, viewDir.x));
+
+            return (albedo / Math.PI) * NdotL * (A + B * cosDiff * sinAlpha * tanBeta);
+        }
+
+        // Simple 3D vector class
+        class Vec3 {
+            constructor(x, y, z) {
+                this.x = x;
+                this.y = y;
+                this.z = z;
+            }
+
+            dot(other) {
+                return this.x * other.x + this.y * other.y + this.z * other.z;
+            }
+
+            add(other) {
+                return new Vec3(this.x + other.x, this.y + other.y, this.z + other.z);
+            }
+
+            normalize() {
+                const len = Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
+                return new Vec3(this.x / len, this.y / len, this.z / len);
+            }
+        }
+
+        // Render sphere with selected BRDF
+        function renderSphere(modelName, lightX, lightY, roughness) {
+            const model = models[modelName];
+            if (!model.canvas) return;
+
+            const canvas = model.canvas;
+            const ctx = model.ctx;
+            const width = canvas.width;
+            const height = canvas.height;
+            const centerX = width / 2;
+            const centerY = height / 2;
+            const radius = 80;
+
+            // Get background color
+            const bgColor = Wiki.colors().bg || '#0a0e27';
+            ctx.fillStyle = bgColor;
+            ctx.fillRect(0, 0, width, height);
+
+            // Light direction (normalized)
+            const lightDirNorm = new Vec3(lightX, lightY, 0.7).normalize();
+            const viewDir = new Vec3(0, 0, 1).normalize();
+            const albedo = 0.7;
+
+            // Render sphere
+            const imageData = ctx.createImageData(width, height);
+            const data = imageData.data;
+
+            for (let py = 0; py < height; py++) {
+                for (let px = 0; px < width; px++) {
+                    const dx = px - centerX;
+                    const dy = py - centerY;
+                    const distSq = dx * dx + dy * dy;
+
+                    let r, g, b, a;
+
+                    if (distSq <= radius * radius) {
+                        // Point is on sphere
+                        const z = Math.sqrt(radius * radius - distSq);
+                        const normal = new Vec3(dx, dy, z).normalize();
+
+                        // Calculate BRDF based on model
+                        let radiance = 0;
+                        switch (modelName) {
+                            case 'lambert':
+                                radiance = lambertBRDF(lightDirNorm, viewDir, normal, albedo);
+                                break;
+                            case 'blinn-phong':
+                                radiance = blinnPhongBRDF(lightDirNorm, viewDir, normal, albedo, roughness);
+                                break;
+                            case 'cook-torrance':
+                                radiance = cookTorranceBRDF(lightDirNorm, viewDir, normal, albedo, roughness);
+                                break;
+                            case 'oren-nayar':
+                                radiance = orenNayarBRDF(lightDirNorm, viewDir, normal, albedo, roughness);
+                                break;
+                        }
+
+                        radiance = Math.min(1, radiance * 1.5); // Scale for visibility
+                        r = Math.floor(radiance * 255);
+                        g = Math.floor(radiance * 200);
+                        b = Math.floor(radiance * 180);
+                        a = 255;
+                    } else {
+                        // Background
+                        r = 20;
+                        g = 20;
+                        b = 40;
+                        a = 255;
+                    }
+
+                    const idx = (py * width + px) * 4;
+                    data[idx] = r;
+                    data[idx + 1] = g;
+                    data[idx + 2] = b;
+                    data[idx + 3] = a;
+                }
+            }
+
+            ctx.putImageData(imageData, 0, 0);
+
+            // Draw light direction indicator
+            ctx.strokeStyle = 'rgba(255, 230, 109, 0.8)';
+            ctx.lineWidth = 2;
+            const lightScreenX = centerX + lightX * 80;
+            const lightScreenY = centerY - lightY * 80;
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(lightScreenX, lightScreenY);
+            ctx.stroke();
+
+            ctx.fillStyle = 'rgba(255, 230, 109, 0.6)';
+            ctx.beginPath();
+            ctx.arc(lightScreenX, lightScreenY, 4, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Event listeners for BRDF cards
+        document.querySelectorAll('.brdf-card').forEach(card => {
+            card.addEventListener('click', function() {
+                const modelName = this.dataset.model;
+
+                // Hide all details
+                document.querySelectorAll('.brdf-details').forEach(det => {
+                    det.classList.remove('active');
+                });
+
+                // Remove active from all cards
+                document.querySelectorAll('.brdf-card').forEach(c => {
+                    c.classList.remove('active');
+                });
+
+                // Show selected details and mark card active
+                document.querySelector(`.brdf-details[data-model="${modelName}"]`).classList.add('active');
+                this.classList.add('active');
+
+                // Render the sphere
+                const model = models[modelName];
+                renderSphere(modelName, model.lightX, model.lightY, model.roughness);
+            });
+        });
+
+        // Event listeners for controls in each BRDF details section
+        document.querySelectorAll('.brdf-details').forEach(details => {
+            const modelName = details.dataset.model;
+            const model = models[modelName];
+
+            const lightXInputs = details.querySelectorAll('input.light-x');
+            const lightYInputs = details.querySelectorAll('input.light-y');
+            const roughnessInputs = details.querySelectorAll('input.roughness');
+
+            lightXInputs.forEach(input => {
+                input.addEventListener('input', (e) => {
+                    model.lightX = parseFloat(e.target.value);
+                    details.querySelector('.light-x-val').textContent = model.lightX.toFixed(2);
+                    renderSphere(modelName, model.lightX, model.lightY, model.roughness);
+                });
+            });
+
+            lightYInputs.forEach(input => {
+                input.addEventListener('input', (e) => {
+                    model.lightY = parseFloat(e.target.value);
+                    details.querySelector('.light-y-val').textContent = model.lightY.toFixed(2);
+                    renderSphere(modelName, model.lightX, model.lightY, model.roughness);
+                });
+            });
+
+            roughnessInputs.forEach(input => {
+                input.addEventListener('input', (e) => {
+                    model.roughness = parseFloat(e.target.value);
+                    details.querySelector('.roughness-val').textContent = model.roughness.toFixed(2);
+                    renderSphere(modelName, model.lightX, model.lightY, model.roughness);
+                });
+            });
+        });
+
+        // Auto-render the first model on load
+        window.addEventListener('load', () => {
+            const firstCard = document.querySelector('.brdf-card');
+            if (firstCard) {
+                firstCard.click();
+            }
+        });
+    </script>
+</body>
+</html>

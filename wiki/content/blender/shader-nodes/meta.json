@@ -1,0 +1,19 @@
+{
+  "title": "Blender Shader Nodes and Material Systems",
+  "category": "blender",
+  "order": 2,
+  "tags": [
+    "blender",
+    "shaders",
+    "cycles",
+    "EEVEE",
+    "nodes",
+    "PBR"
+  ],
+  "description": "Deep dive into Blender's node-based shader system, comparing Cycles and EEVEE rendering, exploring the Principled BSDF, procedural textures, and how Blender's shader model maps to physical-based rendering theory.",
+  "related": [
+    "graphics-fundamentals/pbr-rendering",
+    "graphics-fundamentals/shading-models",
+    "game-engines/unity/shader-programming"
+  ]
+}

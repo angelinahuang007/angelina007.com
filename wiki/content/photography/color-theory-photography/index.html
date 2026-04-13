@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Color Theory & White Balance</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        .color-container {
+            display: flex; flex-wrap: wrap;
+            gap: 20px;
+            height: 100%;
+        }
+        .preview-area {
+            flex: 1;
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, #16213e 100%);
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            overflow-y: auto;
+        }
+        .canvas-section {
+            background: var(--canvas-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .canvas-section h3 {
+            margin: 0;
+            padding: 12px;
+            background: rgba(22, 160, 133, 0.2);
+            color: #16a085;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid rgba(233, 236, 239, 0.1);
+        }
+        .canvas-section canvas {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+        .color-space-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .color-space-item {
+            background: var(--canvas-bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 12px;
+            text-align: center;
+            color: var(--text);
+            font-size: 11px;
+        }
+        .color-space-name {
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #16a085;
+        }
+        .control-panel {
+            width: 280px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 16px;
+            overflow-y: auto;
+            color: var(--text);
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 13px;
+        }
+        .control-group {
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        .control-group h4 {
+            margin: 0 0 8px 0;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #16a085;
+            letter-spacing: 0.5px;
+        }
+        .slider-row {
+            margin-bottom: 12px;
+        }
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+            font-size: 12px;
+        }
+        input[type="range"] {
+            width: 100%;
+            height: 4px;
+            border-radius: 2px;
+            background: var(--border-strong);
+            outline: none;
+            -webkit-appearance: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #16a085;
+            cursor: pointer;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #16a085;
+            border: none;
+            cursor: pointer;
+        }
+        .color-picker-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .color-input {
+            padding: 6px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-strong);
+            border-radius: 4px;
+            color: var(--text);
+            font-size: 11px;
+            font-family: 'Space Grotesk', sans-serif;
+        }
+        .space-toggle {
+            display: flex;
+            gap: 6px;
+            margin-top: 8px;
+        }
+        .space-btn {
+            flex: 1;
+            padding: 6px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-strong);
+            color: var(--text);
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 10px;
+            transition: all 0.2s;
+        }
+        .space-btn:hover {
+            background: rgba(22, 160, 133, 0.3);
+        }
+        .space-btn.active {
+            background: #16a085;
+            color: var(--bg-secondary);
+            border-color: #16a085;
+        }
+        .info-text {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 12px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="color-container">
+        <div class="preview-area">
+            <div class="canvas-section">
+                <h3>CIE Color Space</h3>
+                <canvas id="cieCanvas" width="500" height="300"></canvas>
+            </div>
+
+            <div class="canvas-section">
+                <h3>RGB Histogram</h3>
+                <canvas id="histogramCanvas" width="500" height="150"></canvas>
+            </div>
+
+            <div class="color-space-grid">
+                <div class="color-space-item">
+                    <div class="color-space-name">sRGB</div>
+                    <div id="srgbGamut" style="width: 100%; height: 60px; border: 1px solid var(--border-strong); border-radius: 4px;"></div>
+                </div>
+                <div class="color-space-item">
+                    <div class="color-space-name">Adobe RGB</div>
+                    <div id="adobeGamut" style="width: 100%; height: 60px; border: 1px solid var(--border-strong); border-radius: 4px;"></div>
+                </div>
+                <div class="color-space-item">
+                    <div class="color-space-name">Current Color</div>
+                    <div id="currentColor" style="width: 100%; height: 60px; border: 1px solid var(--border-strong); border-radius: 4px;"></div>
+                </div>
+                <div class="color-space-item">
+                    <div class="color-space-name">ProPhoto RGB</div>
+                    <div id="prophotoGamut" style="width: 100%; height: 60px; border: 1px solid var(--border-strong); border-radius: 4px;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="control-panel">
+            <div class="control-group">
+                <h4>White Balance</h4>
+                <div class="slider-row">
+                    <div class="slider-label">
+                        <span>Color Temperature</span>
+                        <span id="tempValue">5500K</span>
+                    </div>
+                    <input type="range" id="tempSlider" min="2000" max="10000" step="100" value="5500">
+                    <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Warm ← → Cool</div>
+                </div>
+
+                <div class="slider-row">
+                    <div class="slider-label">
+                        <span>Tint</span>
+                        <span id="tintValue">0</span>
+                    </div>
+                    <input type="range" id="tintSlider" min="-50" max="50" step="5" value="0">
+                    <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Green ← → Magenta</div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h4>Color Space</h4>
+                <div class="space-toggle">
+                    <button class="space-btn active" data-space="srgb">sRGB</button>
+                    <button class="space-btn" data-space="adobe">Adobe</button>
+                    <button class="space-btn" data-space="prophoto">ProPhoto</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h4>Sample Color</h4>
+                <div class="color-picker-group">
+                    <input type="text" class="color-input" id="hexInput" placeholder="#xxxxxx" value="#D4A574">
+                    <input type="text" class="color-input" id="labInput" placeholder="Lab: L a b">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h4>Presets</h4>
+                <button style="width: 100%; padding: 6px; background: var(--bg-tertiary); border: 1px solid var(--border-strong); color: var(--text); border-radius: 3px; cursor: pointer; font-size: 11px; margin-bottom: 4px;" data-preset="daylight">Daylight (5500K)</button>
+                <button style="width: 100%; padding: 6px; background: var(--bg-tertiary); border: 1px solid var(--border-strong); color: var(--text); border-radius: 3px; cursor: pointer; font-size: 11px; margin-bottom: 4px;" data-preset="tungsten">Tungsten (3200K)</button>
+                <button style="width: 100%; padding: 6px; background: var(--bg-tertiary); border: 1px solid var(--border-strong); color: var(--text); border-radius: 3px; cursor: pointer; font-size: 11px; margin-bottom: 4px;" data-preset="shade">Shade (7500K)</button>
+                <button style="width: 100%; padding: 6px; background: var(--bg-tertiary); border: 1px solid var(--border-strong); color: var(--text); border-radius: 3px; cursor: pointer; font-size: 11px;" data-preset="cloudy">Cloudy (6500K)</button>
+            </div>
+
+            <div class="info-text">
+                Adjust white balance to match the light source. Different color spaces have different color gamuts (range of displayable colors).
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class ColorTheory {
+            constructor() {
+                this.cieCanvas = document.getElementById('cieCanvas');
+                this.cieCtx = this.cieCanvas.getContext('2d');
+                this.histogramCanvas = document.getElementById('histogramCanvas');
+                this.histogramCtx = this.histogramCanvas.getContext('2d');
+
+                this.temperature = 5500;
+                this.tint = 0;
+                this.currentColor = { r: 212, g: 165, b: 116 };
+                this.colorSpace = 'srgb';
+
+                this.setupEvents();
+                this.render();
+            }
+
+            setupEvents() {
+                document.getElementById('tempSlider').addEventListener('input', (e) => {
+                    this.temperature = parseInt(e.target.value);
+                    document.getElementById('tempValue').textContent = this.temperature + 'K';
+                    this.render();
+                });
+
+                document.getElementById('tintSlider').addEventListener('input', (e) => {
+                    this.tint = parseInt(e.target.value);
+                    document.getElementById('tintValue').textContent = this.tint;
+                    this.render();
+                });
+
+                document.querySelectorAll('[data-space]').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        document.querySelectorAll('[data-space]').forEach(b => b.classList.remove('active'));
+                        e.target.classList.add('active');
+                        this.colorSpace = e.target.dataset.space;
+                        this.render();
+                    });
+                });
+
+                document.querySelectorAll('[data-preset]').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const preset = e.target.dataset.preset;
+                        const temps = { daylight: 5500, tungsten: 3200, shade: 7500, cloudy: 6500 };
+                        this.temperature = temps[preset];
+                        document.getElementById('tempSlider').value = this.temperature;
+                        document.getElementById('tempValue').textContent = this.temperature + 'K';
+                        this.render();
+                    });
+                });
+
+                document.getElementById('hexInput').addEventListener('input', (e) => {
+                    const hex = e.target.value.replace('#', '');
+                    if (hex.length === 6) {
+                        this.currentColor.r = parseInt(hex.substr(0, 2), 16);
+                        this.currentColor.g = parseInt(hex.substr(2, 2), 16);
+                        this.currentColor.b = parseInt(hex.substr(4, 2), 16);
+                        this.render();
+                    }
+                });
+            }
+
+            kelvinToRGB(k) {
+                const temp = k / 100;
+                let r, g, b;
+
+                if (temp <= 66) {
+                    r = 255;
+                    g = temp < 6 ? 0 : 99.4743 * Math.log(temp) - 161.1195;
+                } else {
+                    r = 329.698727 * Math.pow(temp - 60, -0.1332047);
+                    g = 288.1221 * Math.pow(temp - 60, -0.0755148);
+                }
+
+                if (temp >= 66) {
+                    b = 255;
+                } else {
+                    b = temp < 20 ? 0 : 138.5177 * Math.log(temp - 10) - 305.0447;
+                }
+
+                return {
+                    r: Math.max(0, Math.min(255, r)),
+                    g: Math.max(0, Math.min(255, g)),
+                    b: Math.max(0, Math.min(255, b))
+                };
+            }
+
+            applyWhiteBalance(r, g, b) {
+                const wb = this.kelvinToRGB(this.temperature);
+                const correctedR = Math.min(255, r * (255 / wb.r));
+                const correctedG = Math.min(255, g * (255 / wb.g));
+                const correctedB = Math.min(255, b * (255 / wb.b));
+
+                // Apply tint
+                const tintMag = Math.abs(this.tint) / 50;
+                if (this.tint > 0) {
+                    // Magenta
+                    return {
+                        r: correctedR + tintMag * 50,
+                        g: correctedG - tintMag * 20,
+                        b: correctedB + tintMag * 50
+                    };
+                } else {
+                    // Green
+                    return {
+                        r: correctedR - tintMag * 30,
+                        g: correctedG + tintMag * 40,
+                        b: correctedB - tintMag * 30
+                    };
+                }
+            }
+
+            renderCIEDiagram() {
+                const w = this.cieCanvas.width;
+                const h = this.cieCanvas.height;
+
+                this.cieCtx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--canvas-bg').trim();
+                this.cieCtx.fillRect(0, 0, w, h);
+
+                // Draw CIE diagram boundary
+                this.cieCtx.strokeStyle = 'rgba(233, 236, 239, 0.3)';
+                this.cieCtx.lineWidth = 2;
+                this.cieCtx.beginPath();
+
+                // Simplified CIE horseshoe
+                for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 30) {
+                    const radius = 80 + Math.sin(angle * 3) * 20;
+                    const x = w / 2 + Math.cos(angle) * radius;
+                    const y = h / 2 + Math.sin(angle) * radius;
+                    if (angle === 0) this.cieCtx.moveTo(x, y);
+                    else this.cieCtx.lineTo(x, y);
+                }
+                this.cieCtx.closePath();
+                this.cieCtx.stroke();
+
+                // Draw color space triangles
+                const spaces = {
+                    srgb: { points: [[100, 100], [400, 100], [250, 250]], color: 'rgba(231, 76, 60, 0.3)' },
+                    adobe: { points: [[90, 80], [420, 90], [240, 270]], color: 'rgba(52, 152, 219, 0.3)' },
+                    prophoto: { points: [[80, 60], [440, 100], [230, 290]], color: 'rgba(155, 89, 182, 0.3)' }
+                };
+
+                if (this.colorSpace === 'srgb' || true) {
+                    const space = spaces.srgb;
+                    this.cieCtx.fillStyle = space.color;
+                    this.cieCtx.beginPath();
+                    this.cieCtx.moveTo(...space.points[0]);
+                    this.cieCtx.lineTo(...space.points[1]);
+                    this.cieCtx.lineTo(...space.points[2]);
+                    this.cieCtx.closePath();
+                    this.cieCtx.fill();
+
+                    this.cieCtx.strokeStyle = 'rgba(231, 76, 60, 0.6)';
+                    this.cieCtx.lineWidth = 2;
+                    this.cieCtx.stroke();
+                }
+            }
+
+            renderHistogram() {
+                const w = this.histogramCanvas.width;
+                const h = this.histogramCanvas.height;
+
+                this.histogramCtx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--canvas-bg').trim();
+                this.histogramCtx.fillRect(0, 0, w, h);
+
+                const corrected = this.applyWhiteBalance(this.currentColor.r, this.currentColor.g, this.currentColor.b);
+
+                // Draw channel histograms
+                const channels = [
+                    { color: 'rgba(255, 100, 100, 0.8)', value: corrected.r },
+                    { color: 'rgba(100, 255, 100, 0.8)', value: corrected.g },
+                    { color: 'rgba(100, 100, 255, 0.8)', value: corrected.b }
+                ];
+
+                const barWidth = w / 3 - 10;
+                const maxValue = 255;
+
+                channels.forEach((ch, i) => {
+                    const x = i * (w / 3) + 5;
+                    const barHeight = (ch.value / maxValue) * (h * 0.8);
+
+                    this.histogramCtx.fillStyle = ch.color;
+                    this.histogramCtx.fillRect(x, h - barHeight - 10, barWidth, barHeight);
+
+                    this.histogramCtx.strokeStyle = ch.color;
+                    this.histogramCtx.lineWidth = 2;
+                    this.histogramCtx.strokeRect(x, h - barHeight - 10, barWidth, barHeight);
+
+                    // Value label
+                    this.histogramCtx.fillStyle = ch.color;
+                    this.histogramCtx.font = 'bold 11px "Space Mono"';
+                    this.histogramCtx.textAlign = 'center';
+                    this.histogramCtx.fillText(Math.round(ch.value), x + barWidth / 2, h - 5);
+                });
+            }
+
+            render() {
+                this.renderCIEDiagram();
+                this.renderHistogram();
+
+                const corrected = this.applyWhiteBalance(this.currentColor.r, this.currentColor.g, this.currentColor.b);
+                const hex = '#' + [corrected.r, corrected.g, corrected.b].map(x => Math.round(x).toString(16).padStart(2, '0')).join('').toUpperCase();
+                document.getElementById('hexInput').value = hex;
+                document.getElementById('currentColor').style.backgroundColor = hex;
+            }
+        }
+
+        const colorTheory = new ColorTheory();
+    </script>
+</body>
+</html>

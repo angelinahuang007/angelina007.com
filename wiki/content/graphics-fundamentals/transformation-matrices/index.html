@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transformation Matrices</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        body { padding: 20px; font-family: 'Space Grotesk', sans-serif; }
+        .container { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin: 20px 0; }
+        #canvas-wrapper { overflow: hidden; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-secondary); margin: 15px 0; }
+        canvas { border: none; background: transparent; display: block; max-width: 100%; max-height: 100%; }
+
+        .controls { background: var(--bg-secondary); padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .control-group { margin: 15px 0; }
+        .control-label { display: flex; justify-content: space-between; margin-bottom: 8px; font-weight: 500; }
+        .control-label span { font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+        input[type="range"] { width: 100%; }
+        input[type="range"]::slider-thumb { cursor: pointer; }
+
+        .matrix-display {
+            background: var(--bg-secondary); padding: 15px; border-radius: 6px;
+            font-family: 'JetBrains Mono', monospace; font-size: 12px;
+            margin: 15px 0; border-left: 4px solid var(--accent);
+        }
+        .matrix-row { display: flex; gap: 8px; margin: 4px 0; }
+        .matrix-cell { width: 60px; text-align: right; }
+
+        .button-group { display: flex; gap: 10px; margin: 15px 0; }
+        button { padding: 10px 16px; border: none; border-radius: 6px; background: var(--accent);
+            color: white; cursor: pointer; font-weight: 500; transition: all 0.2s; font-family: 'Space Grotesk', sans-serif; }
+        button:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+
+        .toggle-btn {
+            padding: 8px 12px; margin: 5px 5px 5px 0; border: 2px solid var(--border-color);
+            background: transparent; color: var(--text); border-radius: 4px;
+        }
+        .toggle-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+
+        .info { background: var(--bg-secondary); padding: 15px; border-radius: 6px; margin: 15px 0; }
+        .info h4 { margin-top: 0; color: var(--primary); }
+    </style>
+</head>
+<body>
+    <h1>Transformation Matrices</h1>
+    <p>Visualize how 2D transformations work. Adjust sliders to see the 3×3 matrix update and shape transform in real-time.</p>
+
+    <div class="container">
+        <div>
+            <h3>Canvas</h3>
+            <div id="canvas-wrapper" style="width: 400px; height: 400px;">
+                <canvas id="canvas" width="400" height="400"></canvas>
+            </div>
+            <div class="info">
+                <h4>Order Matters!</h4>
+                <div class="button-group">
+                    <button class="toggle-btn active" data-order="trs">TRS (Translate-Rotate-Scale)</button>
+                    <button class="toggle-btn" data-order="srt">SRT (Scale-Rotate-Translate)</button>
+                </div>
+                <p id="orderInfo" style="margin: 10px 0; font-size: 13px; font-family: monospace;">
+                    T × R × S: Translate after rotation
+                </p>
+            </div>
+        </div>
+
+        <div>
+            <h3>Transformation Controls</h3>
+            <div class="controls">
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>Translate X</span>
+                        <span id="val-tx">0</span>
+                    </div>
+                    <input type="range" id="tx" min="-150" max="150" value="0" step="5">
+                </div>
+
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>Translate Y</span>
+                        <span id="val-ty">0</span>
+                    </div>
+                    <input type="range" id="ty" min="-150" max="150" value="0" step="5">
+                </div>
+
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>Rotate (deg)</span>
+                        <span id="val-rot">0</span>
+                    </div>
+                    <input type="range" id="rotate" min="0" max="360" value="0" step="5">
+                </div>
+
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>Scale X</span>
+                        <span id="val-sx">1.0</span>
+                    </div>
+                    <input type="range" id="sx" min="0.2" max="2" value="1" step="0.1">
+                </div>
+
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>Scale Y</span>
+                        <span id="val-sy">1.0</span>
+                    </div>
+                    <input type="range" id="sy" min="0.2" max="2" value="1" step="0.1">
+                </div>
+
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>Shear X</span>
+                        <span id="val-shx">0</span>
+                    </div>
+                    <input type="range" id="shx" min="-1" max="1" value="0" step="0.1">
+                </div>
+
+                <button onclick="resetTransforms()">Reset</button>
+            </div>
+
+            <h3>Transformation Matrix</h3>
+            <div class="matrix-display">
+                <div class="matrix-row">
+                    <span class="matrix-cell" id="m00">1.00</span>
+                    <span class="matrix-cell" id="m01">0.00</span>
+                    <span class="matrix-cell" id="m02">0.00</span>
+                </div>
+                <div class="matrix-row">
+                    <span class="matrix-cell" id="m10">0.00</span>
+                    <span class="matrix-cell" id="m11">1.00</span>
+                    <span class="matrix-cell" id="m12">0.00</span>
+                </div>
+                <div class="matrix-row">
+                    <span class="matrix-cell" id="m20">0.00</span>
+                    <span class="matrix-cell" id="m21">0.00</span>
+                    <span class="matrix-cell" id="m22">1.00</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        let transforms = {
+            tx: 0, ty: 0, rot: 0, sx: 1, sy: 1, shx: 0
+        };
+        let order = 'trs'; // 'trs' or 'srt'
+
+        // Shape: house
+        const houseVertices = [
+            [-40, -40], [40, -40], [40, 20], [-40, 20],  // walls
+            [-50, -40], [0, -80], [50, -40]  // roof
+        ];
+
+        function setupControls() {
+            document.querySelectorAll('input[type="range"]').forEach(input => {
+                input.addEventListener('input', updateFromControls);
+            });
+
+            document.querySelectorAll('.toggle-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+                    e.target.classList.add('active');
+                    order = e.target.dataset.order;
+                    updateUI();
+                    draw();
+                });
+            });
+        }
+
+        function updateFromControls() {
+            transforms.tx = parseFloat(document.getElementById('tx').value);
+            transforms.ty = parseFloat(document.getElementById('ty').value);
+            transforms.rot = parseFloat(document.getElementById('rotate').value);
+            transforms.sx = parseFloat(document.getElementById('sx').value);
+            transforms.sy = parseFloat(document.getElementById('sy').value);
+            transforms.shx = parseFloat(document.getElementById('shx').value);
+            updateUI();
+            draw();
+        }
+
+        function updateUI() {
+            document.getElementById('val-tx').textContent = transforms.tx.toFixed(0);
+            document.getElementById('val-ty').textContent = transforms.ty.toFixed(0);
+            document.getElementById('val-rot').textContent = transforms.rot.toFixed(0);
+            document.getElementById('val-sx').textContent = transforms.sx.toFixed(1);
+            document.getElementById('val-sy').textContent = transforms.sy.toFixed(1);
+            document.getElementById('val-shx').textContent = transforms.shx.toFixed(1);
+
+            const matrix = getTransformMatrix();
+            document.getElementById('m00').textContent = matrix[0][0].toFixed(2);
+            document.getElementById('m01').textContent = matrix[0][1].toFixed(2);
+            document.getElementById('m02').textContent = matrix[0][2].toFixed(2);
+            document.getElementById('m10').textContent = matrix[1][0].toFixed(2);
+            document.getElementById('m11').textContent = matrix[1][1].toFixed(2);
+            document.getElementById('m12').textContent = matrix[1][2].toFixed(2);
+            document.getElementById('m20').textContent = matrix[2][0].toFixed(2);
+            document.getElementById('m21').textContent = matrix[2][1].toFixed(2);
+            document.getElementById('m22').textContent = matrix[2][2].toFixed(2);
+
+            const orderText = order === 'trs'
+                ? 'T × R × S: Translate after rotation'
+                : 'S × R × T: Translate before rotation';
+            document.getElementById('orderInfo').textContent = orderText;
+        }
+
+        function multiplyMatrices(a, b) {
+            const result = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+            for (let i = 0; i < 3; i++) {
+                for (let j = 0; j < 3; j++) {
+                    for (let k = 0; k < 3; k++) {
+                        result[i][j] += a[i][k] * b[k][j];
+                    }
+                }
+            }
+            return result;
+        }
+
+        function getTransformMatrix() {
+            const rad = transforms.rot * Math.PI / 180;
+            const cos = Math.cos(rad);
+            const sin = Math.sin(rad);
+
+            // Individual matrices
+            const T = [[1, 0, transforms.tx], [0, 1, transforms.ty], [0, 0, 1]];
+            const R = [[cos, -sin, 0], [sin, cos, 0], [0, 0, 1]];
+            const S = [[transforms.sx, 0, 0], [0, transforms.sy, 0], [0, 0, 1]];
+            const H = [[1, transforms.shx, 0], [0, 1, 0], [0, 0, 1]];
+
+            let result;
+            if (order === 'trs') {
+                result = multiplyMatrices(T, multiplyMatrices(R, multiplyMatrices(S, H)));
+            } else {
+                result = multiplyMatrices(S, multiplyMatrices(R, multiplyMatrices(T, H)));
+            }
+            return result;
+        }
+
+        function transformPoint(p, matrix) {
+            const x = p[0] * matrix[0][0] + p[1] * matrix[0][1] + matrix[0][2];
+            const y = p[0] * matrix[1][0] + p[1] * matrix[1][1] + matrix[1][2];
+            return [x, y];
+        }
+
+        function draw() {
+            const colors = Wiki.colors();
+
+            // Save context state and establish clipping region
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(0, 0, canvas.width, canvas.height);
+            ctx.clip();
+
+            ctx.fillStyle = colors.bg_secondary;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Grid
+            ctx.strokeStyle = colors.border_color;
+            ctx.lineWidth = 0.5;
+            for (let x = 0; x < canvas.width; x += 40) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += 40) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+
+            // Origin
+            ctx.fillStyle = colors.accent;
+            ctx.beginPath();
+            ctx.arc(200, 200, 3, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Original shape (light)
+            ctx.strokeStyle = colors.accent + '60';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(200 + houseVertices[0][0], 200 + houseVertices[0][1]);
+            for (let i = 1; i < houseVertices.length; i++) {
+                ctx.lineTo(200 + houseVertices[i][0], 200 + houseVertices[i][1]);
+            }
+            ctx.closePath();
+            ctx.stroke();
+
+            // Transformed shape
+            const matrix = getTransformMatrix();
+            const transformed = houseVertices.map(v => transformPoint(v, matrix));
+
+            ctx.strokeStyle = colors.primary;
+            ctx.lineWidth = 2;
+            ctx.fillStyle = colors.primary + '20';
+            ctx.beginPath();
+            const p0 = transformed[0];
+            ctx.moveTo(200 + p0[0], 200 + p0[1]);
+            for (let i = 1; i < transformed.length; i++) {
+                ctx.lineTo(200 + transformed[i][0], 200 + transformed[i][1]);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Vertices
+            transformed.forEach(p => {
+                ctx.fillStyle = colors.primary;
+                ctx.beginPath();
+                ctx.arc(200 + p[0], 200 + p[1], 3, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // Restore context state
+            ctx.restore();
+        }
+
+        function resetTransforms() {
+            document.getElementById('tx').value = 0;
+            document.getElementById('ty').value = 0;
+            document.getElementById('rotate').value = 0;
+            document.getElementById('sx').value = 1;
+            document.getElementById('sy').value = 1;
+            document.getElementById('shx').value = 0;
+            updateFromControls();
+        }
+
+        setupControls();
+        updateUI();
+        draw();
+
+        Wiki.onThemeChange(() => draw());
+    </script>
+</body>
+</html>

@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blender Modeling Workflow</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        .modeling-editor {
+            display: flex; flex-wrap: wrap;
+            gap: 20px;
+            height: 100%;
+        }
+        .viewport {
+            flex: 1;
+            position: relative;
+            background: linear-gradient(135deg, var(--canvas-bg) 0%, var(--bg-secondary) 100%);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .controls-panel {
+            width: 280px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 16px;
+            overflow-y: auto;
+            color: var(--text);
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 13px;
+        }
+        .control-group {
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        .control-group h4 {
+            margin: 0 0 8px 0;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: var(--accent);
+            letter-spacing: 0.5px;
+        }
+        .button-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .btn {
+            padding: 8px 12px;
+            background: var(--border);
+            border: 1px solid var(--border-strong);
+            color: var(--text);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-family: 'Space Grotesk', sans-serif;
+            transition: all 0.2s;
+        }
+        .btn:hover {
+            background: rgba(99, 102, 241, 0.2);
+            border-color: var(--accent);
+        }
+        .btn.active {
+            background: var(--accent);
+            color: var(--bg-secondary);
+            border-color: var(--accent);
+        }
+        .slider-row {
+            margin-bottom: 8px;
+        }
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+            font-size: 12px;
+        }
+        input[type="range"] {
+            width: 100%;
+            height: 4px;
+            border-radius: 2px;
+            background: var(--border-strong);
+            outline: none;
+            -webkit-appearance: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--accent);
+            border: none;
+            cursor: pointer;
+        }
+        .stats {
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 4px;
+            padding: 8px;
+            font-size: 11px;
+            font-family: 'JetBrains Mono', monospace;
+            line-height: 1.6;
+            color: var(--accent-light);
+        }
+        .modifier-stack {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 8px;
+        }
+        .modifier-item {
+            background: rgba(99, 102, 241, 0.2);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 3px;
+            padding: 6px;
+            margin-bottom: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+        }
+        .modifier-remove {
+            cursor: pointer;
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        .info-text {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 12px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="modeling-editor">
+        <div class="viewport">
+            <canvas id="meshCanvas"></canvas>
+        </div>
+        <div class="controls-panel">
+            <div class="control-group">
+                <h4>Mode</h4>
+                <div class="button-group">
+                    <button class="btn active" data-mode="object">Object</button>
+                    <button class="btn" data-mode="edit">Edit</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h4>Selection</h4>
+                <div class="button-group">
+                    <button class="btn active" data-select="vertex">Vertex</button>
+                    <button class="btn" data-select="edge">Edge</button>
+                    <button class="btn" data-select="face">Face</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h4>Tools</h4>
+                <div class="button-group">
+                    <button class="btn" data-tool="move">Move</button>
+                    <button class="btn" data-tool="extrude">Extrude</button>
+                    <button class="btn" data-tool="subdivide">Subdivide</button>
+                    <button class="btn" data-tool="bevel">Bevel</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h4>Modifiers</h4>
+                <button class="btn" style="width: 100%; margin-bottom: 8px;" data-modifier="subdivision">+ Subdivision</button>
+                <button class="btn" style="width: 100%;" data-modifier="mirror">+ Mirror</button>
+                <div class="modifier-stack" style="margin-top: 8px;">
+                    <div id="modifierList"></div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h4>Edit</h4>
+                <button class="btn" style="width: 100%; margin-bottom: 4px;" data-action="undo">↶ Undo</button>
+                <button class="btn" style="width: 100%; margin-bottom: 8px;" data-action="redo">↷ Redo</button>
+                <button class="btn" style="width: 100%;" data-action="reset">Reset Mesh</button>
+            </div>
+
+            <div class="control-group">
+                <h4>Stats</h4>
+                <div class="stats">
+                    <div>Vertices: <span id="vertCount">4</span></div>
+                    <div>Edges: <span id="edgeCount">4</span></div>
+                    <div>Faces: <span id="faceCount">1</span></div>
+                </div>
+            </div>
+
+            <div class="info-text">
+                Click to select vertices. Use Move, Extrude, and Subdivide tools. Add modifiers to see real-time effects.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class MeshEditor {
+            constructor(canvas) {
+                this.canvas = canvas;
+                this.ctx = canvas.getContext('2d');
+                this.mode = 'edit';
+                this.selectMode = 'vertex';
+                this.currentTool = 'move';
+                this.gridSize = 40;
+                this.vertices = [
+                    { x: 150, y: 100 },
+                    { x: 350, y: 100 },
+                    { x: 350, y: 300 },
+                    { x: 150, y: 300 }
+                ];
+                this.edges = [[0, 1], [1, 2], [2, 3], [3, 0]];
+                this.faces = [[0, 1, 2, 3]];
+                this.modifiers = [];
+                this.selection = new Set();
+                this.history = [];
+                this.historyIndex = -1;
+                this.draggedVertex = null;
+                this.hoveredVertex = null;
+                this.extrudeStart = null;
+
+                this.resizeCanvas();
+                window.addEventListener('resize', () => this.resizeCanvas());
+                this.setupEvents();
+                this.saveState();
+                this.render();
+            }
+
+            resizeCanvas() {
+                const rect = this.canvas.parentElement.getBoundingClientRect();
+                this.canvas.width = rect.width;
+                this.canvas.height = rect.height;
+                this.render();
+            }
+
+            setupEvents() {
+                document.querySelectorAll('[data-mode]').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        document.querySelectorAll('[data-mode]').forEach(b => b.classList.remove('active'));
+                        e.target.classList.add('active');
+                        this.mode = e.target.dataset.mode;
+                    });
+                });
+
+                document.querySelectorAll('[data-select]').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        document.querySelectorAll('[data-select]').forEach(b => b.classList.remove('active'));
+                        e.target.classList.add('active');
+                        this.selectMode = e.target.dataset.select;
+                        this.selection.clear();
+                    });
+                });
+
+                document.querySelectorAll('[data-tool]').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        document.querySelectorAll('[data-tool]').forEach(b => b.classList.remove('active'));
+                        e.target.classList.add('active');
+                        this.currentTool = e.target.dataset.tool;
+                    });
+                });
+
+                document.querySelectorAll('[data-modifier]').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const type = e.target.dataset.modifier;
+                        this.addModifier(type);
+                    });
+                });
+
+                document.querySelectorAll('[data-action]').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const action = e.target.dataset.action;
+                        if (action === 'undo') this.undo();
+                        else if (action === 'redo') this.redo();
+                        else if (action === 'reset') this.reset();
+                    });
+                });
+
+                this.canvas.addEventListener('mousedown', (e) => this.onMouseDown(e));
+                this.canvas.addEventListener('mousemove', (e) => this.onMouseMove(e));
+                this.canvas.addEventListener('mouseup', (e) => this.onMouseUp(e));
+            }
+
+            onMouseDown(e) {
+                const rect = this.canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                const hitVertex = this.getVertexAt(x, y);
+                if (hitVertex !== null) {
+                    this.draggedVertex = hitVertex;
+                    if (this.currentTool === 'extrude') {
+                        this.extrudeStart = { x, y };
+                    } else if (e.ctrlKey || e.metaKey) {
+                        this.selection.has(hitVertex) ? this.selection.delete(hitVertex) : this.selection.add(hitVertex);
+                    } else {
+                        this.selection.clear();
+                        this.selection.add(hitVertex);
+                    }
+                }
+            }
+
+            onMouseMove(e) {
+                const rect = this.canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                this.hoveredVertex = this.getVertexAt(x, y);
+
+                if (this.draggedVertex !== null && this.currentTool === 'move') {
+                    this.vertices[this.draggedVertex].x = x;
+                    this.vertices[this.draggedVertex].y = y;
+                }
+
+                this.render();
+            }
+
+            onMouseUp(e) {
+                if (this.draggedVertex !== null) {
+                    this.saveState();
+                }
+                this.draggedVertex = null;
+                this.extrudeStart = null;
+                this.render();
+            }
+
+            getVertexAt(x, y, radius = 8) {
+                for (let i = 0; i < this.vertices.length; i++) {
+                    const dx = this.vertices[i].x - x;
+                    const dy = this.vertices[i].y - y;
+                    if (dx * dx + dy * dy < radius * radius) return i;
+                }
+                return null;
+            }
+
+            addModifier(type) {
+                if (!this.modifiers.find(m => m.type === type)) {
+                    this.modifiers.push({ type, enabled: true });
+                    this.updateModifierList();
+                    this.saveState();
+                    this.render();
+                }
+            }
+
+            removeModifier(index) {
+                this.modifiers.splice(index, 1);
+                this.updateModifierList();
+                this.saveState();
+                this.render();
+            }
+
+            updateModifierList() {
+                const list = document.getElementById('modifierList');
+                list.innerHTML = this.modifiers.map((m, i) => `
+                    <div class="modifier-item">
+                        <span>${m.type}</span>
+                        <span class="modifier-remove" onclick="editor.removeModifier(${i})">×</span>
+                    </div>
+                `).join('');
+            }
+
+            subdivide() {
+                const newVertices = [...this.vertices];
+                const newEdges = [];
+                const edgeMap = new Map();
+
+                this.edges.forEach(([a, b]) => {
+                    const key = a < b ? `${a}-${b}` : `${b}-${a}`;
+                    const midIndex = newVertices.length + Object.keys(edgeMap).length;
+                    if (!edgeMap.has(key)) {
+                        const mx = (this.vertices[a].x + this.vertices[b].x) / 2;
+                        const my = (this.vertices[a].y + this.vertices[b].y) / 2;
+                        newVertices.push({ x: mx, y: my });
+                        edgeMap.set(key, midIndex);
+                    }
+                });
+
+                this.vertices = newVertices;
+                this.saveState();
+            }
+
+            applyModifiers(vertices) {
+                let result = JSON.parse(JSON.stringify(vertices));
+
+                this.modifiers.forEach(mod => {
+                    if (mod.type === 'subdivision') {
+                        // Smooth the shape
+                        for (let i = 0; i < result.length; i++) {
+                            let sumX = 0, sumY = 0, count = 0;
+                            this.edges.forEach(([a, b]) => {
+                                if (a === i) { sumX += result[b].x; sumY += result[b].y; count++; }
+                                if (b === i) { sumX += result[a].x; sumY += result[a].y; count++; }
+                            });
+                            if (count > 0) {
+                                result[i].x = result[i].x * 0.7 + (sumX / count) * 0.3;
+                                result[i].y = result[i].y * 0.7 + (sumY / count) * 0.3;
+                            }
+                        }
+                    } else if (mod.type === 'mirror') {
+                        const centerX = result.reduce((s, v) => s + v.x, 0) / result.length;
+                        result = result.map((v, i) => ({
+                            x: centerX + (centerX - v.x) * 0.5,
+                            y: v.y
+                        }));
+                    }
+                });
+
+                return result;
+            }
+
+            render() {
+                const w = this.canvas.width;
+                const h = this.canvas.height;
+                const styles = getComputedStyle(document.documentElement);
+                this.ctx.fillStyle = styles.getPropertyValue('--canvas-bg').trim();
+                this.ctx.fillRect(0, 0, w, h);
+
+                // Grid
+                this.ctx.strokeStyle = 'rgba(228, 228, 231, 0.05)';
+                this.ctx.lineWidth = 0.5;
+                for (let x = 0; x < w; x += this.gridSize) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(x, 0);
+                    this.ctx.lineTo(x, h);
+                    this.ctx.stroke();
+                }
+                for (let y = 0; y < h; y += this.gridSize) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(0, y);
+                    this.ctx.lineTo(w, y);
+                    this.ctx.stroke();
+                }
+
+                const displayVertices = this.applyModifiers(this.vertices);
+
+                // Draw edges
+                this.ctx.strokeStyle = 'rgba(99, 102, 241, 0.6)';
+                this.ctx.lineWidth = 2;
+                this.edges.forEach(([a, b]) => {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(displayVertices[a].x, displayVertices[a].y);
+                    this.ctx.lineTo(displayVertices[b].x, displayVertices[b].y);
+                    this.ctx.stroke();
+                });
+
+                // Draw faces
+                if (this.modifiers.some(m => m.type === 'subdivision')) {
+                    this.ctx.fillStyle = 'rgba(99, 102, 241, 0.15)';
+                } else {
+                    this.ctx.fillStyle = 'rgba(99, 102, 241, 0.08)';
+                }
+                this.faces.forEach(face => {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(displayVertices[face[0]].x, displayVertices[face[0]].y);
+                    for (let i = 1; i < face.length; i++) {
+                        this.ctx.lineTo(displayVertices[face[i]].x, displayVertices[face[i]].y);
+                    }
+                    this.ctx.closePath();
+                    this.ctx.fill();
+                });
+
+                // Draw vertices
+                displayVertices.forEach((v, i) => {
+                    const isSelected = this.selection.has(i);
+                    const isHovered = i === this.hoveredVertex;
+
+                    this.ctx.fillStyle = isSelected ? '#e74c3c' : isHovered ? '#f39c12' : styles.getPropertyValue('--accent').trim();
+                    this.ctx.beginPath();
+                    this.ctx.arc(v.x, v.y, isSelected ? 6 : 4, 0, Math.PI * 2);
+                    this.ctx.fill();
+                });
+
+                this.updateStats();
+            }
+
+            updateStats() {
+                document.getElementById('vertCount').textContent = this.vertices.length;
+                document.getElementById('edgeCount').textContent = this.edges.length;
+                document.getElementById('faceCount').textContent = this.faces.length;
+            }
+
+            saveState() {
+                this.historyIndex++;
+                this.history = this.history.slice(0, this.historyIndex);
+                this.history.push({
+                    vertices: JSON.parse(JSON.stringify(this.vertices)),
+                    edges: JSON.parse(JSON.stringify(this.edges)),
+                    modifiers: JSON.parse(JSON.stringify(this.modifiers))
+                });
+            }
+
+            undo() {
+                if (this.historyIndex > 0) {
+                    this.historyIndex--;
+                    const state = this.history[this.historyIndex];
+                    this.vertices = JSON.parse(JSON.stringify(state.vertices));
+                    this.edges = JSON.parse(JSON.stringify(state.edges));
+                    this.modifiers = JSON.parse(JSON.stringify(state.modifiers));
+                    this.updateModifierList();
+                    this.render();
+                }
+            }
+
+            redo() {
+                if (this.historyIndex < this.history.length - 1) {
+                    this.historyIndex++;
+                    const state = this.history[this.historyIndex];
+                    this.vertices = JSON.parse(JSON.stringify(state.vertices));
+                    this.edges = JSON.parse(JSON.stringify(state.edges));
+                    this.modifiers = JSON.parse(JSON.stringify(state.modifiers));
+                    this.updateModifierList();
+                    this.render();
+                }
+            }
+
+            reset() {
+                this.vertices = [
+                    { x: 150, y: 100 },
+                    { x: 350, y: 100 },
+                    { x: 350, y: 300 },
+                    { x: 150, y: 300 }
+                ];
+                this.edges = [[0, 1], [1, 2], [2, 3], [3, 0]];
+                this.faces = [[0, 1, 2, 3]];
+                this.modifiers = [];
+                this.selection.clear();
+                this.updateModifierList();
+                this.saveState();
+                this.render();
+            }
+        }
+
+        const canvas = document.getElementById('meshCanvas');
+        const editor = new MeshEditor(canvas);
+    </script>
+</body>
+</html>

@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unity Performance Optimization</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        body { background: var(--bg-primary); color: var(--text-primary); font-family: 'Space+Grotesk', sans-serif; }
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+        #budgetCanvas { border: 2px solid var(--accent-primary); border-radius: 8px; background: var(--bg-secondary); }
+        .stats-panel { background: var(--bg-secondary); padding: 1.5rem; border-radius: 8px; border: 1px solid var(--accent-secondary); }
+        .stat-row { display: flex; justify-content: space-between; margin-bottom: 1rem; padding: 0.75rem; background: var(--bg-primary); border-radius: 4px; font-family: 'JetBrains+Mono', monospace; }
+        .stat-label { font-weight: 600; }
+        .stat-value { color: var(--accent-primary); font-weight: 700; }
+        .stat-value.warn { color: #FF9500; }
+        .stat-value.critical { color: #FF6B6B; }
+        .controls { margin-bottom: 2rem; }
+        button { padding: 0.6rem 1.2rem; margin-right: 1rem; margin-bottom: 0.5rem; border: 2px solid var(--accent-primary); background: var(--bg-secondary); color: var(--text-primary); cursor: pointer; border-radius: 4px; font-weight: 600; transition: all 0.3s; }
+        button:hover { transform: translateY(-2px); }
+        button.optimized { background: var(--accent-primary); color: var(--bg-primary); border-color: var(--accent-primary); }
+        .frame-indicator { font-size: 0.9rem; margin-top: 1rem; padding: 1rem; background: var(--bg-primary); border-left: 4px solid var(--accent-primary); border-radius: 4px; }
+        .frame-indicator.good { border-left-color: #4ECDC4; }
+        .frame-indicator.warn { border-left-color: #FFE66D; }
+        .frame-indicator.bad { border-left-color: #FF6B6B; }
+        @media (max-width: 768px) { .layout { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Performance Optimization Frame Budget</h1>
+        <p>Visualize frame budget allocation. Add objects, toggle optimizations, and monitor FPS.</p>
+
+        <div class="controls">
+            <button id="addObjectsBtn">+ Add Objects</button>
+            <button id="enableBatchingBtn">Enable Batching</button>
+            <button id="enableInstancingBtn">Enable GPU Instancing</button>
+            <button id="resetBtn">Reset Scene</button>
+        </div>
+
+        <div class="layout">
+            <div>
+                <canvas id="budgetCanvas" width="600" height="400"></canvas>
+                <p style="font-size: 0.85rem; color: var(--text-secondary); text-align: center; margin-top: 0.5rem;">Frame time budget at 60 FPS: 16.67ms</p>
+            </div>
+
+            <div class="stats-panel">
+                <h3>Performance Stats</h3>
+                <div class="stat-row">
+                    <span class="stat-label">FPS</span>
+                    <span class="stat-value" id="fpsValue">60</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Frame Time</span>
+                    <span class="stat-value" id="frameTimeValue">16.67ms</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Draw Calls</span>
+                    <span class="stat-value" id="drawCallsValue">15</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Batches</span>
+                    <span class="stat-value" id="batchesValue">8</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Objects</span>
+                    <span class="stat-value" id="objectsValue">10</span>
+                </div>
+
+                <h3 style="margin-top: 2rem;">Frame Breakdown</h3>
+                <div class="stat-row">
+                    <span class="stat-label">Rendering</span>
+                    <span class="stat-value" id="renderTime">6.2ms</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Physics</span>
+                    <span class="stat-value" id="physicsTime">3.1ms</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Scripts</span>
+                    <span class="stat-value" id="scriptTime">2.5ms</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Other</span>
+                    <span class="stat-value" id="otherTime">4.87ms</span>
+                </div>
+
+                <div id="frameIndicator" class="frame-indicator good">
+                    ✓ Frame time within budget
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { colors, onThemeChange } = Wiki;
+        const canvas = document.getElementById('budgetCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let numObjects = 10;
+        let drawCalls = 15;
+        let batchingEnabled = false;
+        let instancingEnabled = false;
+        let frameTime = 10.5;
+        let renderTime = 6.2;
+        let physicsTime = 3.1;
+        let scriptTime = 2.5;
+
+        function getThemeColors() {
+            const theme = colors();
+            return {
+                bg: theme['bg-primary'],
+                text: theme['text-primary'],
+                accent: theme['accent-primary'],
+                secondary: theme['accent-secondary']
+            };
+        }
+
+        function updateStats() {
+            const fps = Math.max(1, Math.floor(1000 / frameTime));
+            document.getElementById('fpsValue').textContent = fps;
+            document.getElementById('frameTimeValue').textContent = frameTime.toFixed(2) + 'ms';
+            document.getElementById('drawCallsValue').textContent = drawCalls;
+            document.getElementById('batchesValue').textContent = Math.max(1, Math.floor(drawCalls / 2));
+            document.getElementById('objectsValue').textContent = numObjects;
+
+            document.getElementById('renderTime').textContent = renderTime.toFixed(2) + 'ms';
+            document.getElementById('physicsTime').textContent = physicsTime.toFixed(2) + 'ms';
+            document.getElementById('scriptTime').textContent = scriptTime.toFixed(2) + 'ms';
+            const otherTime = frameTime - renderTime - physicsTime - scriptTime;
+            document.getElementById('otherTime').textContent = Math.max(0, otherTime).toFixed(2) + 'ms';
+
+            const indicator = document.getElementById('frameIndicator');
+            if (frameTime <= 16.67) {
+                indicator.className = 'frame-indicator good';
+                indicator.innerHTML = '✓ Frame time within budget (' + frameTime.toFixed(2) + 'ms)';
+            } else if (frameTime <= 20) {
+                indicator.className = 'frame-indicator warn';
+                indicator.innerHTML = '⚠ Frame time exceeding budget (' + frameTime.toFixed(2) + 'ms)';
+            } else {
+                indicator.className = 'frame-indicator bad';
+                indicator.innerHTML = '✗ Critical: Frame time too high (' + frameTime.toFixed(2) + 'ms)';
+            }
+        }
+
+        function drawBudget() {
+            const theme = getThemeColors();
+            ctx.fillStyle = theme.bg;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const targetFrameTime = 16.67;
+            const scale = (canvas.width - 100) / targetFrameTime;
+            const blockHeight = 80;
+            const startY = 80;
+
+            // Draw timeline
+            ctx.strokeStyle = theme.secondary;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(50, startY);
+            ctx.lineTo(50 + scale * frameTime, startY);
+            ctx.stroke();
+
+            // Draw budget limit
+            ctx.strokeStyle = theme.accent + '66';
+            ctx.setLineDash([5, 5]);
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(50 + scale * targetFrameTime, startY - 40);
+            ctx.lineTo(50 + scale * targetFrameTime, startY + 200);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            ctx.fillStyle = theme.text;
+            ctx.font = '10px JetBrains+Mono';
+            ctx.textAlign = 'right';
+            ctx.fillText('16.67ms (60 FPS)', 50 + scale * targetFrameTime - 5, startY - 50);
+
+            // Draw frame time blocks
+            const blocks = [
+                { label: 'Rendering', time: renderTime, color: '#FF6B6B' },
+                { label: 'Physics', time: physicsTime, color: '#4ECDC4' },
+                { label: 'Scripts', time: scriptTime, color: '#95E1D3' },
+            ];
+
+            let currentX = 50;
+            blocks.forEach(block => {
+                const blockWidth = scale * block.time;
+                ctx.fillStyle = block.color;
+                ctx.fillRect(currentX, startY, blockWidth, blockHeight);
+
+                ctx.fillStyle = theme.bg;
+                ctx.font = 'bold 11px Space+Mono';
+                ctx.textAlign = 'center';
+                ctx.fillText(block.label, currentX + blockWidth / 2, startY + blockHeight / 2 + 5);
+
+                ctx.fillStyle = theme.text;
+                ctx.font = '9px JetBrains+Mono';
+                ctx.fillText(block.time.toFixed(1) + 'ms', currentX + blockWidth / 2, startY + blockHeight + 20);
+
+                currentX += blockWidth;
+            });
+
+            // Draw idle time
+            const idleTime = frameTime - renderTime - physicsTime - scriptTime;
+            if (idleTime > 0) {
+                const idleWidth = scale * idleTime;
+                ctx.fillStyle = theme.secondary + '33';
+                ctx.fillRect(currentX, startY, idleWidth, blockHeight);
+                ctx.fillStyle = theme.text;
+                ctx.font = '9px Space+Mono';
+                ctx.textAlign = 'center';
+                ctx.fillText('Idle', currentX + idleWidth / 2, startY + blockHeight / 2 + 5);
+            }
+
+            // Over-budget indicator
+            if (frameTime > targetFrameTime) {
+                const overflow = (frameTime - targetFrameTime) * scale;
+                ctx.fillStyle = '#FF6B6B66';
+                ctx.fillRect(50 + scale * targetFrameTime, startY, overflow, blockHeight);
+            }
+
+            // Labels
+            ctx.fillStyle = theme.text;
+            ctx.font = 'bold 12px Space+Mono';
+            ctx.textAlign = 'left';
+            ctx.fillText('Frame Time: ' + frameTime.toFixed(2) + 'ms', 50, 50);
+            ctx.fillText('Draw Calls: ' + drawCalls, 50, canvas.height - 30);
+            if (batchingEnabled) ctx.fillText('✓ Batching Enabled', 50, canvas.height - 10);
+            if (instancingEnabled) ctx.fillText('✓ GPU Instancing', 250, canvas.height - 10);
+
+            requestAnimationFrame(drawBudget);
+        }
+
+        function recalculatePerformance() {
+            // Base times
+            renderTime = 2 + (drawCalls * 0.15);
+            physicsTime = 1.5 + (numObjects * 0.08);
+            scriptTime = 1 + (numObjects * 0.06);
+
+            if (batchingEnabled) {
+                renderTime *= 0.6;
+            }
+            if (instancingEnabled) {
+                renderTime *= 0.7;
+            }
+
+            frameTime = renderTime + physicsTime + scriptTime + 2.5;
+            updateStats();
+        }
+
+        document.getElementById('addObjectsBtn').addEventListener('click', () => {
+            numObjects += 5;
+            drawCalls = numObjects + Math.floor(numObjects / 3);
+            recalculatePerformance();
+        });
+
+        document.getElementById('enableBatchingBtn').addEventListener('click', () => {
+            batchingEnabled = !batchingEnabled;
+            document.getElementById('enableBatchingBtn').classList.toggle('optimized');
+            if (batchingEnabled) {
+                document.getElementById('enableBatchingBtn').textContent = '✓ Batching Enabled';
+                drawCalls = Math.max(2, Math.floor(drawCalls * 0.6));
+            } else {
+                document.getElementById('enableBatchingBtn').textContent = 'Enable Batching';
+                drawCalls = Math.floor(drawCalls / 0.6);
+            }
+            recalculatePerformance();
+        });
+
+        document.getElementById('enableInstancingBtn').addEventListener('click', () => {
+            instancingEnabled = !instancingEnabled;
+            document.getElementById('enableInstancingBtn').classList.toggle('optimized');
+            if (instancingEnabled) {
+                document.getElementById('enableInstancingBtn').textContent = '✓ GPU Instancing';
+            } else {
+                document.getElementById('enableInstancingBtn').textContent = 'Enable GPU Instancing';
+            }
+            recalculatePerformance();
+        });
+
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            numObjects = 10;
+            drawCalls = 15;
+            batchingEnabled = false;
+            instancingEnabled = false;
+            frameTime = 10.5;
+            renderTime = 6.2;
+            physicsTime = 3.1;
+            scriptTime = 2.5;
+            document.getElementById('enableBatchingBtn').classList.remove('optimized');
+            document.getElementById('enableInstancingBtn').classList.remove('optimized');
+            document.getElementById('enableBatchingBtn').textContent = 'Enable Batching';
+            document.getElementById('enableInstancingBtn').textContent = 'Enable GPU Instancing';
+            updateStats();
+        });
+
+        onThemeChange(() => {
+            drawBudget();
+        });
+
+        updateStats();
+        drawBudget();
+    </script>
+</body>
+</html>

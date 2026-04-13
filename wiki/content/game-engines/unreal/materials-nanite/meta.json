@@ -1,0 +1,11 @@
+{
+  "title": "Materials & Nanite",
+  "category": "game-engines/unreal",
+  "tags": ["unreal", "materials", "nanite", "lod", "mesh", "layers", "rendering"],
+  "description": "Interactive Nanite LOD visualization with material layer stacking. Adjust distance to see LOD transitions and material blending.",
+  "related": [
+    "game-engines/unreal/nanite-lumen",
+    "game-engines/unity/shader-programming"
+  ],
+  "order": 2
+}

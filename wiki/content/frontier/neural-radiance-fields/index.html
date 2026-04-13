@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neural Radiance Fields</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        body { background: var(--bg-dark); color: var(--fg-light); }
+        .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+        .controls { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; align-items: center; }
+        button { padding: 8px 16px; background: var(--accent); color: var(--bg-dark); border: none; border-radius: 4px; cursor: pointer; font-family: 'Space Mono'; font-weight: 700; }
+        button:hover { opacity: 0.8; }
+        #canvas { border: 1px solid var(--fg-dark); background: var(--bg-darker); display: block; margin: 0 auto; }
+        .info { font-size: 0.9em; color: var(--fg-muted); margin-top: 10px; font-family: 'Space Mono'; }
+        .slider-group { display: flex; gap: 10px; align-items: center; }
+        input[type="range"] { min-width: 150px; }
+        .papers-section { margin-top: 40px; padding-top: 24px; border-top: 1px solid var(--border-strong, rgba(228,228,231,0.2)); }
+        .papers-section h2 { font-family: 'Space Mono', monospace; font-size: 1.1rem; color: var(--accent, #6366f1); margin-bottom: 16px; }
+        .paper-list { display: flex; flex-direction: column; gap: 12px; }
+        .paper-card { display: block; background: var(--bg-secondary, #1a1b27); border: 1px solid var(--border, rgba(228,228,231,0.1)); border-radius: 8px; padding: 16px; text-decoration: none; transition: border-color 0.2s; }
+        .paper-card:hover { border-color: var(--accent, #6366f1); }
+        .paper-title { font-family: 'Space Mono', monospace; font-size: 0.9rem; font-weight: 700; color: var(--text, #e4e4e7); margin-bottom: 4px; }
+        .paper-authors { font-size: 0.8rem; color: var(--text-muted, #a1a1aa); margin-bottom: 8px; }
+        .paper-desc { font-size: 0.85rem; color: var(--text-dim, #71717a); line-height: 1.5; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Neural Radiance Fields (NeRF)</h1>
+        <p>Interactive visualization of NeRF training process: camera views, ray sampling, MLP network, and reconstruction.</p>
+
+        <div class="controls">
+            <button id="showRaysBtn">Show Rays</button>
+            <button id="showEncodingBtn">Show Encoding</button>
+            <div class="slider-group">
+                <label>Training Progress:</label>
+                <input type="range" id="progressSlider" min="0" max="100" value="0">
+                <span id="progressLabel">0%</span>
+            </div>
+        </div>
+
+        <canvas id="canvas" width="800" height="500"></canvas>
+        <div class="info" id="info">Left: Camera positions around scene. Right: Reconstructed view improving with training. Drag slider to advance training.</div>
+    </div>
+
+    <script>
+        const canvas = Wiki.createCanvas('canvas', 800, 500);
+        const ctx = canvas.getContext('2d');
+        let trainingProgress = 0;
+        let showRays = false;
+        let showEncoding = false;
+
+        // Camera positions in a circle
+        const cameraPositions = [];
+        const numCameras = 8;
+        for (let i = 0; i < numCameras; i++) {
+            const angle = (i / numCameras) * Math.PI * 2;
+            cameraPositions.push({
+                x: Math.cos(angle) * 150 + 250,
+                y: Math.sin(angle) * 100 + 250,
+                angle: angle
+            });
+        }
+
+        const sceneObject = { x: 250, y: 250, r: 30 }; // Simple sphere
+
+        function drawScene(x, y, w, h) {
+            // Scene background
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.fillRect(x, y, w, h);
+            ctx.strokeStyle = '#666';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x, y, w, h);
+
+            // Draw scene object
+            const objX = x + w / 2;
+            const objY = y + h / 2;
+            ctx.fillStyle = '#ff6b6b';
+            ctx.globalAlpha = 0.7;
+            ctx.beginPath();
+            ctx.arc(objX, objY, 25, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+
+            ctx.strokeStyle = '#ff6b6b';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Draw camera positions
+            cameraPositions.forEach((cam, idx) => {
+                const relX = cam.x - 100;
+                const relY = cam.y - 100;
+                const screenX = x + (relX / 400) * w;
+                const screenY = y + (relY / 300) * h;
+
+                ctx.fillStyle = trainingProgress / 100 > idx / numCameras ? '#4ecdc4' : '#666';
+                ctx.beginPath();
+                ctx.arc(screenX, screenY, 5, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Draw cone
+                if (showRays && idx === Math.floor(trainingProgress / 100 * numCameras)) {
+                    ctx.strokeStyle = '#ffe66d';
+                    ctx.globalAlpha = 0.5;
+                    ctx.beginPath();
+                    ctx.moveTo(screenX, screenY);
+                    const angle = cam.angle;
+                    ctx.lineTo(screenX + Math.cos(angle) * 40, screenY + Math.sin(angle) * 40);
+                    ctx.stroke();
+                    ctx.globalAlpha = 1;
+                }
+            });
+        }
+
+        function drawReconstruction(x, y, w, h) {
+            // Reconstruction background
+            ctx.fillStyle = 'rgba(50, 100, 100, 0.2)';
+            ctx.fillRect(x, y, w, h);
+            ctx.strokeStyle = '#4ecdc4';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x, y, w, h);
+
+            const centerX = x + w / 2;
+            const centerY = y + h / 2;
+            const objR = 25;
+
+            // Draw reconstructed object with progressive quality
+            if (trainingProgress < 30) {
+                // Blurry reconstruction
+                ctx.fillStyle = 'rgba(255, 107, 107, 0.3)';
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, objR + 15, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (trainingProgress < 60) {
+                // Medium quality
+                ctx.fillStyle = 'rgba(255, 107, 107, 0.5)';
+                for (let i = 0; i < 3; i++) {
+                    ctx.beginPath();
+                    ctx.arc(centerX, centerY, objR + (3 - i) * 5, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+                ctx.fillStyle = '#ff6b6b';
+                ctx.globalAlpha = 0.6;
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, objR, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            } else {
+                // High quality sharp reconstruction
+                ctx.fillStyle = '#ff6b6b';
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, objR, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.strokeStyle = '#ffe66d';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Add detail based on progress
+                const detail = (trainingProgress - 60) / 40;
+                for (let i = 0; i < 6; i++) {
+                    const angle = (i / 6) * Math.PI * 2 + trainingProgress / 100 * Math.PI;
+                    ctx.fillStyle = `rgba(255, 230, 109, ${0.3 * detail})`;
+                    const x1 = centerX + Math.cos(angle) * objR;
+                    const y1 = centerY + Math.sin(angle) * objR;
+                    ctx.beginPath();
+                    ctx.arc(x1, y1, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            // Draw rays shooting into the object
+            if (showRays) {
+                const numRays = 5 + Math.floor(trainingProgress / 20);
+                for (let i = 0; i < numRays; i++) {
+                    const angle = (i / numRays) * Math.PI * 2;
+                    const rayColor = `hsl(${180 + trainingProgress}, 100%, 50%)`;
+                    ctx.strokeStyle = rayColor;
+                    ctx.lineWidth = 1;
+                    ctx.globalAlpha = 0.6;
+                    ctx.beginPath();
+                    ctx.moveTo(centerX - Math.cos(angle) * 80, centerY - Math.sin(angle) * 80);
+                    ctx.lineTo(centerX + Math.cos(angle) * objR, centerY + Math.sin(angle) * objR);
+                    ctx.stroke();
+                    ctx.globalAlpha = 1;
+                }
+            }
+        }
+
+        function drawMLPBlackBox(x, y, w, h) {
+            // MLP box
+            ctx.fillStyle = 'rgba(100, 100, 200, 0.15)';
+            ctx.fillRect(x, y, w, h);
+            ctx.strokeStyle = '#a8dadc';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x, y, w, h);
+
+            // Title
+            ctx.fillStyle = '#a8dadc';
+            ctx.font = 'bold 12px Space Grotesk';
+            ctx.fillText('MLP Network', x + 10, y + 20);
+
+            // Visualize encoding
+            if (showEncoding) {
+                ctx.font = '9px Space Mono';
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+                ctx.fillText('Input: Position (x,y,z) + Direction (dx,dy,dz)', x + 10, y + 40);
+                ctx.fillText('Encoding: Positional (sin/cos frequencies)', x + 10, y + 55);
+                ctx.fillText('Hidden Layers: 8 layers, 256 neurons', x + 10, y + 70);
+                ctx.fillText('Output: Color (RGB) + Density (σ)', x + 10, y + 85);
+
+                // Draw layer visualization
+                const layerY = y + 100;
+                const layerHeight = 20;
+                for (let i = 0; i < 8; i++) {
+                    const opacity = trainingProgress / 100 > i / 8 ? 0.8 : 0.3;
+                    ctx.fillStyle = `rgba(168, 218, 220, ${opacity})`;
+                    ctx.fillRect(x + 10 + i * 43, layerY, 40, layerHeight);
+                    ctx.strokeStyle = '#a8dadc';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(x + 10 + i * 43, layerY, 40, layerHeight);
+                }
+            } else {
+                ctx.font = '11px Space Mono';
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                ctx.fillText('Neural Network:', x + 10, y + 45);
+                ctx.fillText('Position → Density', x + 20, y + 65);
+                ctx.fillText('Ray → Color', x + 20, y + 85);
+            }
+        }
+
+        function draw() {
+            ctx.fillStyle = Wiki.colors().bg;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = Wiki.colors().fg;
+            ctx.font = 'bold 18px Space Grotesk';
+            ctx.fillText('Neural Radiance Fields', 20, 35);
+
+            ctx.font = '11px Space Mono';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.fillText('Training progress controls ray sampling and MLP optimization', 20, 55);
+
+            // Draw three sections
+            drawScene(40, 100, 250, 200); // Camera setup
+            drawReconstruction(320, 100, 250, 200); // Reconstruction
+            drawMLPBlackBox(40, 320, 530, 260); // MLP
+
+            // Progress info
+            ctx.fillStyle = '#ffe66d';
+            ctx.font = 'bold 14px Space Mono';
+            ctx.fillText('Progress: ' + trainingProgress + '%', 600, 120);
+
+            // Training phases
+            ctx.fillStyle = 'rgba(255, 230, 109, 0.2)';
+            ctx.fillRect(600, 150, 280, 100);
+            ctx.strokeStyle = '#ffe66d';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(600, 150, 280, 100);
+
+            ctx.fillStyle = '#ffe66d';
+            ctx.font = 'bold 11px Space Grotesk';
+            ctx.fillText('Training Phases', 610, 170);
+
+            ctx.font = '10px Space Mono';
+            const phases = ['Coarse (0-33%)', 'Medium (33-66%)', 'Fine (66-100%)'];
+            phases.forEach((phase, i) => {
+                const phaseProg = Math.max(0, Math.min(1, (trainingProgress - i * 33.3) / 33.3));
+                ctx.fillStyle = phaseProg > 0 ? '#4ecdc4' : 'rgba(100, 200, 200, 0.3)';
+                ctx.fillRect(610, 185 + i * 20, 260 * phaseProg, 15);
+                ctx.fillStyle = Wiki.colors().text;
+                ctx.fillText(phase, 615, 195 + i * 20);
+            });
+
+            ctx.strokeStyle = Wiki.colors().fg;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(0, 0, canvas.width, canvas.height);
+        }
+
+        document.getElementById('progressSlider').addEventListener('input', (e) => {
+            trainingProgress = parseInt(e.target.value);
+            document.getElementById('progressLabel').textContent = trainingProgress + '%';
+            draw();
+        });
+
+        document.getElementById('showRaysBtn').addEventListener('click', () => {
+            showRays = !showRays;
+            document.getElementById('showRaysBtn').classList.toggle('active');
+            draw();
+        });
+
+        document.getElementById('showEncodingBtn').addEventListener('click', () => {
+            showEncoding = !showEncoding;
+            document.getElementById('showEncodingBtn').classList.toggle('active');
+            draw();
+        });
+
+        draw();
+    </script>
+
+    <div class="papers-section">
+        <h2>Key Papers</h2>
+        <div class="paper-list">
+            <a href="https://arxiv.org/abs/2003.08934" target="_blank" rel="noopener" class="paper-card">
+                <div class="paper-title">NeRF: Representing Scenes as Neural Radiance Fields for View Synthesis</div>
+                <div class="paper-authors">Mildenhall, Srinivasan, Tancik, Barron, Ramamoorthi, Ng — ECCV 2020</div>
+                <div class="paper-desc">开创性论文。用一个全连接网络将场景编码为连续的 5D 辐射场（空间坐标 + 视角方向），通过体积渲染合成新视角图像。仅需稀疏的输入视角即可重建高质量的 3D 场景。</div>
+            </a>
+            <a href="https://arxiv.org/abs/2103.13415" target="_blank" rel="noopener" class="paper-card">
+                <div class="paper-title">Mip-NeRF: A Multiscale Representation for Anti-Aliasing Neural Radiance Fields</div>
+                <div class="paper-authors">Barron, Mildenhall, Tancik, Hedman, Martin-Brualla, Srinivasan — ICCV 2021</div>
+                <div class="paper-desc">用圆锥台（conical frustum）替代射线进行采样，解决了 NeRF 在不同尺度下的锯齿问题。渲染速度比 NeRF 快 7%，模型大小减半，多尺度细节显著提升。</div>
+            </a>
+            <a href="https://arxiv.org/abs/2111.12077" target="_blank" rel="noopener" class="paper-card">
+                <div class="paper-title">Mip-NeRF 360: Unbounded Anti-Aliased Neural Radiance Fields</div>
+                <div class="paper-authors">Barron, Mildenhall, Verbin, Srinivasan, Hedman — CVPR 2022</div>
+                <div class="paper-desc">将 Mip-NeRF 扩展到无界场景（360° 环境）。引入非线性场景参数化、在线蒸馏和基于畸变的正则化，在无界场景的均方误差上比 Mip-NeRF 降低了 57%。</div>
+            </a>
+            <a href="https://arxiv.org/abs/2201.05989" target="_blank" rel="noopener" class="paper-card">
+                <div class="paper-title">Instant Neural Graphics Primitives with a Multiresolution Hash Encoding</div>
+                <div class="paper-authors">Müller, Evans, Schied, Keller (NVIDIA) — SIGGRAPH 2022</div>
+                <div class="paper-desc">提出多分辨率哈希编码，将可训练特征存储在多级哈希表中，配合小型 MLP 网络实现秒级训练。将 NeRF 训练时间从小时级压缩到几秒，在 1080p 下实现实时渲染。</div>
+            </a>
+            <a href="https://arxiv.org/abs/2008.02268" target="_blank" rel="noopener" class="paper-card">
+                <div class="paper-title">NeRF in the Wild: Neural Radiance Fields for Unconstrained Photo Collections</div>
+                <div class="paper-authors">Martin-Brualla, Radwan, Sajjadi, Barron, Dosovitskiy, Duckworth — CVPR 2021</div>
+                <div class="paper-desc">将 NeRF 扩展到非受控环境的照片集（如旅游照片）。处理光照变化和瞬态遮挡物（行人等），使 NeRF 可以从互联网照片中重建地标场景。</div>
+            </a>
+            <a href="https://arxiv.org/abs/2203.09517" target="_blank" rel="noopener" class="paper-card">
+                <div class="paper-title">TensoRF: Tensorial Radiance Fields</div>
+                <div class="paper-authors">Chen, Xu, Geiger, Yu, Su — ECCV 2022</div>
+                <div class="paper-desc">将辐射场建模为 4D 张量，通过向量-矩阵分解 (VM decomposition) 大幅减少存储和计算量。训练速度接近 Instant-NGP，同时渲染质量更高，模型更紧凑。</div>
+            </a>
+        </div>
+    </div>
+</body>
+</html>

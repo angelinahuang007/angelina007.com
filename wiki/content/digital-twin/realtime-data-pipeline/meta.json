@@ -1,0 +1,18 @@
+{
+  "title": "Real-Time Data Pipeline for Digital Twins",
+  "category": "digital-twin",
+  "tags": [
+    "data-pipeline",
+    "MQTT",
+    "Kafka",
+    "time-series",
+    "edge-computing"
+  ],
+  "description": "Architecture and implementation of real-time data ingestion systems using MQTT, Apache Kafka, and edge computing for digital twin data streams.",
+  "related": [
+    "digital-twin/architecture-overview",
+    "digital-twin/iot-sensor-integration",
+    "concepts/realtime-systems"
+  ],
+  "order": 2
+}

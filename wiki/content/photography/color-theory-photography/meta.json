@@ -1,0 +1,18 @@
+{
+  "title": "Color Theory and Color Science in Photography",
+  "category": "photography",
+  "order": 5,
+  "tags": [
+    "photography",
+    "color",
+    "white-balance",
+    "color-space",
+    "ACES"
+  ],
+  "description": "Color spaces from sRGB to ACES, white balance principles, color harmony theory, and connections between photography color science, 3D rendering, and post-processing workflows.",
+  "related": [
+    "photo-editing/color-grading",
+    "photo-editing/raw-processing",
+    "concepts/color-theory-visual-design"
+  ]
+}

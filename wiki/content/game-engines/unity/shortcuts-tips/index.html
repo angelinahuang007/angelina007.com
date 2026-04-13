@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unity Shortcuts & Tips</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--bg-dark); color: var(--fg-light); font-family: 'Space Grotesk', sans-serif; }
+
+        .page { max-width: 900px; margin: 0 auto; padding: 24px; }
+        h1 { font-family: 'Space Grotesk'; font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+        .subtitle { color: var(--fg-muted); font-size: 13px; margin-bottom: 20px; }
+
+        /* Tabs */
+        .mode-bar { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+        .mode-tab {
+            padding: 6px 14px;
+            font-family: 'Space Mono'; font-size: 11px; font-weight: 700;
+            border: 1px solid var(--fg-dark); background: transparent; color: var(--fg-muted);
+            border-radius: 4px; cursor: pointer; transition: all 0.15s;
+        }
+        .mode-tab:hover { border-color: var(--accent); color: var(--accent); }
+        .mode-tab.active { background: var(--accent); color: var(--bg-dark); border-color: var(--accent); }
+
+        .search-input {
+            margin-left: auto;
+            padding: 6px 12px;
+            font-family: 'Space Grotesk'; font-size: 12px;
+            background: var(--bg-darker); color: var(--fg-light);
+            border: 1px solid var(--fg-dark); border-radius: 4px;
+            width: 200px;
+        }
+        .search-input::placeholder { color: var(--fg-dark); }
+
+        /* Cards grid */
+        .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+
+        .category-card {
+            background: var(--bg-darker);
+            border: 1px solid var(--fg-dark);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .category-header {
+            padding: 10px 14px;
+            font-family: 'Space Mono'; font-size: 11px; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.5px;
+            color: var(--bg-dark);
+            background: var(--accent);
+        }
+        .category-body { padding: 6px 0; }
+
+        .shortcut-row {
+            display: flex; align-items: center;
+            padding: 7px 14px;
+            transition: background 0.1s;
+        }
+        .shortcut-row:hover { background: rgba(255,255,255,0.03); }
+
+        .sc-keys {
+            font-family: 'JetBrains Mono'; font-size: 12px; font-weight: 500;
+            color: var(--accent);
+            min-width: 120px;
+            display: flex; gap: 4px; flex-wrap: wrap;
+        }
+        .sc-key {
+            display: inline-block;
+            padding: 2px 7px;
+            background: rgba(99, 102, 241, 0.12);
+            border: 1px solid rgba(99, 102, 241, 0.25);
+            border-radius: 3px;
+            font-size: 11px;
+            line-height: 1.4;
+        }
+        :root.light .sc-key {
+            background: rgba(180, 83, 9, 0.1);
+            border-color: rgba(180, 83, 9, 0.25);
+        }
+
+        .sc-desc {
+            font-size: 12px; color: var(--fg-muted);
+            flex: 1;
+        }
+
+        .sc-context {
+            font-family: 'Space Mono'; font-size: 9px;
+            color: var(--fg-dark);
+            padding: 1px 6px;
+            border: 1px solid var(--fg-dark);
+            border-radius: 2px;
+            white-space: nowrap;
+        }
+
+        /* Tips section */
+        .tips-section { margin-top: 24px; }
+        .tip-card {
+            background: var(--bg-darker);
+            border: 1px solid var(--fg-dark);
+            border-left: 3px solid var(--accent);
+            border-radius: 6px;
+            padding: 14px 16px;
+            margin-bottom: 10px;
+        }
+        .tip-title {
+            font-family: 'Space Mono'; font-size: 12px; font-weight: 700;
+            color: var(--accent); margin-bottom: 4px;
+        }
+        .tip-body { font-size: 12px; color: var(--fg-muted); line-height: 1.6; }
+
+        .hidden { display: none !important; }
+
+        .count-badge {
+            font-family: 'Space Mono'; font-size: 10px;
+            color: var(--fg-dark); margin-left: 8px;
+        }
+    </style>
+</head>
+<body>
+<div class="page">
+    <h1>Unity Shortcuts & Tips</h1>
+    <p class="subtitle">Quick reference for Unity keyboard shortcuts by workspace. Search or filter by mode.</p>
+
+    <div class="mode-bar">
+        <button class="mode-tab active" data-mode="all">All</button>
+        <button class="mode-tab" data-mode="scene">Scene</button>
+        <button class="mode-tab" data-mode="inspector">Inspector</button>
+        <button class="mode-tab" data-mode="animation">Animation</button>
+        <button class="mode-tab" data-mode="prefabs">Prefabs</button>
+        <input class="search-input" id="searchInput" type="text" placeholder="Search shortcuts...">
+        <span class="count-badge" id="countBadge"></span>
+    </div>
+
+    <div class="cards" id="cardsContainer"></div>
+
+    <div class="tips-section" id="tipsSection">
+        <div class="tip-card">
+            <div class="tip-title">Scene Navigation Mastery</div>
+            <div class="tip-body">Use <strong>Middle Mouse Button</strong> drag to orbit freely around objects. <strong>Scroll wheel</strong> zooms in/out smoothly. Press <strong>F</strong> to instantly frame your selection, then <strong>Shift+F</strong> to lock the camera follow mode for continuous tracking.</div>
+        </div>
+        <div class="tip-card">
+            <div class="tip-title">Rapid GameObject Workflow</div>
+            <div class="tip-body"><strong>W/E/R/T</strong> toggle between Move, Rotate, Scale, and Rect Transform tools instantly. <strong>Ctrl+D</strong> duplicates selected objects. <strong>Ctrl+Shift+N</strong> creates empty GameObjects. Double-click objects in the hierarchy to ping and select them.</div>
+        </div>
+        <div class="tip-card">
+            <div class="tip-title">Animation & Inspector Tips</div>
+            <div class="tip-body"><strong>Shift+K</strong> adds keyframes in the Animation window. Use <strong>Comma/Period</strong> to navigate frames, <strong>Alt+Comma/Period</strong> to jump between keyframes. <strong>Ctrl+Shift+C</strong> quickly adds components from the Inspector without opening dropdowns.</div>
+        </div>
+    </div>
+</div>
+
+<script>
+const shortcuts = [
+    // General
+    { keys: ['Ctrl+Z'], desc: 'Undo', mode: 'scene', cat: 'General' },
+    { keys: ['Ctrl+Y'], desc: 'Redo', mode: 'scene', cat: 'General' },
+    { keys: ['Ctrl+S'], desc: 'Save scene', mode: 'scene', cat: 'General' },
+    { keys: ['Ctrl+D'], desc: 'Duplicate selected', mode: 'scene', cat: 'General' },
+    { keys: ['Delete'], desc: 'Delete selected', mode: 'scene', cat: 'General' },
+    { keys: ['F'], desc: 'Focus / Frame selection', mode: 'scene', cat: 'General' },
+    { keys: ['W'], desc: 'Move tool', mode: 'scene', cat: 'General' },
+    { keys: ['E'], desc: 'Rotate tool', mode: 'scene', cat: 'General' },
+    { keys: ['R'], desc: 'Scale tool', mode: 'scene', cat: 'General' },
+    { keys: ['T'], desc: 'Rect Transform tool', mode: 'scene', cat: 'General' },
+    { keys: ['Q'], desc: 'Hand tool (pan view)', mode: 'scene', cat: 'General' },
+
+    // Scene Navigation
+    { keys: ['MMB Drag'], desc: 'Orbit view', mode: 'scene', cat: 'Scene Navigation' },
+    { keys: ['Scroll'], desc: 'Zoom in / out', mode: 'scene', cat: 'Scene Navigation' },
+    { keys: ['Right-click + WASD'], desc: 'Fly through scene', mode: 'scene', cat: 'Scene Navigation' },
+    { keys: ['F'], desc: 'Focus on selection', mode: 'scene', cat: 'Scene Navigation' },
+    { keys: ['Alt+LMB Drag'], desc: 'Orbit (Mac alternative)', mode: 'scene', cat: 'Scene Navigation' },
+    { keys: ['Shift+F'], desc: 'Follow lock (frame lock)', mode: 'scene', cat: 'Scene Navigation' },
+
+    // GameObject
+    { keys: ['Ctrl+Shift+N'], desc: 'Create empty GameObject', mode: 'scene', cat: 'GameObject' },
+    { keys: ['F5'], desc: 'Refresh asset database', mode: 'scene', cat: 'GameObject' },
+    { keys: ['Ctrl+G'], desc: 'Group selected objects', mode: 'scene', cat: 'GameObject' },
+    { keys: ['Shift+Click'], desc: 'Expand all children in hierarchy', mode: 'scene', cat: 'GameObject' },
+
+    // Components
+    { keys: ['Ctrl+Shift+C'], desc: 'Add component (Inspector)', mode: 'inspector', cat: 'Components' },
+    { keys: ['Alt+Click'], desc: 'Reset property to default', mode: 'inspector', cat: 'Components' },
+
+    // Animation
+    { keys: ['Shift+K'], desc: 'Add keyframe', mode: 'animation', cat: 'Animation' },
+    { keys: ['Comma'], desc: 'Previous frame', mode: 'animation', cat: 'Animation' },
+    { keys: ['Period'], desc: 'Next frame', mode: 'animation', cat: 'Animation' },
+    { keys: ['Alt+Comma'], desc: 'Previous keyframe', mode: 'animation', cat: 'Animation' },
+    { keys: ['Alt+Period'], desc: 'Next keyframe', mode: 'animation', cat: 'Animation' },
+    { keys: ['Space'], desc: 'Play / Pause animation', mode: 'animation', cat: 'Animation' },
+
+    // Prefabs
+    { keys: ['Ctrl+Shift+P'], desc: 'Pack prefab (hierarchy context)', mode: 'prefabs', cat: 'Prefabs' },
+    { keys: ['Shift+Click'], desc: 'Select prefab variant root', mode: 'prefabs', cat: 'Prefabs' },
+];
+
+let currentMode = 'all';
+let searchQuery = '';
+
+function render() {
+    const filtered = shortcuts.filter(sc => {
+        const modeMatch = currentMode === 'all' || sc.mode === currentMode;
+        const searchMatch = !searchQuery ||
+            sc.desc.toLowerCase().includes(searchQuery) ||
+            sc.keys.join(' ').toLowerCase().includes(searchQuery) ||
+            sc.cat.toLowerCase().includes(searchQuery);
+        return modeMatch && searchMatch;
+    });
+
+    // Group by category
+    const groups = {};
+    filtered.forEach(sc => {
+        if (!groups[sc.cat]) groups[sc.cat] = [];
+        groups[sc.cat].push(sc);
+    });
+
+    const container = document.getElementById('cardsContainer');
+    container.innerHTML = Object.entries(groups).map(([cat, items]) => `
+        <div class="category-card">
+            <div class="category-header">${cat}</div>
+            <div class="category-body">
+                ${items.map(sc => `
+                    <div class="shortcut-row">
+                        <div class="sc-keys">${sc.keys.map(k => `<span class="sc-key">${k}</span>`).join('')}</div>
+                        <div class="sc-desc">${sc.desc}</div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `).join('');
+
+    document.getElementById('countBadge').textContent = `${filtered.length} shortcuts`;
+
+    // Show/hide tips based on search
+    document.getElementById('tipsSection').classList.toggle('hidden', searchQuery.length > 0);
+}
+
+// Mode tabs
+document.querySelectorAll('.mode-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        currentMode = tab.dataset.mode;
+        render();
+    });
+});
+
+// Search
+document.getElementById('searchInput').addEventListener('input', (e) => {
+    searchQuery = e.target.value.toLowerCase().trim();
+    render();
+});
+
+render();
+</script>
+</body>
+</html>

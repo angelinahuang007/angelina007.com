@@ -1,0 +1,11 @@
+{
+  "title": "Performance Optimization",
+  "category": "game-engines/unity",
+  "tags": ["unity", "performance", "optimization", "frame-budget", "batching", "instancing", "profiling"],
+  "description": "Interactive frame budget visualizer. Add objects, enable batching/instancing, and watch FPS impact in real-time.",
+  "related": [
+    "game-engines/unity/architecture-workflow",
+    "game-engines/unreal/architecture-blueprints"
+  ],
+  "order": 4
+}

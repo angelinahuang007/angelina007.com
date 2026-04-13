@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unity Lighting & Post-Processing</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        body { background: var(--bg-primary); color: var(--text-primary); font-family: 'Space+Grotesk', sans-serif; }
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        .controls { display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap; }
+        button { padding: 0.5rem 1rem; border: 2px solid var(--accent-primary); background: var(--bg-secondary); color: var(--text-primary); cursor: pointer; border-radius: 4px; font-weight: 600; transition: all 0.3s; }
+        button.active { background: var(--accent-primary); color: var(--bg-primary); }
+        button:hover { transform: translateY(-2px); }
+        .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+        #sceneCanvas { border: 2px solid var(--accent-primary); border-radius: 8px; background: var(--bg-secondary); cursor: crosshair; }
+        .control-panel { background: var(--bg-secondary); padding: 1.5rem; border-radius: 8px; border: 1px solid var(--accent-secondary); }
+        .control-group { margin-bottom: 1.5rem; }
+        .control-group label { display: block; margin-bottom: 0.5rem; font-weight: 600; }
+        input[type="range"] { width: 100%; cursor: pointer; }
+        .stage-item { padding: 0.75rem; margin: 0.5rem 0; background: var(--bg-primary); border-left: 4px solid var(--accent-primary); border-radius: 4px; font-size: 0.9rem; cursor: pointer; transition: all 0.3s; }
+        .stage-item:hover { transform: translateX(5px); }
+        .stage-item.active { border-left-color: var(--accent-secondary); font-weight: 600; }
+        .info-text { font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.5rem; }
+        @media (max-width: 768px) { .layout { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Lighting & Post-Processing Pipeline</h1>
+        <p>Interactive scene with lighting modes and post-processing effects. Move the light, adjust effects, and see real-time results.</p>
+
+        <div class="controls">
+            <button id="lightingModeBtn" class="active">Realtime</button>
+            <button id="bakedModeBtn">Baked</button>
+            <button id="mixedModeBtn">Mixed</button>
+        </div>
+
+        <div class="layout">
+            <div>
+                <canvas id="sceneCanvas" width="600" height="500"></canvas>
+                <p class="info-text">Drag the light sphere to move the light source</p>
+            </div>
+
+            <div class="control-panel">
+                <h3>Post-Processing Pipeline</h3>
+                <div id="stages"></div>
+
+                <h3 style="margin-top: 2rem;">Effect Controls</h3>
+                <div class="control-group">
+                    <label>Bloom Threshold</label>
+                    <input type="range" id="bloomThreshold" min="0" max="1" step="0.01" value="0.6">
+                    <span id="bloomThresholdVal">0.6</span>
+                </div>
+                <div class="control-group">
+                    <label>Bloom Intensity</label>
+                    <input type="range" id="bloomIntensity" min="0" max="2" step="0.1" value="1">
+                    <span id="bloomIntensityVal">1.0</span>
+                </div>
+                <div class="control-group">
+                    <label>Color Temperature</label>
+                    <input type="range" id="colorTemp" min="0" max="2" step="0.1" value="1">
+                    <span id="colorTempVal">1.0</span>
+                </div>
+                <div class="control-group">
+                    <label>Vignette Strength</label>
+                    <input type="range" id="vignetteStr" min="0" max="1" step="0.05" value="0.4">
+                    <span id="vignetteStrVal">0.4</span>
+                </div>
+
+                <h3 style="margin-top: 2rem;">Light Probes</h3>
+                <label><input type="checkbox" id="showProbes" checked> Show Light Probes</label>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { colors, onThemeChange } = Wiki;
+        const canvas = document.getElementById('sceneCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let lightMode = 'realtime';
+        let lightX = canvas.width * 0.7;
+        let lightY = 100;
+        let draggingLight = false;
+
+        const postProcessStages = [
+            { name: 'Original', active: true },
+            { name: 'Bloom', active: true },
+            { name: 'Color Grading', active: true },
+            { name: 'Vignette', active: true },
+            { name: 'Final', active: true }
+        ];
+
+        // Scene objects
+        const sceneObjects = [
+            { x: 150, y: 300, w: 80, h: 80, type: 'cube' },
+            { x: 400, y: 320, w: 60, h: 60, type: 'sphere' },
+            { x: 500, y: 350, w: 50, h: 50, type: 'cube' }
+        ];
+
+        function getThemeColors() {
+            const theme = colors();
+            return {
+                bg: theme['bg-primary'],
+                text: theme['text-primary'],
+                accent: theme['accent-primary'],
+                secondary: theme['accent-secondary']
+            };
+        }
+
+        function drawScene() {
+            const theme = getThemeColors();
+
+            // Base scene
+            ctx.fillStyle = '#0f0f23';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Ground grid
+            ctx.strokeStyle = theme.secondary + '33';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < canvas.width; x += 30) {
+                ctx.beginPath();
+                ctx.moveTo(x, 400);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+
+            // Light source
+            const lightRadius = 15;
+            const lightGradient = ctx.createRadialGradient(lightX, lightY, 2, lightX, lightY, lightRadius);
+            lightGradient.addColorStop(0, 'rgba(255, 255, 200, 1)');
+            lightGradient.addColorStop(1, 'rgba(255, 200, 100, 0)');
+            ctx.fillStyle = lightGradient;
+            ctx.fillRect(lightX - lightRadius*2, lightY - lightRadius*2, lightRadius*4, lightRadius*4);
+            ctx.fillStyle = '#FFFFC8';
+            ctx.beginPath();
+            ctx.arc(lightX, lightY, lightRadius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Light probes
+            if (document.getElementById('showProbes').checked) {
+                ctx.strokeStyle = theme.accent + '66';
+                ctx.lineWidth = 2;
+                for (let x = 100; x < canvas.width; x += 100) {
+                    for (let y = 250; y < 400; y += 75) {
+                        ctx.beginPath();
+                        ctx.arc(x, y, 20, 0, Math.PI * 2);
+                        ctx.stroke();
+                        ctx.fillStyle = theme.accent + '22';
+                        ctx.fill();
+                    }
+                }
+            }
+
+            // Draw scene objects with lighting
+            sceneObjects.forEach(obj => {
+                // Calculate distance to light
+                const dx = obj.x + obj.w/2 - lightX;
+                const dy = obj.y + obj.h/2 - lightY;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                const brightness = Math.max(0.3, 1 - dist / 400);
+
+                if (obj.type === 'cube') {
+                    ctx.fillStyle = `rgba(${100 + brightness * 155}, ${100 + brightness * 100}, ${150 + brightness * 100}, 0.9)`;
+                    ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
+                    ctx.strokeStyle = theme.accent;
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(obj.x, obj.y, obj.w, obj.h);
+                } else {
+                    const gradient = ctx.createRadialGradient(obj.x + obj.w/2 - 10, obj.y + obj.h/2 - 10, 5, obj.x + obj.w/2, obj.y + obj.h/2, obj.w);
+                    gradient.addColorStop(0, `rgba(${200 * brightness}, ${150 * brightness}, ${100 * brightness}, 0.9)`);
+                    gradient.addColorStop(1, `rgba(${100 * brightness}, ${80 * brightness}, ${60 * brightness}, 0.8)`);
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.arc(obj.x + obj.w/2, obj.y + obj.h/2, obj.w/2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+
+            // Apply post-processing effects
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+
+            const bloomThreshold = parseFloat(document.getElementById('bloomThreshold').value);
+            const bloomIntensity = parseFloat(document.getElementById('bloomIntensity').value);
+            const colorTemp = parseFloat(document.getElementById('colorTemp').value);
+            const vignetteStr = parseFloat(document.getElementById('vignetteStr').value);
+
+            // Color grading
+            for (let i = 0; i < data.length; i += 4) {
+                if (colorTemp > 1) {
+                    data[i] = Math.min(255, data[i] * colorTemp);
+                    data[i+2] = Math.max(0, data[i+2] / colorTemp);
+                } else if (colorTemp < 1) {
+                    data[i] = Math.max(0, data[i] * colorTemp);
+                    data[i+2] = Math.min(255, data[i+2] / colorTemp);
+                }
+            }
+
+            // Vignette
+            for (let y = 0; y < canvas.height; y++) {
+                for (let x = 0; x < canvas.width; x++) {
+                    const dx = x - canvas.width/2;
+                    const dy = y - canvas.height/2;
+                    const dist = Math.sqrt(dx*dx + dy*dy) / Math.sqrt(canvas.width*canvas.width + canvas.height*canvas.height);
+                    const vignette = 1 - dist * vignetteStr;
+                    const idx = (y * canvas.width + x) * 4;
+                    data[idx] *= vignette;
+                    data[idx+1] *= vignette;
+                    data[idx+2] *= vignette;
+                }
+            }
+
+            ctx.putImageData(imageData, 0, 0);
+
+            requestAnimationFrame(drawScene);
+        }
+
+        function renderStages() {
+            const stagesDiv = document.getElementById('stages');
+            stagesDiv.innerHTML = '';
+            postProcessStages.forEach((stage, i) => {
+                const el = document.createElement('div');
+                el.className = 'stage-item' + (stage.active ? ' active' : '');
+                el.textContent = stage.name;
+                el.addEventListener('click', () => {
+                    stage.active = !stage.active;
+                    renderStages();
+                });
+                stagesDiv.appendChild(el);
+            });
+        }
+
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            if (Math.sqrt((x - lightX)**2 + (y - lightY)**2) < 20) {
+                draggingLight = true;
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (draggingLight) {
+                const rect = canvas.getBoundingClientRect();
+                lightX = e.clientX - rect.left;
+                lightY = Math.max(50, e.clientY - rect.top);
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            draggingLight = false;
+        });
+
+        document.getElementById('lightingModeBtn').addEventListener('click', () => {
+            lightMode = 'realtime';
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('lightingModeBtn').classList.add('active');
+        });
+
+        document.getElementById('bakedModeBtn').addEventListener('click', () => {
+            lightMode = 'baked';
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('bakedModeBtn').classList.add('active');
+        });
+
+        document.getElementById('mixedModeBtn').addEventListener('click', () => {
+            lightMode = 'mixed';
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('mixedModeBtn').classList.add('active');
+        });
+
+        document.getElementById('bloomThreshold').addEventListener('input', (e) => {
+            document.getElementById('bloomThresholdVal').textContent = e.target.value;
+        });
+
+        document.getElementById('bloomIntensity').addEventListener('input', (e) => {
+            document.getElementById('bloomIntensityVal').textContent = e.target.value;
+        });
+
+        document.getElementById('colorTemp').addEventListener('input', (e) => {
+            document.getElementById('colorTempVal').textContent = e.target.value;
+        });
+
+        document.getElementById('vignetteStr').addEventListener('input', (e) => {
+            document.getElementById('vignetteStrVal').textContent = e.target.value;
+        });
+
+        onThemeChange(() => {
+            drawScene();
+        });
+
+        renderStages();
+        drawScene();
+    </script>
+</body>
+</html>

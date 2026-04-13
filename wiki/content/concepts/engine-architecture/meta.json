@@ -1,0 +1,18 @@
+{
+  "title": "Game Engine Architecture",
+  "category": "concepts",
+  "order": 2,
+  "tags": [
+    "engine",
+    "architecture",
+    "ECS",
+    "scene-graph",
+    "rendering"
+  ],
+  "description": "Comprehensive guide to game engine architecture patterns including entity-component systems, scene graphs, rendering pipelines, resource management, and comparisons across major engines.",
+  "related": [
+    "game-engines/unity/architecture-workflow",
+    "game-engines/unreal/architecture-blueprints",
+    "concepts/realtime-systems"
+  ]
+}

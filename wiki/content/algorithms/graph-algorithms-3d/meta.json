@@ -1,0 +1,18 @@
+{
+  "title": "Graph Algorithms for 3D Applications",
+  "category": "algorithms",
+  "tags": [
+    "algorithms",
+    "graph",
+    "pathfinding",
+    "A-star",
+    "nav-mesh",
+    "topology"
+  ],
+  "description": "Graph algorithms essential for 3D: pathfinding (A*), navigation meshes, scene graph traversal, and topology optimization.",
+  "related": [
+    "algorithms/spatial-data-structures",
+    "game-engines/unity/performance-optimization"
+  ],
+  "order": 3
+}

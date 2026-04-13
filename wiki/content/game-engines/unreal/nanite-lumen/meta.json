@@ -1,0 +1,11 @@
+{
+  "title": "Nanite & Lumen",
+  "category": "game-engines/unreal",
+  "tags": ["unreal", "lumen", "gi", "global-illumination", "ray-tracing", "screen-traces", "sdf"],
+  "description": "Interactive Lumen global illumination visualization. Toggle between screen traces, mesh SDF, and hardware ray tracing modes.",
+  "related": [
+    "game-engines/unreal/materials-nanite",
+    "game-engines/unity/lighting-postprocessing"
+  ],
+  "order": 3
+}

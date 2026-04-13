@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blender Shortcuts & Tips</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--bg-dark); color: var(--fg-light); font-family: 'Space Grotesk', sans-serif; }
+
+        .page { max-width: 900px; margin: 0 auto; padding: 24px; }
+        h1 { font-family: 'Space Grotesk'; font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+        .subtitle { color: var(--fg-muted); font-size: 13px; margin-bottom: 20px; }
+
+        /* Tabs */
+        .mode-bar { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+        .mode-tab {
+            padding: 6px 14px;
+            font-family: 'Space Mono'; font-size: 11px; font-weight: 700;
+            border: 1px solid var(--fg-dark); background: transparent; color: var(--fg-muted);
+            border-radius: 4px; cursor: pointer; transition: all 0.15s;
+        }
+        .mode-tab:hover { border-color: var(--accent); color: var(--accent); }
+        .mode-tab.active { background: var(--accent); color: var(--bg-dark); border-color: var(--accent); }
+
+        .search-input {
+            margin-left: auto;
+            padding: 6px 12px;
+            font-family: 'Space Grotesk'; font-size: 12px;
+            background: var(--bg-darker); color: var(--fg-light);
+            border: 1px solid var(--fg-dark); border-radius: 4px;
+            width: 200px;
+        }
+        .search-input::placeholder { color: var(--fg-dark); }
+
+        /* Cards grid */
+        .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+
+        .category-card {
+            background: var(--bg-darker);
+            border: 1px solid var(--fg-dark);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .category-header {
+            padding: 10px 14px;
+            font-family: 'Space Mono'; font-size: 11px; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.5px;
+            color: var(--bg-dark);
+            background: var(--accent);
+        }
+        .category-body { padding: 6px 0; }
+
+        .shortcut-row {
+            display: flex; align-items: center;
+            padding: 7px 14px;
+            transition: background 0.1s;
+        }
+        .shortcut-row:hover { background: rgba(255,255,255,0.03); }
+
+        .sc-keys {
+            font-family: 'JetBrains Mono'; font-size: 12px; font-weight: 500;
+            color: var(--accent);
+            min-width: 120px;
+            display: flex; gap: 4px; flex-wrap: wrap;
+        }
+        .sc-key {
+            display: inline-block;
+            padding: 2px 7px;
+            background: rgba(99, 102, 241, 0.12);
+            border: 1px solid rgba(99, 102, 241, 0.25);
+            border-radius: 3px;
+            font-size: 11px;
+            line-height: 1.4;
+        }
+        :root.light .sc-key {
+            background: rgba(180, 83, 9, 0.1);
+            border-color: rgba(180, 83, 9, 0.25);
+        }
+
+        .sc-desc {
+            font-size: 12px; color: var(--fg-muted);
+            flex: 1;
+        }
+
+        .sc-context {
+            font-family: 'Space Mono'; font-size: 9px;
+            color: var(--fg-dark);
+            padding: 1px 6px;
+            border: 1px solid var(--fg-dark);
+            border-radius: 2px;
+            white-space: nowrap;
+        }
+
+        /* Tips section */
+        .tips-section { margin-top: 24px; }
+        .tip-card {
+            background: var(--bg-darker);
+            border: 1px solid var(--fg-dark);
+            border-left: 3px solid var(--accent);
+            border-radius: 6px;
+            padding: 14px 16px;
+            margin-bottom: 10px;
+        }
+        .tip-title {
+            font-family: 'Space Mono'; font-size: 12px; font-weight: 700;
+            color: var(--accent); margin-bottom: 4px;
+        }
+        .tip-body { font-size: 12px; color: var(--fg-muted); line-height: 1.6; }
+
+        .hidden { display: none !important; }
+
+        .count-badge {
+            font-family: 'Space Mono'; font-size: 10px;
+            color: var(--fg-dark); margin-left: 8px;
+        }
+    </style>
+</head>
+<body>
+<div class="page">
+    <h1>Blender Shortcuts & Tips</h1>
+    <p class="subtitle">Quick reference for Blender keyboard shortcuts by mode. Search or filter by mode.</p>
+
+    <div class="mode-bar">
+        <button class="mode-tab active" data-mode="all">All</button>
+        <button class="mode-tab" data-mode="general">General</button>
+        <button class="mode-tab" data-mode="object">Object</button>
+        <button class="mode-tab" data-mode="edit">Edit</button>
+        <button class="mode-tab" data-mode="sculpt">Sculpt</button>
+        <button class="mode-tab" data-mode="nodes">Nodes</button>
+        <input class="search-input" id="searchInput" type="text" placeholder="Search shortcuts...">
+        <span class="count-badge" id="countBadge"></span>
+    </div>
+
+    <div class="cards" id="cardsContainer"></div>
+
+    <div class="tips-section" id="tipsSection">
+        <div class="tip-card">
+            <div class="tip-title">Faster Workflow</div>
+            <div class="tip-body">Use <strong>Tab</strong> to toggle Object/Edit mode instantly. Hold <strong>Shift</strong> while clicking to select multiple objects. Press <strong>Numpad .</strong> to focus on selection.</div>
+        </div>
+        <div class="tip-card">
+            <div class="tip-title">Precision Transforms</div>
+            <div class="tip-body">After pressing G/R/S, type a number for exact values (e.g., <strong>S 2 Enter</strong> = scale 2x). Add axis constraint by pressing <strong>X/Y/Z</strong> after the transform key.</div>
+        </div>
+        <div class="tip-card">
+            <div class="tip-title">Hidden Gems</div>
+            <div class="tip-body"><strong>Ctrl+Shift+M</strong> for Merge by Distance (clean duplicates). <strong>Alt+Z</strong> toggles X-ray mode. <strong>Shift+S</strong> opens the Snap menu for precise cursor/selection placement.</div>
+        </div>
+    </div>
+</div>
+
+<script>
+const shortcuts = [
+    // General
+    { keys: ['Ctrl+Z'], desc: 'Undo', mode: 'general', cat: 'General' },
+    { keys: ['Ctrl+Shift+Z'], desc: 'Redo', mode: 'general', cat: 'General' },
+    { keys: ['Ctrl+S'], desc: 'Save', mode: 'general', cat: 'General' },
+    { keys: ['F2'], desc: 'Rename selected', mode: 'general', cat: 'General' },
+    { keys: ['F3'], desc: 'Search commands', mode: 'general', cat: 'General' },
+    { keys: ['N'], desc: 'Toggle sidebar panel', mode: 'general', cat: 'General' },
+    { keys: ['T'], desc: 'Toggle toolbar', mode: 'general', cat: 'General' },
+    { keys: ['Tab'], desc: 'Toggle Object / Edit mode', mode: 'general', cat: 'General' },
+    { keys: ['Z'], desc: 'Shading pie menu', mode: 'general', cat: 'General' },
+    { keys: ['Alt+Z'], desc: 'Toggle X-ray mode', mode: 'general', cat: 'General' },
+
+    // Navigation
+    { keys: ['MMB Drag'], desc: 'Orbit view', mode: 'general', cat: 'Navigation' },
+    { keys: ['Shift+MMB'], desc: 'Pan view', mode: 'general', cat: 'Navigation' },
+    { keys: ['Scroll'], desc: 'Zoom in / out', mode: 'general', cat: 'Navigation' },
+    { keys: ['Numpad 1/3/7'], desc: 'Front / Right / Top view', mode: 'general', cat: 'Navigation' },
+    { keys: ['Numpad 5'], desc: 'Toggle perspective / ortho', mode: 'general', cat: 'Navigation' },
+    { keys: ['Numpad .'], desc: 'Focus on selection', mode: 'general', cat: 'Navigation' },
+    { keys: ['Home'], desc: 'Frame all objects', mode: 'general', cat: 'Navigation' },
+
+    // Object Mode
+    { keys: ['G'], desc: 'Grab / Move', mode: 'object', cat: 'Object Mode' },
+    { keys: ['R'], desc: 'Rotate', mode: 'object', cat: 'Object Mode' },
+    { keys: ['S'], desc: 'Scale', mode: 'object', cat: 'Object Mode' },
+    { keys: ['X / Delete'], desc: 'Delete selected', mode: 'object', cat: 'Object Mode' },
+    { keys: ['Shift+D'], desc: 'Duplicate', mode: 'object', cat: 'Object Mode' },
+    { keys: ['Shift+A'], desc: 'Add object menu', mode: 'object', cat: 'Object Mode' },
+    { keys: ['Ctrl+A'], desc: 'Apply transforms', mode: 'object', cat: 'Object Mode' },
+    { keys: ['Ctrl+J'], desc: 'Join selected objects', mode: 'object', cat: 'Object Mode' },
+    { keys: ['P'], desc: 'Separate selection', mode: 'object', cat: 'Object Mode' },
+    { keys: ['H'], desc: 'Hide selected', mode: 'object', cat: 'Object Mode' },
+    { keys: ['Alt+H'], desc: 'Unhide all', mode: 'object', cat: 'Object Mode' },
+    { keys: ['M'], desc: 'Move to collection', mode: 'object', cat: 'Object Mode' },
+    { keys: ['Ctrl+P'], desc: 'Set parent', mode: 'object', cat: 'Object Mode' },
+
+    // Edit Mode
+    { keys: ['E'], desc: 'Extrude', mode: 'edit', cat: 'Edit Mode' },
+    { keys: ['I'], desc: 'Inset faces', mode: 'edit', cat: 'Edit Mode' },
+    { keys: ['Ctrl+R'], desc: 'Loop cut', mode: 'edit', cat: 'Edit Mode' },
+    { keys: ['K'], desc: 'Knife tool', mode: 'edit', cat: 'Edit Mode' },
+    { keys: ['F'], desc: 'Fill / Create face', mode: 'edit', cat: 'Edit Mode' },
+    { keys: ['Ctrl+B'], desc: 'Bevel edges', mode: 'edit', cat: 'Edit Mode' },
+    { keys: ['Alt+Click'], desc: 'Select edge loop', mode: 'edit', cat: 'Edit Mode' },
+    { keys: ['1 / 2 / 3'], desc: 'Vertex / Edge / Face mode', mode: 'edit', cat: 'Edit Mode' },
+    { keys: ['Ctrl+Shift+M'], desc: 'Merge by Distance', mode: 'edit', cat: 'Edit Mode' },
+    { keys: ['Shift+N'], desc: 'Recalculate normals', mode: 'edit', cat: 'Edit Mode' },
+    { keys: ['U'], desc: 'UV Unwrap menu', mode: 'edit', cat: 'Edit Mode' },
+    { keys: ['Ctrl+E'], desc: 'Edge menu', mode: 'edit', cat: 'Edit Mode' },
+    { keys: ['Ctrl+F'], desc: 'Face menu', mode: 'edit', cat: 'Edit Mode' },
+    { keys: ['Ctrl+V'], desc: 'Vertex menu', mode: 'edit', cat: 'Edit Mode' },
+
+    // Sculpt Mode
+    { keys: ['F'], desc: 'Brush size', mode: 'sculpt', cat: 'Sculpt Mode' },
+    { keys: ['Shift+F'], desc: 'Brush strength', mode: 'sculpt', cat: 'Sculpt Mode' },
+    { keys: ['Ctrl'], desc: 'Invert brush (subtract)', mode: 'sculpt', cat: 'Sculpt Mode' },
+    { keys: ['Shift'], desc: 'Smooth brush (hold)', mode: 'sculpt', cat: 'Sculpt Mode' },
+    { keys: ['X'], desc: 'Flip brush direction', mode: 'sculpt', cat: 'Sculpt Mode' },
+    { keys: ['Ctrl+D'], desc: 'Dyntopo detail size', mode: 'sculpt', cat: 'Sculpt Mode' },
+    { keys: ['Shift+Space'], desc: 'Brush selector', mode: 'sculpt', cat: 'Sculpt Mode' },
+
+    // Nodes
+    { keys: ['Ctrl+Shift+Click'], desc: 'Preview node output', mode: 'nodes', cat: 'Node Editor' },
+    { keys: ['Ctrl+T'], desc: 'Add texture mapping setup', mode: 'nodes', cat: 'Node Editor' },
+    { keys: ['Shift+A'], desc: 'Add node menu', mode: 'nodes', cat: 'Node Editor' },
+    { keys: ['Ctrl+RMB Drag'], desc: 'Cut node links', mode: 'nodes', cat: 'Node Editor' },
+    { keys: ['M'], desc: 'Mute selected node', mode: 'nodes', cat: 'Node Editor' },
+    { keys: ['H'], desc: 'Collapse / Expand node', mode: 'nodes', cat: 'Node Editor' },
+    { keys: ['Ctrl+G'], desc: 'Group nodes', mode: 'nodes', cat: 'Node Editor' },
+];
+
+let currentMode = 'all';
+let searchQuery = '';
+
+function render() {
+    const filtered = shortcuts.filter(sc => {
+        const modeMatch = currentMode === 'all' || sc.mode === currentMode;
+        const searchMatch = !searchQuery ||
+            sc.desc.toLowerCase().includes(searchQuery) ||
+            sc.keys.join(' ').toLowerCase().includes(searchQuery) ||
+            sc.cat.toLowerCase().includes(searchQuery);
+        return modeMatch && searchMatch;
+    });
+
+    // Group by category
+    const groups = {};
+    filtered.forEach(sc => {
+        if (!groups[sc.cat]) groups[sc.cat] = [];
+        groups[sc.cat].push(sc);
+    });
+
+    const container = document.getElementById('cardsContainer');
+    container.innerHTML = Object.entries(groups).map(([cat, items]) => `
+        <div class="category-card">
+            <div class="category-header">${cat}</div>
+            <div class="category-body">
+                ${items.map(sc => `
+                    <div class="shortcut-row">
+                        <div class="sc-keys">${sc.keys.map(k => `<span class="sc-key">${k}</span>`).join('')}</div>
+                        <div class="sc-desc">${sc.desc}</div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `).join('');
+
+    document.getElementById('countBadge').textContent = `${filtered.length} shortcuts`;
+
+    // Show/hide tips based on search
+    document.getElementById('tipsSection').classList.toggle('hidden', searchQuery.length > 0);
+}
+
+// Mode tabs
+document.querySelectorAll('.mode-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        currentMode = tab.dataset.mode;
+        render();
+    });
+});
+
+// Search
+document.getElementById('searchInput').addEventListener('input', (e) => {
+    searchQuery = e.target.value.toLowerCase().trim();
+    render();
+});
+
+render();
+</script>
+</body>
+</html>

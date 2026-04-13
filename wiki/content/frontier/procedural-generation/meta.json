@@ -1,0 +1,19 @@
+{
+  "title": "Procedural Content Generation",
+  "category": "frontier",
+  "order": 5,
+  "tags": [
+    "procedural",
+    "noise",
+    "WFC",
+    "L-systems",
+    "terrain",
+    "generation"
+  ],
+  "description": "Comprehensive guide to procedural generation including noise functions, Wave Function Collapse, L-systems, terrain, city generation, and art-directability techniques.",
+  "related": [
+    "algorithms/computational-geometry",
+    "blender/shader-nodes",
+    "frontier/ai-content-generation"
+  ]
+}

@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Realtime Data Pipeline</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        body { background: var(--bg-dark); color: var(--fg-light); }
+        .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+        .controls { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+        button { padding: 8px 16px; background: var(--accent); color: var(--bg-dark); border: none; border-radius: 4px; cursor: pointer; font-family: 'Space Mono'; font-weight: 700; }
+        button:hover { opacity: 0.8; }
+        #canvas { border: 1px solid var(--fg-dark); background: var(--bg-darker); display: block; margin: 0 auto; }
+        .info { font-size: 0.9em; color: var(--fg-muted); margin-top: 10px; font-family: 'Space Mono'; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Realtime Data Pipeline</h1>
+        <p>Watch data flow through the pipeline stages: Sensors → MQTT → Kafka → Flink → TimescaleDB → Dashboard</p>
+
+        <div class="controls">
+            <button id="startBtn">Send Reading</button>
+            <button id="resetBtn">Reset</button>
+        </div>
+
+        <canvas id="canvas" width="800" height="500"></canvas>
+        <div class="info" id="info">Click "Send Reading" to simulate a temperature sensor value flowing through the pipeline.</div>
+    </div>
+
+    <script>
+        const canvas = Wiki.createCanvas('canvas', 800, 500);
+        const ctx = canvas.getContext('2d');
+
+        const stages = [
+            { name: 'Sensors', x: 50, color: '#ff6b6b', latency: 10 },
+            { name: 'MQTT Broker', x: 200, color: '#ffe66d', latency: 15 },
+            { name: 'Kafka', x: 350, color: '#4ecdc4', latency: 20 },
+            { name: 'Flink', x: 500, color: '#a8dadc', latency: 50 },
+            { name: 'TimescaleDB', x: 650, color: '#00d4ff', latency: 30 },
+            { name: 'Dashboard', x: 800, color: '#ff00aa', latency: 5 }
+        ];
+
+        let dataPackets = [];
+        let totalLatency = 0;
+        let packetCounter = 0;
+
+        class DataPacket {
+            constructor(stageIndex) {
+                this.stageIndex = stageIndex;
+                this.progress = 0;
+                this.value = Math.floor(Math.random() * 15 + 18); // Temperature 18-33C
+                this.color = `hsl(${this.value * 10}, 100%, 50%)`;
+                this.startTime = Date.now();
+            }
+
+            update() {
+                this.progress = Math.min(this.progress + 0.05, 1);
+                return this.progress >= 1;
+            }
+
+            draw(ctx) {
+                const stage = stages[this.stageIndex];
+                const nextStage = stages[this.stageIndex + 1];
+                const startX = stage.x + 80;
+                const endX = nextStage.x;
+                const y = 300;
+
+                const x = startX + (endX - startX) * this.progress;
+
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(x, y, 8, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = Wiki.colors().text;
+                ctx.font = 'bold 10px Space Mono';
+                ctx.textAlign = 'center';
+                ctx.fillText(this.value + '°C', x, y + 3);
+            }
+        }
+
+        function sendReading() {
+            let current = new DataPacket(0);
+            dataPackets.push(current);
+            packetCounter++;
+
+            // Schedule progression through stages
+            let stageIdx = 0;
+            const progressInterval = setInterval(() => {
+                if (stageIdx < stages.length - 1) {
+                    const nextPacket = new DataPacket(stageIdx + 1);
+                    nextPacket.value = current.value;
+                    nextPacket.color = current.color;
+                    dataPackets.push(nextPacket);
+                    current = nextPacket;
+                    stageIdx++;
+                } else {
+                    clearInterval(progressInterval);
+                }
+            }, 200);
+        }
+
+        function draw() {
+            ctx.fillStyle = Wiki.colors().bg;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = Wiki.colors().fg;
+            ctx.font = 'bold 18px Space Grotesk';
+            ctx.fillText('Data Pipeline Flow', 20, 30);
+
+            // Draw stages
+            stages.forEach((stage, idx) => {
+                // Stage box
+                ctx.fillStyle = stage.color;
+                ctx.globalAlpha = 0.2;
+                ctx.fillRect(stage.x, 200, 80, 120);
+                ctx.globalAlpha = 1;
+
+                ctx.strokeStyle = stage.color;
+                ctx.lineWidth = 2;
+                ctx.strokeRect(stage.x, 200, 80, 120);
+
+                // Stage name
+                ctx.fillStyle = stage.color;
+                ctx.font = 'bold 12px Space Grotesk';
+                ctx.textAlign = 'center';
+                ctx.fillText(stage.name, stage.x + 40, 235);
+
+                // Latency
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+                ctx.font = '10px Space Mono';
+                ctx.fillText(stage.latency + 'ms', stage.x + 40, 280);
+
+                // Arrow to next
+                if (idx < stages.length - 1) {
+                    ctx.strokeStyle = 'rgba(200, 200, 200, 0.4)';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(stage.x + 80, 260);
+                    ctx.lineTo(stages[idx + 1].x, 260);
+                    ctx.stroke();
+
+                    // Arrow head
+                    const arrowSize = 8;
+                    ctx.beginPath();
+                    ctx.moveTo(stages[idx + 1].x, 260);
+                    ctx.lineTo(stages[idx + 1].x - arrowSize, 260 - arrowSize / 2);
+                    ctx.lineTo(stages[idx + 1].x - arrowSize, 260 + arrowSize / 2);
+                    ctx.closePath();
+                    ctx.fillStyle = 'rgba(200, 200, 200, 0.4)';
+                    ctx.fill();
+                }
+            });
+
+            // Draw and update packets
+            for (let i = dataPackets.length - 1; i >= 0; i--) {
+                const packet = dataPackets[i];
+                const isDone = packet.update();
+
+                packet.draw(ctx);
+
+                if (isDone && packet.stageIndex === stages.length - 1) {
+                    dataPackets.splice(i, 1);
+                }
+            }
+
+            // Stats
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.font = '12px Space Mono';
+            ctx.textAlign = 'left';
+            ctx.fillText(`Packets processed: ${packetCounter}`, 20, 450);
+            ctx.fillText(`Active packets: ${dataPackets.length}`, 20, 475);
+
+            let totalLatencyMs = 0;
+            stages.forEach(s => totalLatencyMs += s.latency);
+            ctx.fillText(`Total pipeline latency: ${totalLatencyMs}ms`, 20, 500);
+
+            ctx.strokeStyle = Wiki.colors().fg;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(0, 0, canvas.width, canvas.height);
+        }
+
+        document.getElementById('startBtn').addEventListener('click', sendReading);
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            dataPackets = [];
+            packetCounter = 0;
+            document.getElementById('info').textContent = 'Pipeline reset. Click "Send Reading" to start.';
+        });
+
+        Wiki.animate(draw);
+    </script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+{
+  "title": "Color Grading Principles and Techniques",
+  "category": "photo-editing",
+  "tags": [
+    "color-grading",
+    "LUT",
+    "editing",
+    "color-science",
+    "film-emulation"
+  ],
+  "description": "Deep dive into color grading theory, LUT creation, color harmony, and developing a personal color style across Lightroom, Photoshop, and DaVinci Resolve.",
+  "related": [
+    "photography/color-theory-photography",
+    "photo-editing/lightroom-workflow",
+    "concepts/color-theory-visual-design"
+  ],
+  "order": 3
+}

@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Virtual Cinematography</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        .cinematography-container {
+            display: flex; flex-wrap: wrap;
+            gap: 20px;
+            height: 100%;
+        }
+        .scene-area {
+            flex: 1;
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, #16213e 100%);
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            overflow-y: auto;
+        }
+        .scene-canvas {
+            background: var(--canvas-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+            flex: 1;
+            min-height: 250px;
+        }
+        .scene-canvas canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        .comparison-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .preview-box {
+            background: var(--canvas-bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+            height: 140px;
+        }
+        .preview-box h4 {
+            margin: 0;
+            padding: 8px 12px;
+            background: rgba(22, 160, 133, 0.15);
+            color: #16a085;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid rgba(233, 236, 239, 0.1);
+        }
+        .preview-box canvas {
+            display: block;
+            width: 100%;
+            height: calc(100% - 30px);
+        }
+        .control-panel {
+            width: 280px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 16px;
+            overflow-y: auto;
+            color: var(--text);
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 13px;
+        }
+        .control-group {
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        .control-group h4 {
+            margin: 0 0 8px 0;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #16a085;
+            letter-spacing: 0.5px;
+        }
+        .slider-row {
+            margin-bottom: 12px;
+        }
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+            font-size: 12px;
+        }
+        input[type="range"] {
+            width: 100%;
+            height: 4px;
+            border-radius: 2px;
+            background: var(--border-strong);
+            outline: none;
+            -webkit-appearance: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #16a085;
+            cursor: pointer;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #16a085;
+            border: none;
+            cursor: pointer;
+        }
+        .info-box {
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 4px;
+            padding: 8px;
+            font-size: 11px;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--accent-light);
+            line-height: 1.5;
+        }
+        .info-text {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 12px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="cinematography-container">
+        <div class="scene-area">
+            <div class="scene-canvas">
+                <canvas id="sceneCanvas"></canvas>
+            </div>
+
+            <div class="comparison-row">
+                <div class="preview-box">
+                    <h4>Depth of Field Preview</h4>
+                    <canvas id="dofPreview"></canvas>
+                </div>
+                <div class="preview-box">
+                    <h4>Motion Blur Preview</h4>
+                    <canvas id="blurPreview"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="control-panel">
+            <div class="control-group">
+                <h4>Camera Settings</h4>
+                <div class="slider-row">
+                    <div class="slider-label">
+                        <span>Focal Length</span>
+                        <span id="focalValue">50mm</span>
+                    </div>
+                    <input type="range" id="focalSlider" min="15" max="200" step="5" value="50">
+                    <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Wide → Telephoto</div>
+                </div>
+
+                <div class="slider-row">
+                    <div class="slider-label">
+                        <span>Aperture</span>
+                        <span id="apertureValue">f/2.8</span>
+                    </div>
+                    <input type="range" id="apertureSlider" min="1.4" max="16" step="0.2" value="2.8">
+                    <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Wide (shallow) → Narrow (deep)</div>
+                </div>
+
+                <div class="slider-row">
+                    <div class="slider-label">
+                        <span>Focus Distance</span>
+                        <span id="focusValue">5.0m</span>
+                    </div>
+                    <input type="range" id="focusSlider" min="1" max="15" step="0.5" value="5.0">
+                    <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Close → Far</div>
+                </div>
+
+                <div class="slider-row">
+                    <div class="slider-label">
+                        <span>Motion Blur Amount</span>
+                        <span id="motionValue">50%</span>
+                    </div>
+                    <input type="range" id="motionSlider" min="0" max="100" step="10" value="50">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h4>Scene Depth Layers</h4>
+                <div class="info-box">
+                    <div>Near: 0-3m</div>
+                    <div>Mid: 3-7m</div>
+                    <div>Far: 7-15m</div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h4>Real Camera Equivalents</h4>
+                <div class="info-box">
+                    <div>Focal: <span id="realFocal">50</span>mm</div>
+                    <div>F-Stop: <span id="realFStop">f/2.8</span></div>
+                    <div>DOF: <span id="realDOF">2.5m</span></div>
+                </div>
+            </div>
+
+            <div class="info-text">
+                Adjust focal length and aperture to see how real camera parameters affect your virtual shot composition.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class VirtualCamera {
+            constructor() {
+                this.sceneCanvas = document.getElementById('sceneCanvas');
+                this.sceneCtx = this.sceneCanvas.getContext('2d');
+                this.dofCanvas = document.getElementById('dofPreview');
+                this.dofCtx = this.dofCanvas.getContext('2d');
+                this.blurCanvas = document.getElementById('blurPreview');
+                this.blurCtx = this.blurCanvas.getContext('2d');
+
+                // Camera parameters
+                this.focalLength = 50;
+                this.aperture = 2.8;
+                this.focusDistance = 5.0;
+                this.motionBlur = 50;
+
+                // Scene depth layers with objects
+                this.depthLayers = [
+                    { depth: 1.5, name: 'Near', elements: [{ x: 0.2, y: 0.4, size: 0.15, color: '#e74c3c' }] },
+                    { depth: 5.0, name: 'Mid', elements: [{ x: 0.5, y: 0.3, size: 0.25, color: '#27ae60' }, { x: 0.7, y: 0.5, size: 0.2, color: '#f39c12' }] },
+                    { depth: 10.0, name: 'Far', elements: [{ x: 0.3, y: 0.6, size: 0.1, color: '#3498db' }] }
+                ];
+
+                this.resizeCanvases();
+                window.addEventListener('resize', () => this.resizeCanvases());
+                this.setupEvents();
+                this.render();
+            }
+
+            resizeCanvases() {
+                const rect = this.sceneCanvas.parentElement.getBoundingClientRect();
+                this.sceneCanvas.width = rect.width;
+                this.sceneCanvas.height = rect.height;
+
+                const dofRect = this.dofCanvas.parentElement.getBoundingClientRect();
+                this.dofCanvas.width = dofRect.width;
+                this.dofCanvas.height = dofRect.height;
+
+                const blurRect = this.blurCanvas.parentElement.getBoundingClientRect();
+                this.blurCanvas.width = blurRect.width;
+                this.blurCanvas.height = blurRect.height;
+
+                this.render();
+            }
+
+            setupEvents() {
+                document.getElementById('focalSlider').addEventListener('input', (e) => {
+                    this.focalLength = parseFloat(e.target.value);
+                    document.getElementById('focalValue').textContent = this.focalLength + 'mm';
+                    document.getElementById('realFocal').textContent = this.focalLength;
+                    this.render();
+                });
+
+                document.getElementById('apertureSlider').addEventListener('input', (e) => {
+                    this.aperture = parseFloat(e.target.value);
+                    document.getElementById('apertureValue').textContent = `f/${this.aperture.toFixed(1)}`;
+                    document.getElementById('realFStop').textContent = `f/${this.aperture.toFixed(1)}`;
+                    this.render();
+                });
+
+                document.getElementById('focusSlider').addEventListener('input', (e) => {
+                    this.focusDistance = parseFloat(e.target.value);
+                    document.getElementById('focusValue').textContent = this.focusDistance.toFixed(1) + 'm';
+                    this.render();
+                });
+
+                document.getElementById('motionSlider').addEventListener('input', (e) => {
+                    this.motionBlur = parseFloat(e.target.value);
+                    document.getElementById('motionValue').textContent = this.motionBlur + '%';
+                    this.render();
+                });
+            }
+
+            calculateDOF() {
+                // Simplified DOF calculation
+                const coc = this.aperture / 1000;
+                const dof = (2 * coc * this.focusDistance * (this.focusDistance - this.focalLength / 1000)) / (this.focalLength / 1000);
+                return Math.abs(dof);
+            }
+
+            calculateBlur(depth) {
+                const distance = Math.abs(depth - this.focusDistance);
+                const dof = this.calculateDOF();
+                if (distance > dof) {
+                    return Math.min(1, distance / 5);
+                }
+                return 0;
+            }
+
+            render() {
+                this.renderMainScene();
+                this.renderDOFPreview();
+                this.renderMotionBlurPreview();
+                this.updateStats();
+            }
+
+            renderMainScene() {
+                const w = this.sceneCanvas.width;
+                const h = this.sceneCanvas.height;
+
+                // Background gradient (depth)
+                const grad = this.sceneCtx.createLinearGradient(0, 0, 0, h);
+                const bgSecondary = getComputedStyle(document.documentElement).getPropertyValue('--bg-secondary').trim();
+                const canvas = getComputedStyle(document.documentElement).getPropertyValue('--canvas-bg').trim();
+                grad.addColorStop(0, bgSecondary);
+                grad.addColorStop(1, canvas);
+                this.sceneCtx.fillStyle = grad;
+                this.sceneCtx.fillRect(0, 0, w, h);
+
+                // Depth layers visualization
+                for (let i = 0; i < this.depthLayers.length; i++) {
+                    const layer = this.depthLayers[i];
+                    const blur = this.calculateBlur(layer.depth);
+
+                    // Layer background
+                    const layerAlpha = 1 - (blur * 0.5);
+                    this.sceneCtx.globalAlpha = layerAlpha;
+
+                    // Draw depth indicator stripe
+                    const stripeY = (layer.depth / 15) * h;
+                    this.sceneCtx.fillStyle = `rgba(22, 160, 133, ${0.1 * (1 - blur)})`;
+                    this.sceneCtx.fillRect(0, stripeY - 2, w, 4);
+
+                    // Draw objects in layer
+                    layer.elements.forEach(el => {
+                        const x = el.x * w;
+                        const y = el.y * h;
+                        const size = el.size * Math.min(w, h);
+
+                        // Add blur effect
+                        if (blur > 0.2) {
+                            this.sceneCtx.filter = `blur(${blur * 8}px)`;
+                        }
+
+                        this.sceneCtx.fillStyle = el.color;
+                        this.sceneCtx.beginPath();
+                        this.sceneCtx.arc(x, y, size, 0, Math.PI * 2);
+                        this.sceneCtx.fill();
+
+                        this.sceneCtx.filter = 'none';
+
+                        // Outline
+                        this.sceneCtx.strokeStyle = 'rgba(233, 236, 239, 0.5)';
+                        this.sceneCtx.lineWidth = 2;
+                        this.sceneCtx.stroke();
+                    });
+
+                    this.sceneCtx.globalAlpha = 1;
+
+                    // Label
+                    const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text').trim();
+                    this.sceneCtx.fillStyle = 'rgba(233, 236, 239, 0.4)';
+                    this.sceneCtx.font = '11px "Space Mono"';
+                    this.sceneCtx.fillText(`${layer.name} (${layer.depth.toFixed(1)}m)`, 10, stripeY - 5);
+                }
+
+                // Focus distance indicator
+                const focusY = (this.focusDistance / 15) * h;
+                this.sceneCtx.strokeStyle = '#16a085';
+                this.sceneCtx.lineWidth = 3;
+                this.sceneCtx.setLineDash([5, 5]);
+                this.sceneCtx.beginPath();
+                this.sceneCtx.moveTo(0, focusY);
+                this.sceneCtx.lineTo(w, focusY);
+                this.sceneCtx.stroke();
+                this.sceneCtx.setLineDash([]);
+
+                // Camera frustum visualization
+                this.sceneCtx.strokeStyle = 'rgba(52, 152, 219, 0.3)';
+                this.sceneCtx.lineWidth = 2;
+                const fovScale = this.focalLength / 50;
+                this.sceneCtx.beginPath();
+                this.sceneCtx.moveTo(0, 0);
+                this.sceneCtx.lineTo(w * fovScale, h);
+                this.sceneCtx.lineTo(w * (1 - fovScale), h);
+                this.sceneCtx.closePath();
+                this.sceneCtx.stroke();
+            }
+
+            renderDOFPreview() {
+                const w = this.dofCanvas.width;
+                const h = this.dofCanvas.height;
+
+                this.dofCtx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--canvas-bg').trim();
+                this.dofCtx.fillRect(0, 0, w, h);
+
+                // DOF visualization
+                const focusY = (this.focusDistance / 15) * h;
+                const dof = this.calculateDOF();
+                const dofPixels = (dof / 15) * h;
+
+                // Blurred areas
+                const grad1 = this.dofCtx.createLinearGradient(0, 0, 0, focusY - dofPixels);
+                grad1.addColorStop(0, 'rgba(22, 160, 133, 0.5)');
+                grad1.addColorStop(1, 'rgba(22, 160, 133, 0.1)');
+                this.dofCtx.fillStyle = grad1;
+                this.dofCtx.fillRect(0, 0, w, focusY - dofPixels);
+
+                const grad2 = this.dofCtx.createLinearGradient(0, focusY + dofPixels, 0, h);
+                grad2.addColorStop(0, 'rgba(22, 160, 133, 0.1)');
+                grad2.addColorStop(1, 'rgba(22, 160, 133, 0.5)');
+                this.dofCtx.fillStyle = grad2;
+                this.dofCtx.fillRect(0, focusY + dofPixels, w, h);
+
+                // Sharp area
+                this.dofCtx.fillStyle = 'rgba(22, 160, 133, 0.3)';
+                this.dofCtx.fillRect(0, focusY - dofPixels, w, dofPixels * 2);
+
+                // Focus line
+                this.dofCtx.strokeStyle = '#16a085';
+                this.dofCtx.lineWidth = 2;
+                this.dofCtx.beginPath();
+                this.dofCtx.moveTo(0, focusY);
+                this.dofCtx.lineTo(w, focusY);
+                this.dofCtx.stroke();
+            }
+
+            renderMotionBlurPreview() {
+                const w = this.blurCanvas.width;
+                const h = this.blurCanvas.height;
+
+                this.blurCtx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--canvas-bg').trim();
+                this.blurCtx.fillRect(0, 0, w, h);
+
+                const blurAmount = (this.motionBlur / 100) * 15;
+
+                // Simulate motion trails
+                this.blurCtx.strokeStyle = 'rgba(52, 152, 219, 0.6)';
+                this.blurCtx.lineWidth = 3;
+                this.blurCtx.setLineDash([2, 2]);
+
+                for (let i = 0; i < 5; i++) {
+                    const offset = (i / 5) * blurAmount;
+                    this.blurCtx.globalAlpha = 1 - (i / 5);
+                    this.blurCtx.beginPath();
+                    this.blurCtx.arc(w / 2 + offset * 20, h / 2, 30, 0, Math.PI * 2);
+                    this.blurCtx.stroke();
+                }
+
+                this.blurCtx.setLineDash([]);
+                this.blurCtx.globalAlpha = 1;
+
+                // Center circle (sharp)
+                this.blurCtx.fillStyle = 'rgba(52, 152, 219, 0.8)';
+                this.blurCtx.beginPath();
+                this.blurCtx.arc(w / 2, h / 2, 30, 0, Math.PI * 2);
+                this.blurCtx.fill();
+            }
+
+            updateStats() {
+                const dof = this.calculateDOF();
+                document.getElementById('realDOF').textContent = dof.toFixed(2) + 'm';
+            }
+        }
+
+        const camera = new VirtualCamera();
+    </script>
+</body>
+</html>

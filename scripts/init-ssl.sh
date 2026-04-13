@@ -1,73 +1,94 @@
 #!/bin/bash
 # ─────────────────────────────────────────────────────
-# init-ssl.sh — Bootstrap SSL certificates for first-time setup
+# init-ssl.sh — First-time deployment with Caddy
 #
-# Usage: ./scripts/init-ssl.sh [your-email@example.com]
+# Usage: ./scripts/init-ssl.sh
 #
-# This script:
-# 1. Creates temporary self-signed certs so nginx can start
-# 2. Starts nginx + next-app containers
-# 3. Requests real Let's Encrypt certs via certbot
-# 4. Reloads nginx with the real certs
+# With Caddy, SSL is automatic — no manual cert setup needed.
+# This script simply ensures DNS is pointing correctly and
+# brings up the full stack.
 # ─────────────────────────────────────────────────────
 
 set -e
 
 DOMAIN="angelina007.com"
-EMAIL="${1:-admin@angelina007.com}"
-CERT_PATH="./certbot/conf/live/$DOMAIN"
+WIKI_DOMAIN="wiki.angelina007.com"
 
-echo "==> SSL Bootstrap for $DOMAIN"
-echo "    Email: $EMAIL"
+echo "========================================="
+echo " angelina007.com — Deployment Bootstrap"
+echo "========================================="
+echo ""
+echo "Domains:"
+echo "  Main site:  $DOMAIN / www.$DOMAIN"
+echo "  Wiki:       $WIKI_DOMAIN"
 echo ""
 
-# Step 1: Create directories
-mkdir -p ./certbot/conf ./certbot/www
+# Step 1: Check DNS
+echo "==> Checking DNS resolution..."
+MAIN_IP=$(dig +short "$DOMAIN" 2>/dev/null || echo "")
+WIKI_IP=$(dig +short "$WIKI_DOMAIN" 2>/dev/null || echo "")
 
-# Step 2: Check if real certs already exist
-if [ -f "$CERT_PATH/fullchain.pem" ] && [ ! -f "$CERT_PATH/.selfsigned" ]; then
-    echo "==> Real SSL certificates already exist. Skipping."
-    echo "    To force renewal: docker compose run --rm certbot renew --force-renewal"
-    exit 0
+if [ -z "$MAIN_IP" ]; then
+    echo "    WARNING: $DOMAIN does not resolve yet."
+    echo "    Add an A record pointing to this server's IP."
+else
+    echo "    $DOMAIN -> $MAIN_IP"
 fi
 
-# Step 3: Create temporary self-signed cert (so nginx can start with SSL)
-echo "==> Creating temporary self-signed certificate..."
-mkdir -p "$CERT_PATH"
-openssl req -x509 -nodes -newkey rsa:2048 -days 1 \
-    -keyout "$CERT_PATH/privkey.pem" \
-    -out "$CERT_PATH/fullchain.pem" \
-    -subj "/CN=$DOMAIN" 2>/dev/null
-cp "$CERT_PATH/fullchain.pem" "$CERT_PATH/chain.pem"
-touch "$CERT_PATH/.selfsigned"
-echo "    Done."
-
-# Step 4: Start containers (nginx will use the self-signed cert)
-echo "==> Starting containers..."
-docker compose up -d nginx next-app
-echo "    Waiting for nginx to be ready..."
-sleep 5
-
-# Step 5: Request real certificate from Let's Encrypt
-echo "==> Requesting Let's Encrypt certificate..."
-rm -f "$CERT_PATH/.selfsigned"
-docker compose run --rm certbot certonly \
-    --webroot -w /var/www/certbot \
-    -d "$DOMAIN" -d "www.$DOMAIN" \
-    --email "$EMAIL" \
-    --agree-tos \
-    --non-interactive \
-    --force-renewal
-
-# Step 6: Reload nginx with real certs
-echo "==> Reloading nginx..."
-docker compose exec nginx nginx -s reload
-
-# Step 7: Start certbot auto-renewal container
-echo "==> Starting certbot auto-renewal..."
-docker compose up -d certbot
+if [ -z "$WIKI_IP" ]; then
+    echo "    WARNING: $WIKI_DOMAIN does not resolve yet."
+    echo "    Add an A record for 'wiki' pointing to this server's IP."
+else
+    echo "    $WIKI_DOMAIN -> $WIKI_IP"
+fi
 
 echo ""
-echo "==> SSL setup complete!"
-echo "    https://$DOMAIN should now be live."
-echo "    Certbot will auto-renew certificates every 12 hours."
+
+# Step 2: Ensure .env exists
+if [ ! -f .env ]; then
+    echo "==> Creating .env from .env.example..."
+    cp .env.example .env
+    echo "    Please edit .env with your actual values."
+    echo ""
+fi
+
+# Step 3: Build all services
+echo "==> Building Docker images..."
+docker compose build
+
+# Step 4: Start the stack
+echo "==> Starting all services..."
+docker compose up -d
+
+echo ""
+echo "==> Waiting for services to be healthy..."
+sleep 10
+
+# Step 5: Check service status
+echo "==> Service status:"
+docker compose ps
+
+echo ""
+echo "========================================="
+echo " Deployment complete!"
+echo "========================================="
+echo ""
+echo " Caddy handles HTTPS automatically."
+echo " Once DNS propagates, certificates will"
+echo " be provisioned within minutes."
+echo ""
+echo " Access locally (before DNS):"
+echo "   Main site: http://localhost:8080"
+echo "   Wiki:      http://localhost:8081"
+echo ""
+echo " Access via domain (after DNS):"
+echo "   Main site: https://$DOMAIN"
+echo "   Wiki:      https://$WIKI_DOMAIN"
+echo ""
+echo " Useful commands:"
+echo "   docker compose logs -f caddy       # Watch proxy logs"
+echo "   docker compose logs -f wiki-app    # Watch wiki logs"
+echo "   docker compose restart wiki-app    # Restart wiki only"
+echo "   docker compose restart next-app    # Restart main site only"
+echo "   docker compose down                # Stop everything"
+echo "========================================="

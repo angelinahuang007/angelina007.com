@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Computational Geometry</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        body { background: var(--bg-dark); color: var(--fg-light); }
+        .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+        .controls { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; align-items: center; }
+        button { padding: 8px 16px; background: var(--accent); color: var(--bg-dark); border: none; border-radius: 4px; cursor: pointer; font-family: 'Space Mono'; font-weight: 700; }
+        button.active { background: var(--accent-alt); }
+        button:hover { opacity: 0.8; }
+        #canvas { border: 1px solid var(--fg-dark); background: var(--bg-darker); display: block; margin: 0 auto; cursor: crosshair; }
+        .info { font-size: 0.9em; color: var(--fg-muted); margin-top: 10px; font-family: 'Space Mono'; }
+        .playback { display: flex; gap: 10px; align-items: center; }
+        input[type="range"] { min-width: 150px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Computational Geometry</h1>
+        <p>Interactive visualization of core geometry algorithms: Convex Hull, Delaunay Triangulation, and Voronoi Diagrams.</p>
+
+        <div class="controls">
+            <button id="convexBtn">Convex Hull</button>
+            <button id="delaunayBtn">Delaunay Triangulation</button>
+            <button id="voronoiBtn">Voronoi Diagram</button>
+            <button id="generateBtn">Generate Points</button>
+            <button id="clearBtn">Clear</button>
+            <div class="playback">
+                <button id="playBtn">Play</button>
+                <input type="range" id="stepSlider" min="0" max="100" value="0">
+                <span id="stepLabel">Step: 0/0</span>
+            </div>
+        </div>
+
+        <canvas id="canvas" width="800" height="500"></canvas>
+        <div class="info" id="info">Click to add points. Select algorithm and press Play to animate.</div>
+    </div>
+
+    <script>
+        const canvas = Wiki.createCanvas('canvas', 800, 500);
+        const ctx = canvas.getContext('2d');
+        let points = [];
+        let currentAlgorithm = 'convex';
+        let isAnimating = false;
+        let animationStep = 0;
+        let animationSteps = [];
+
+        class ConvexHull {
+            static graham(pts) {
+                if (pts.length < 3) return pts;
+                pts = pts.sort((a, b) => a.x === b.x ? a.y - b.y : a.x - b.x);
+
+                const steps = [];
+                const lower = [];
+                for (let p of pts) {
+                    while (lower.length >= 2 && this.cross(lower[lower.length-2], lower[lower.length-1], p) <= 0) {
+                        lower.pop();
+                    }
+                    lower.push(p);
+                    steps.push({ type: 'hull', hull: [...lower], processing: p });
+                }
+
+                const upper = [];
+                for (let i = pts.length - 1; i >= 0; i--) {
+                    while (upper.length >= 2 && this.cross(upper[upper.length-2], upper[upper.length-1], pts[i]) <= 0) {
+                        upper.pop();
+                    }
+                    upper.push(pts[i]);
+                    steps.push({ type: 'hull', hull: [...lower, ...upper], processing: pts[i] });
+                }
+
+                return { hull: lower.concat(upper.slice(1, -1)), steps };
+            }
+            static cross(a, b, c) {
+                return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+            }
+        }
+
+        class Delaunay {
+            static triangulate(pts) {
+                if (pts.length < 3) return [];
+                const steps = [];
+                const triangles = [];
+
+                const superTriangle = [
+                    { x: -1000, y: -1000 },
+                    { x: 2000, y: -1000 },
+                    { x: 500, y: 2000 }
+                ];
+                triangles.push(superTriangle);
+
+                for (let p of pts) {
+                    const badTriangles = [];
+                    for (let tri of triangles) {
+                        if (this.inCircumcircle(p, tri)) {
+                            badTriangles.push(tri);
+                        }
+                    }
+
+                    const edges = [];
+                    for (let tri of badTriangles) {
+                        for (let edge of [[tri[0], tri[1]], [tri[1], tri[2]], [tri[2], tri[0]]]) {
+                            if (!edges.some(e => (e[0] === edge[0] && e[1] === edge[1]) || (e[0] === edge[1] && e[1] === edge[0]))) {
+                                edges.push(edge);
+                            }
+                        }
+                    }
+
+                    for (let tri of badTriangles) {
+                        const idx = triangles.indexOf(tri);
+                        if (idx > -1) triangles.splice(idx, 1);
+                    }
+
+                    for (let edge of edges) {
+                        triangles.push([edge[0], edge[1], p]);
+                    }
+
+                    steps.push({ type: 'triangles', triangles: [...triangles].filter(t => t[0].x >= 0), processing: p });
+                }
+
+                return { triangles: triangles.filter(t => t[0].x >= 0), steps };
+            }
+            static inCircumcircle(p, tri) {
+                const [a, b, c] = tri;
+                const ax = a.x - p.x, ay = a.y - p.y;
+                const bx = b.x - p.x, by = b.y - p.y;
+                const cx = c.x - p.x, cy = c.y - p.y;
+                return (ax*ax + ay*ay) * (bx*cy - cx*by) -
+                       (bx*bx + by*by) * (ax*cy - cx*ay) +
+                       (cx*cx + cy*cy) * (ax*by - bx*ay) > 0;
+            }
+        }
+
+        function runAlgorithm() {
+            animationSteps = [];
+            animationStep = 0;
+
+            if (currentAlgorithm === 'convex') {
+                const result = ConvexHull.graham([...points]);
+                animationSteps = result.steps || [];
+            } else if (currentAlgorithm === 'delaunay') {
+                const result = Delaunay.triangulate([...points]);
+                animationSteps = result.steps || [];
+            } else if (currentAlgorithm === 'voronoi') {
+                animationSteps = points.map((p, i) => ({
+                    type: 'voronoi',
+                    point: p,
+                    index: i,
+                    total: points.length
+                }));
+            }
+
+            document.getElementById('stepSlider').max = Math.max(1, animationSteps.length - 1);
+            document.getElementById('stepSlider').value = 0;
+            updateStepLabel();
+            isAnimating = true;
+            animate();
+        }
+
+        function animate() {
+            if (!isAnimating) return;
+            animationStep = Math.min(animationStep + 1, animationSteps.length - 1);
+            document.getElementById('stepSlider').value = animationStep;
+            updateStepLabel();
+            draw();
+            if (animationStep < animationSteps.length - 1) {
+                setTimeout(animate, 100);
+            }
+        }
+
+        function updateStepLabel() {
+            document.getElementById('stepLabel').textContent = `Step: ${animationStep}/${Math.max(1, animationSteps.length - 1)}`;
+        }
+
+        function draw() {
+            ctx.fillStyle = Wiki.colors().bg;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = Wiki.colors().fg;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(0, 0, canvas.width, canvas.height);
+
+            const step = animationSteps[animationStep];
+
+            if (currentAlgorithm === 'convex' && step && step.hull) {
+                ctx.strokeStyle = '#4ecdc4';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                const hull = step.hull;
+                if (hull.length > 0) {
+                    ctx.moveTo(hull[0].x, hull[0].y);
+                    for (let i = 1; i < hull.length; i++) {
+                        ctx.lineTo(hull[i].x, hull[i].y);
+                    }
+                    ctx.closePath();
+                    ctx.stroke();
+                }
+            } else if (currentAlgorithm === 'delaunay' && step && step.triangles) {
+                ctx.strokeStyle = '#4ecdc4';
+                ctx.lineWidth = 1;
+                for (let tri of step.triangles) {
+                    ctx.beginPath();
+                    ctx.moveTo(tri[0].x, tri[0].y);
+                    ctx.lineTo(tri[1].x, tri[1].y);
+                    ctx.lineTo(tri[2].x, tri[2].y);
+                    ctx.closePath();
+                    ctx.stroke();
+                }
+            }
+
+            // Draw points
+            points.forEach((p, i) => {
+                ctx.fillStyle = (step && step.processing === p) ? '#ffe66d' : '#ff6b6b';
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        canvas.addEventListener('click', (e) => {
+            if (e.shiftKey) return;
+            const rect = canvas.getBoundingClientRect();
+            points.push({
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            });
+            draw();
+        });
+
+        document.getElementById('convexBtn').addEventListener('click', () => {
+            currentAlgorithm = 'convex';
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('convexBtn').classList.add('active');
+            runAlgorithm();
+        });
+
+        document.getElementById('delaunayBtn').addEventListener('click', () => {
+            currentAlgorithm = 'delaunay';
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('delaunayBtn').classList.add('active');
+            runAlgorithm();
+        });
+
+        document.getElementById('voronoiBtn').addEventListener('click', () => {
+            currentAlgorithm = 'voronoi';
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('voronoiBtn').classList.add('active');
+            runAlgorithm();
+        });
+
+        document.getElementById('generateBtn').addEventListener('click', () => {
+            points = [];
+            for (let i = 0; i < 15; i++) {
+                points.push({
+                    x: Math.random() * 800 + 50,
+                    y: Math.random() * 500 + 50
+                });
+            }
+            draw();
+        });
+
+        document.getElementById('clearBtn').addEventListener('click', () => {
+            points = [];
+            animationSteps = [];
+            animationStep = 0;
+            isAnimating = false;
+            draw();
+        });
+
+        document.getElementById('playBtn').addEventListener('click', () => {
+            isAnimating = !isAnimating;
+            if (isAnimating && animationSteps.length > 0) {
+                animate();
+            }
+        });
+
+        document.getElementById('stepSlider').addEventListener('input', (e) => {
+            animationStep = parseInt(e.target.value);
+            isAnimating = false;
+            updateStepLabel();
+            draw();
+        });
+
+        draw();
+    </script>
+</body>
+</html>

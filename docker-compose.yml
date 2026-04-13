@@ -1,7 +1,49 @@
-version: '3.9'
+# =============================================================================
+# angelina007.com — Full Stack: Caddy + Main Site + Wiki + PostgreSQL
+# =============================================================================
+# Usage:
+#   docker compose up -d                  # Start all services
+#   docker compose up -d next-app         # Start only main site
+#   docker compose up -d wiki-app         # Start only wiki
+#   docker compose restart wiki-app       # Restart wiki independently
+#   docker compose logs -f caddy          # Watch proxy logs
+#   docker compose down                   # Stop everything
+# =============================================================================
 
 services:
-  # Next.js application
+  # ---------------------------------------------------------------------------
+  # Reverse Proxy — Caddy (automatic HTTPS, no certbot needed)
+  # ---------------------------------------------------------------------------
+  caddy:
+    image: caddy:2-alpine
+    container_name: angelina-caddy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3 (QUIC)
+      - "8080:8080"     # Local dev: main site
+      - "8081:8081"     # Local dev: wiki
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data        # TLS certificates
+      - caddy_config:/config    # Caddy config state
+    depends_on:
+      next-app:
+        condition: service_healthy
+      wiki-app:
+        condition: service_healthy
+    networks:
+      - angelina-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # Main Site — Next.js application (angelina007.com)
+  # ---------------------------------------------------------------------------
   next-app:
     build:
       context: .
@@ -16,9 +58,9 @@ services:
       NEXT_PUBLIC_SANITY_DATASET: ${NEXT_PUBLIC_SANITY_DATASET:-production}
       SANITY_API_TOKEN: ${SANITY_API_TOKEN:-}
     expose:
-      - 3000
+      - "3000"
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000', (r) => { if (r.statusCode !== 200) throw new Error(r.statusCode) })"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -31,20 +73,29 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Nginx reverse proxy
-  nginx:
-    image: nginx:alpine
-    container_name: angelina-nginx
+  # ---------------------------------------------------------------------------
+  # Wiki — Custom Node.js wiki app (wiki.angelina007.com)
+  # ---------------------------------------------------------------------------
+  wiki-app:
+    build:
+      context: ./wiki
+      dockerfile: Dockerfile
+    container_name: angelina-wiki
     restart: always
-    ports:
-      - "80:80"
-      - "443:443"
+    environment:
+      NODE_ENV: production
+      PORT: "4000"
+    expose:
+      - "4000"
     volumes:
-      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./certbot/conf:/etc/letsencrypt:ro
-      - ./certbot/www:/var/www/certbot:ro
-    depends_on:
-      - next-app
+      # Mount content separately so you can update articles without rebuilding
+      - ./wiki/content:/app/content:ro
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/api/articles', (r) => { if (r.statusCode !== 200) throw new Error(r.statusCode) })"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     networks:
       - angelina-network
     logging:
@@ -53,22 +104,27 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Certbot for SSL certificate management
-  certbot:
-    image: certbot/certbot
-    container_name: angelina-certbot
+  # ---------------------------------------------------------------------------
+  # Database — PostgreSQL (for future use: analytics, comments, etc.)
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: angelina-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-angelina}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_in_production}
+      POSTGRES_DB: ${POSTGRES_DB:-angelina_wiki}
     volumes:
-      - ./certbot/conf:/etc/letsencrypt
-      - ./certbot/www:/var/www/certbot
-    # Auto-renew every 12 hours (only renews if cert is near expiry)
-    entrypoint: >
-      /bin/sh -c "
-      trap exit TERM;
-      while :; do
-        certbot renew --webroot -w /var/www/certbot --quiet;
-        sleep 12h & wait $${!};
-      done
-      "
+      - postgres_data:/var/lib/postgresql/data
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-angelina}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       - angelina-network
     logging:
@@ -77,6 +133,20 @@ services:
         max-size: "10m"
         max-file: "3"
 
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  caddy_data:
+    driver: local
+  caddy_config:
+    driver: local
+  postgres_data:
+    driver: local
+
+# =============================================================================
+# Networks
+# =============================================================================
 networks:
   angelina-network:
     driver: bridge

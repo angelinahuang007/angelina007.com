@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exposure Triangle Simulator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/lib/wiki-interactive.css" />
+    <script src="/lib/wiki-interactive.js"></script>
+    <style>
+        .exposure-container {
+            display: flex; flex-wrap: wrap;
+            gap: 20px;
+            height: 100%;
+        }
+        .preview-area {
+            flex: 1;
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, #16213e 100%);
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .photo-preview {
+            flex: 1;
+            background: var(--canvas-bg);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            overflow: hidden;
+            position: relative;
+            min-height: 200px;
+        }
+        .photo-preview canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        .preview-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 12px;
+        }
+        .info-card {
+            background: rgba(233, 236, 239, 0.05);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 12px;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 12px;
+            color: var(--text);
+        }
+        .info-card h4 {
+            margin: 0 0 6px 0;
+            color: #16a085;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .info-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            color: #a1e9d6;
+            font-weight: bold;
+        }
+        .effects-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .effect-canvas {
+            background: var(--canvas-bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            aspect-ratio: 1;
+            overflow: hidden;
+        }
+        .effect-canvas canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        .effect-label {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            background: rgba(0, 0, 0, 0.6);
+            color: var(--text);
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-family: 'Space Mono', monospace;
+            z-index: 10;
+        }
+        .control-panel {
+            width: 300px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 16px;
+            overflow-y: auto;
+            color: var(--text);
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 13px;
+        }
+        .control-group {
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        .control-group h4 {
+            margin: 0 0 8px 0;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #16a085;
+            letter-spacing: 0.5px;
+        }
+        .slider-row {
+            margin-bottom: 12px;
+        }
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+            font-size: 12px;
+        }
+        input[type="range"] {
+            width: 100%;
+            height: 4px;
+            border-radius: 2px;
+            background: var(--border-strong);
+            outline: none;
+            -webkit-appearance: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #16a085;
+            cursor: pointer;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #16a085;
+            border: none;
+            cursor: pointer;
+        }
+        .ev-meter {
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 4px;
+            padding: 8px;
+            margin-top: 8px;
+        }
+        .ev-bar {
+            height: 20px;
+            background: linear-gradient(90deg, #c0392b 0%, #e74c3c 25%, #f39c12 50%, #f1c40f 75%, #27ae60 100%);
+            border-radius: 2px;
+            position: relative;
+            margin-bottom: 4px;
+            overflow: hidden;
+        }
+        .ev-pointer {
+            position: absolute;
+            width: 2px;
+            height: 100%;
+            background: white;
+            top: 0;
+        }
+        .ev-label {
+            font-size: 10px;
+            color: var(--text-muted);
+            text-align: center;
+        }
+        .info-text {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 12px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="exposure-container">
+        <div class="preview-area">
+            <div class="photo-preview">
+                <canvas id="photoCanvas"></canvas>
+            </div>
+
+            <div class="preview-info">
+                <div class="info-card">
+                    <h4>Depth of Field</h4>
+                    <div class="info-value" id="dofValue">f/2.8</div>
+                </div>
+                <div class="info-card">
+                    <h4>Motion Blur</h4>
+                    <div class="info-value" id="mbValue">1/1000s</div>
+                </div>
+                <div class="info-card">
+                    <h4>Noise Level</h4>
+                    <div class="info-value" id="noiseValue">ISO 100</div>
+                </div>
+            </div>
+
+            <div class="effects-grid">
+                <div class="effect-canvas" style="position: relative;">
+                    <div class="effect-label">Depth of Field</div>
+                    <canvas id="dofCanvas"></canvas>
+                </div>
+                <div class="effect-canvas" style="position: relative;">
+                    <div class="effect-label">Histogram</div>
+                    <canvas id="histogramCanvas"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="control-panel">
+            <div class="control-group">
+                <h4>Exposure Triangle</h4>
+                <div class="slider-row">
+                    <div class="slider-label">
+                        <span>Aperture (f-stop)</span>
+                        <span id="apertureValue">f/2.8</span>
+                    </div>
+                    <input type="range" id="apertureSlider" min="0" max="100" value="35">
+                    <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Wider → Shallower DOF</div>
+                </div>
+
+                <div class="slider-row">
+                    <div class="slider-label">
+                        <span>Shutter Speed</span>
+                        <span id="shutterValue">1/125s</span>
+                    </div>
+                    <input type="range" id="shutterSlider" min="0" max="100" value="50">
+                    <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Faster → Less motion blur</div>
+                </div>
+
+                <div class="slider-row">
+                    <div class="slider-label">
+                        <span>ISO</span>
+                        <span id="isoValue">ISO 400</span>
+                    </div>
+                    <input type="range" id="isoSlider" min="0" max="100" value="35">
+                    <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Higher → More noise</div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h4>Exposure Value</h4>
+                <div class="ev-meter">
+                    <div class="ev-bar">
+                        <div class="ev-pointer" id="evPointer"></div>
+                    </div>
+                    <div class="ev-label" id="evLabel">EV: 0</div>
+                </div>
+            </div>
+
+            <div class="info-text">
+                The exposure triangle: aperture controls depth of field, shutter speed controls motion blur, and ISO controls noise. All three affect overall exposure.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class ExposureTriangle {
+            constructor() {
+                this.photoCanvas = document.getElementById('photoCanvas');
+                this.photoCtx = this.photoCanvas.getContext('2d');
+                this.dofCanvas = document.getElementById('dofCanvas');
+                this.dofCtx = this.dofCanvas.getContext('2d');
+                this.histogramCanvas = document.getElementById('histogramCanvas');
+                this.histogramCtx = this.histogramCanvas.getContext('2d');
+
+                // Exposure settings
+                this.aperture = 2.8;
+                this.shutter = 1/125;
+                this.iso = 400;
+
+                // F-stop lookup table
+                this.fstops = [1.4, 2, 2.8, 4, 5.6, 8, 11, 16, 22];
+                this.shutterValues = [1/4000, 1/2000, 1/1000, 1/500, 1/250, 1/125, 1/60, 1/30, 1/15, 1/8, 1/4, 1/2, 1, 2, 4, 8, 15, 30];
+                this.isoValues = [100, 200, 400, 800, 1600, 3200, 6400, 12800];
+
+                this.resizeCanvases();
+                window.addEventListener('resize', () => this.resizeCanvases());
+                this.setupEvents();
+                this.render();
+            }
+
+            resizeCanvases() {
+                const rect = this.photoCanvas.parentElement.getBoundingClientRect();
+                this.photoCanvas.width = rect.width;
+                this.photoCanvas.height = rect.height;
+
+                const dofRect = this.dofCanvas.parentElement.getBoundingClientRect();
+                this.dofCanvas.width = dofRect.width;
+                this.dofCanvas.height = dofRect.height;
+
+                const histRect = this.histogramCanvas.parentElement.getBoundingClientRect();
+                this.histogramCanvas.width = histRect.width;
+                this.histogramCanvas.height = histRect.height;
+
+                this.render();
+            }
+
+            setupEvents() {
+                document.getElementById('apertureSlider').addEventListener('input', (e) => {
+                    const val = parseFloat(e.target.value);
+                    const idx = Math.round((val / 100) * (this.fstops.length - 1));
+                    this.aperture = this.fstops[idx];
+                    document.getElementById('apertureValue').textContent = `f/${this.aperture}`;
+                    this.render();
+                });
+
+                document.getElementById('shutterSlider').addEventListener('input', (e) => {
+                    const val = parseFloat(e.target.value);
+                    const idx = Math.round((val / 100) * (this.shutterValues.length - 1));
+                    this.shutter = this.shutterValues[idx];
+                    const label = this.shutter < 1 ? `1/${Math.round(1/this.shutter)}s` : `${this.shutter}s`;
+                    document.getElementById('shutterValue').textContent = label;
+                    this.render();
+                });
+
+                document.getElementById('isoSlider').addEventListener('input', (e) => {
+                    const val = parseFloat(e.target.value);
+                    const idx = Math.round((val / 100) * (this.isoValues.length - 1));
+                    this.iso = this.isoValues[idx];
+                    document.getElementById('isoValue').textContent = `ISO ${this.iso}`;
+                    this.render();
+                });
+            }
+
+            getExposure() {
+                const apertureStop = Math.log2(this.aperture);
+                const shutterStop = Math.log2(1 / this.shutter);
+                const isoStop = Math.log2(this.iso / 100);
+                return apertureStop + shutterStop - isoStop;
+            }
+
+            render() {
+                this.renderPhoto();
+                this.renderDOF();
+                this.renderHistogram();
+                this.updateEVMeter();
+            }
+
+            renderPhoto() {
+                const w = this.photoCanvas.width;
+                const h = this.photoCanvas.height;
+                const exposure = this.getExposure();
+                const exposureFactor = Math.pow(2, exposure);
+
+                // Sky
+                const skyGrad = this.photoCtx.createLinearGradient(0, 0, 0, h * 0.3);
+                skyGrad.addColorStop(0, `rgb(${Math.min(255, 100 * exposureFactor)}, ${Math.min(255, 150 * exposureFactor)}, ${Math.min(255, 200 * exposureFactor)})`);
+                skyGrad.addColorStop(1, `rgb(${Math.min(255, 80 * exposureFactor)}, ${Math.min(255, 120 * exposureFactor)}, ${Math.min(255, 180 * exposureFactor)})`);
+                this.photoCtx.fillStyle = skyGrad;
+                this.photoCtx.fillRect(0, 0, w, h * 0.3);
+
+                // Mountains
+                this.photoCtx.fillStyle = `rgb(${Math.min(255, 60 * exposureFactor)}, ${Math.min(255, 80 * exposureFactor)}, ${Math.min(255, 40 * exposureFactor)})`;
+                this.photoCtx.beginPath();
+                this.photoCtx.moveTo(0, h * 0.3);
+                this.photoCtx.quadraticCurveTo(w * 0.2, h * 0.15, w * 0.4, h * 0.3);
+                this.photoCtx.quadraticCurveTo(w * 0.6, h * 0.2, w * 0.8, h * 0.3);
+                this.photoCtx.lineTo(w, h * 0.3);
+                this.photoCtx.lineTo(w, h);
+                this.photoCtx.lineTo(0, h);
+                this.photoCtx.closePath();
+                this.photoCtx.fill();
+
+                // Foreground
+                this.photoCtx.fillStyle = `rgb(${Math.min(255, 40 * exposureFactor)}, ${Math.min(255, 60 * exposureFactor)}, ${Math.min(255, 20 * exposureFactor)})`;
+                this.photoCtx.fillRect(0, h * 0.5, w, h * 0.5);
+
+                // Add noise based on ISO
+                this.addNoise(this.photoCtx, w, h);
+            }
+
+            renderDOF() {
+                const w = this.dofCanvas.width;
+                const h = this.dofCanvas.height;
+
+                this.dofCtx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg-secondary').trim();
+                this.dofCtx.fillRect(0, 0, w, h);
+
+                // Draw focus gradient
+                const dofIntensity = 1 / (this.aperture / 2.8);
+                const grad = this.dofCtx.createLinearGradient(0, 0, 0, h);
+                grad.addColorStop(0, `rgba(22, 160, 133, ${0.1 * dofIntensity})`);
+                grad.addColorStop(0.3, `rgba(22, 160, 133, ${0.5 * dofIntensity})`);
+                grad.addColorStop(0.5, `rgba(22, 160, 133, ${1 * dofIntensity})`);
+                grad.addColorStop(0.7, `rgba(22, 160, 133, ${0.5 * dofIntensity})`);
+                grad.addColorStop(1, `rgba(22, 160, 133, ${0.1 * dofIntensity})`);
+
+                this.dofCtx.fillStyle = grad;
+                this.dofCtx.fillRect(0, 0, w, h);
+
+                // Label
+                this.dofCtx.fillStyle = '#a1e9d6';
+                this.dofCtx.font = '12px "Space Mono"';
+                this.dofCtx.textAlign = 'center';
+                this.dofCtx.fillText(`DOF: f/${this.aperture}`, w / 2, h / 2);
+            }
+
+            renderHistogram() {
+                const w = this.histogramCanvas.width;
+                const h = this.histogramCanvas.height;
+
+                this.histogramCtx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg-secondary').trim();
+                this.histogramCtx.fillRect(0, 0, w, h);
+
+                const exposure = this.getExposure();
+                const bins = 256;
+                const histogram = new Uint32Array(bins);
+
+                // Create histogram data based on exposure
+                for (let i = 0; i < bins; i++) {
+                    const intensity = i / bins;
+                    const shifted = Math.min(1, Math.max(0, intensity * Math.pow(2, exposure)));
+                    const binValue = Math.round(shifted * bins);
+                    histogram[binValue]++;
+                }
+
+                // Draw histogram
+                const maxValue = Math.max(...histogram);
+                this.histogramCtx.strokeStyle = 'rgba(22, 160, 133, 0.8)';
+                this.histogramCtx.lineWidth = 1;
+                this.histogramCtx.beginPath();
+
+                for (let i = 0; i < bins; i++) {
+                    const x = (i / bins) * w;
+                    const y = h - (histogram[i] / maxValue) * h * 0.8 - h * 0.1;
+                    if (i === 0) this.histogramCtx.moveTo(x, y);
+                    else this.histogramCtx.lineTo(x, y);
+                }
+
+                this.histogramCtx.stroke();
+
+                // Fill under curve
+                this.histogramCtx.lineTo(w, h);
+                this.histogramCtx.lineTo(0, h);
+                this.histogramCtx.closePath();
+                this.histogramCtx.fillStyle = 'rgba(22, 160, 133, 0.2)';
+                this.histogramCtx.fill();
+            }
+
+            addNoise(ctx, w, h) {
+                const noiseIntensity = (this.iso / 100) * 0.003;
+                const imageData = ctx.getImageData(0, 0, w, h);
+                const data = imageData.data;
+
+                for (let i = 0; i < data.length; i += 4) {
+                    const noise = (Math.random() - 0.5) * 255 * noiseIntensity;
+                    data[i] += noise;
+                    data[i + 1] += noise;
+                    data[i + 2] += noise;
+                }
+
+                ctx.putImageData(imageData, 0, 0);
+            }
+
+            updateEVMeter() {
+                const ev = this.getExposure();
+                const evNormalized = (ev + 5) / 10;
+                const pointerPercent = Math.max(0, Math.min(1, evNormalized)) * 100;
+
+                document.getElementById('evPointer').style.left = pointerPercent + '%';
+                document.getElementById('evLabel').textContent = `EV: ${ev.toFixed(1)}`;
+
+                document.getElementById('dofValue').textContent = `f/${this.aperture}`;
+                const shutterLabel = this.shutter < 1 ? `1/${Math.round(1/this.shutter)}s` : `${this.shutter}s`;
+                document.getElementById('mbValue').textContent = shutterLabel;
+                document.getElementById('noiseValue').textContent = `ISO ${this.iso}`;
+            }
+        }
+
+        const exposure = new ExposureTriangle();
+    </script>
+</body>
+</html>

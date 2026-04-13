@@ -1,0 +1,16 @@
+{
+  "title": "Photography Composition and Visual Design",
+  "category": "photography",
+  "order": 4,
+  "tags": [
+    "photography",
+    "composition",
+    "framing",
+    "visual-design"
+  ],
+  "description": "Fundamental composition principles including rule of thirds, golden ratio, leading lines, framing, symmetry, and application to 3D scene setup and virtual camera placement.",
+  "related": [
+    "photography/virtual-cinematography",
+    "concepts/color-theory-visual-design"
+  ]
+}

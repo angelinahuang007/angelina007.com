@@ -1,0 +1,18 @@
+{
+  "title": "Animation Principles and Interpolation",
+  "category": "concepts",
+  "order": 3,
+  "tags": [
+    "animation",
+    "principles",
+    "Disney",
+    "timing",
+    "interpolation"
+  ],
+  "description": "Deep dive into the 12 Disney animation principles applied to 2D and 3D, interpolation methods for smooth motion, and technical implementation of professional animation systems.",
+  "related": [
+    "blender/animation-rigging",
+    "game-engines/unity/architecture-workflow",
+    "graphics-fundamentals/curves-and-surfaces"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "title": "Texture Mapping and Filtering",
+  "category": "graphics-fundamentals",
+  "tags": [
+    "texture",
+    "uv-mapping",
+    "filtering",
+    "mipmaps",
+    "normal-mapping",
+    "compression"
+  ],
+  "description": "UV mapping, texture filtering strategies (nearest, bilinear, trilinear, anisotropic), mipmaps, and advanced mapping techniques (normal, bump, parallax, displacement).",
+  "related": [
+    "graphics-fundamentals/shading-models",
+    "blender/shader-nodes",
+    "game-engines/unity/shader-programming"
+  ],
+  "order": 4
+}

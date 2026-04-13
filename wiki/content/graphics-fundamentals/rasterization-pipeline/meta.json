@@ -1,0 +1,19 @@
+{
+  "title": "The Rasterization Pipeline",
+  "category": "graphics-fundamentals",
+  "tags": [
+    "rasterization",
+    "gpu",
+    "pipeline",
+    "rendering",
+    "fixed-function",
+    "programmable"
+  ],
+  "description": "Complete overview of the modern GPU rasterization pipeline from vertex input through framebuffer output, covering programmable and fixed-function stages.",
+  "related": [
+    "graphics-fundamentals/transformation-matrices",
+    "graphics-fundamentals/shading-models",
+    "algorithms/gpu-parallel-computing"
+  ],
+  "order": 1
+}
