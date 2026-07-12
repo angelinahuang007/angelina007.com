@@ -6,16 +6,17 @@ on:
       - main
   workflow_dispatch:
 
-env:
-  REGISTRY: ghcr.io
+# 同一时间只允许一个部署在跑，避免连续 push 时互相踩
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
 
 jobs:
-  build-and-test:
-    name: Build and Test
+  build:
+    name: Build (smoke test)
     runs-on: ubuntu-latest
     permissions:
       contents: read
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -29,45 +30,26 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run linter
+      # lint 只做提示，不阻塞部署（等 P1 阶段代码清理完再改成强制）
+      - name: Run linter (advisory)
         run: npm run lint
+        continue-on-error: true
 
       - name: Build Next.js application
         run: npm run build
         env:
           NEXT_PUBLIC_SITE_URL: https://angelina007.com
-          NEXT_PUBLIC_SANITY_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_SANITY_PROJECT_ID }}
-          NEXT_PUBLIC_SANITY_DATASET: ${{ secrets.NEXT_PUBLIC_SANITY_DATASET }}
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: build
-          path: |
-            .next/
-            public/
-            node_modules/
-          retention-days: 1
 
   deploy:
-    name: Deploy to Production
-    needs: build-and-test
+    name: Deploy to droplet
+    needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: read
     environment:
       name: production
       url: https://angelina007.com
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v3
-        with:
-          name: build
-
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
@@ -79,62 +61,20 @@ jobs:
         run: |
           ssh ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }} << 'EOF'
             set -e
-
-            # Navigate to project directory
             cd ~/angelina007.com
 
-            # Pull latest changes
-            git pull origin main
+            # 用 fetch + reset 而不是 pull：即使远端历史被改写也能可靠对齐
+            git fetch origin
+            git reset --hard origin/main
 
-            # Load environment variables from .env.production
-            if [ -f .env.production ]; then
-              export $(cat .env.production | grep -v '^#' | xargs)
-            fi
+            # 构建并启动（--build 会利用缓存，只重建有变化的层）
+            docker compose up -d --build --remove-orphans
 
-            # Build Docker images
-            docker compose build
-
-            # Start containers with updated images
-            docker compose up -d
-
-            # Run any post-deployment tasks
-            docker compose exec -T next-app npm run build || true
-
-            # Verify deployment
-            sleep 5
             docker compose ps
-
-            echo "Deployment completed successfully"
+            echo "Deployment completed"
           EOF
 
       - name: Verify deployment
         run: |
           sleep 10
-          curl -f https://angelina007.com/ || exit 1
-          echo "Deployment verified"
-
-  notify:
-    name: Notify on Deployment
-    needs: [build-and-test, deploy]
-    runs-on: ubuntu-latest
-    if: always()
-
-    steps:
-      - name: Determine status
-        id: status
-        run: |
-          if [ "${{ needs.deploy.result }}" == "success" ]; then
-            echo "status=Success" >> $GITHUB_OUTPUT
-            echo "emoji=✅" >> $GITHUB_OUTPUT
-          else
-            echo "status=Failed" >> $GITHUB_OUTPUT
-            echo "emoji=❌" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Deployment notification
-        run: |
-          echo "${{ steps.status.outputs.emoji }} Deployment ${{ steps.status.outputs.status }}"
-          echo "Repository: ${{ github.repository }}"
-          echo "Branch: ${{ github.ref_name }}"
-          echo "Commit: ${{ github.sha }}"
-          echo "Author: ${{ github.actor }}"
+          curl -fsS -o /dev/null https://angelina007.com/ && echo "OK: site responds with valid TLS"

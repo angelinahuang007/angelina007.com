@@ -11,7 +11,7 @@ export const SITE_METADATA = {
 
 export const NAVIGATION_LINKS = [
   { href: '/', label: 'Home' },
-  { href: '/projects', label: 'Projects' },
+  { href: '/portfolio', label: 'Projects' }, // 修复：原先指向不存在的 /projects（404）
   { href: '/blog', label: 'Blog' },
   { href: '/about', label: 'About' },
   { href: '/contact', label: 'Contact' },

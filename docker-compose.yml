@@ -28,11 +28,14 @@ services:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data        # TLS certificates
       - caddy_config:/config    # Caddy config state
+    # 2026-07-12 修复：依赖条件从 service_healthy 放宽为 service_started。
+    # 教训：wiki 的健康检查误报曾导致 Caddy 拒绝启动，主站被拖下线。
+    # 反向代理不应被后端健康状态阻塞——后端不健康顶多 502，主站其他部分照常服务。
     depends_on:
       next-app:
-        condition: service_healthy
+        condition: service_started
       wiki-app:
-        condition: service_healthy
+        condition: service_started
     networks:
       - angelina-network
     logging:
@@ -59,8 +62,10 @@ services:
       SANITY_API_TOKEN: ${SANITY_API_TOKEN:-}
     expose:
       - "3000"
+    # 2026-07-12 修复：健康检查改为消费完响应体后按状态码退出。
+    # 旧写法从不读取响应，进程会挂到 keep-alive 超时，容易被误判不健康。
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000', (r) => { if (r.statusCode !== 200) throw new Error(r.statusCode) })"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000', (r) => { r.resume(); r.on('end', () => process.exit(r.statusCode === 200 ? 0 : 1)); }).on('error', () => process.exit(1))"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -90,10 +95,12 @@ services:
     volumes:
       # Mount content separately so you can update articles without rebuilding
       - ./wiki/content:/app/content:ro
+    # 2026-07-12 修复：同上，消费响应体；超时 5s→10s（/api/articles 响应较大，
+    # 旧检查的挂起时长恰好压在 5s 边界上，导致稳定误报 unhealthy）。
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/api/articles', (r) => { if (r.statusCode !== 200) throw new Error(r.statusCode) })"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/api/articles', (r) => { r.resume(); r.on('end', () => process.exit(r.statusCode === 200 ? 0 : 1)); }).on('error', () => process.exit(1))"]
       interval: 30s
-      timeout: 5s
+      timeout: 10s
       retries: 3
       start_period: 15s
     networks:
