@@ -6,51 +6,42 @@ export const SITE_METADATA = {
   url: 'https://angelina007.com',
   image: 'https://angelina007.com/og-image.jpg',
   author: 'Angelina Huang',
-  email: 'contact@angelina007.com',
+  email: 'angelina007huang@gmail.com',
 };
 
 export const NAVIGATION_LINKS = [
   { href: '/', label: 'Home' },
-  { href: '/portfolio', label: 'Projects' }, // 修复：原先指向不存在的 /projects（404）
+  { href: '/portfolio', label: 'Projects' },
   { href: '/blog', label: 'Blog' },
   { href: '/about', label: 'About' },
   { href: '/contact', label: 'Contact' },
 ];
 
+// 全部为已确认的真实账号（2026-07-12）。ArtStation/Twitter 暂无账号，开通后在此追加。
 export const SOCIAL_LINKS: SocialLink[] = [
   {
     platform: 'GitHub',
-    url: 'https://github.com/angelina007',
+    url: 'https://github.com/angelinahuang007',
     icon: 'FaGithub',
   },
   {
-    platform: 'Bilibili',
-    url: 'https://www.bilibili.com/angelina007',
+    platform: 'Bilibili', // 弥也ovo
+    url: 'https://space.bilibili.com/12422321',
     icon: 'FaVideo',
   },
   {
     platform: 'YouTube',
-    url: 'https://www.youtube.com/@angelina007',
+    url: 'https://www.youtube.com/@miyeovo',
     icon: 'FaYoutube',
   },
   {
     platform: 'Instagram',
-    url: 'https://instagram.com/angelina007',
+    url: 'https://www.instagram.com/_angelina.007_/',
     icon: 'FaInstagram',
   },
   {
-    platform: 'ArtStation',
-    url: 'https://www.artstation.com/angelina007',
-    icon: 'FaArtstation',
-  },
-  {
-    platform: 'Twitter',
-    url: 'https://twitter.com/angelina007',
-    icon: 'FaTwitter',
-  },
-  {
     platform: 'LinkedIn',
-    url: 'https://linkedin.com/in/angelina007',
+    url: 'https://www.linkedin.com/in/xiaolan-angelina-huang/',
     icon: 'FaLinkedin',
   },
 ];

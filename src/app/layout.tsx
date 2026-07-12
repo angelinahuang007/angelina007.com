@@ -19,6 +19,7 @@ const spaceGrotesk = Space_Grotesk({
 const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-jetbrains-mono' });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_METADATA.url),
   title: {
     template: '%s | Angelina Huang',
     default: 'Angelina Huang — Computing × Art',
@@ -31,6 +32,13 @@ export const metadata: Metadata = {
     url: SITE_METADATA.url,
     siteName: SITE_METADATA.title,
     type: 'website',
+    images: ['/og-image.jpg'],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: SITE_METADATA.title,
+    description: SITE_METADATA.description,
+    images: ['/og-image.jpg'],
   },
 };
 

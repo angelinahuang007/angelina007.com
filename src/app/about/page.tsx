@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { FiDownload } from 'react-icons/fi';
 import { SectionHeading } from '@/components/ui/SectionHeading';
@@ -18,16 +19,21 @@ export default function AboutPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          {/* Avatar */}
+          {/* Avatar — 2026-07-12: 由 "AH" 字母占位替换为真实头像 */}
           <div className="mb-8 flex justify-center">
             <motion.div
               className="w-32 h-32 rounded-full bg-light-accent dark:bg-dark-accent p-1"
               whileHover={{ scale: 1.05 }}
               transition={{ duration: 0.3 }}
             >
-              <div className="w-full h-full rounded-full bg-light-bg dark:bg-dark-bg flex items-center justify-center text-4xl font-bold text-light-accent dark:text-dark-accent">
-                AH
-              </div>
+              <Image
+                src="/images/profile.png"
+                alt="Angelina Huang"
+                width={128}
+                height={128}
+                priority
+                className="w-full h-full rounded-full object-cover"
+              />
             </motion.div>
           </div>
 
