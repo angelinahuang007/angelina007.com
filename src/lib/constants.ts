@@ -2,7 +2,7 @@ import { SocialLink } from '@/types';
 
 export const SITE_METADATA = {
   title: 'Angelina Huang — Computing × Art',
-  description: 'A portfolio exploring the intersection of computing and art through interactive projects, graphics programming, machine learning, and creative tools.',
+  description: 'Angelina Huang — 3D assets, scenes, interactive experiences, and simulation support for embodied AI. Get in touch to discuss a project.',
   url: 'https://angelina007.com',
   image: 'https://angelina007.com/og-image.jpg',
   author: 'Angelina Huang',

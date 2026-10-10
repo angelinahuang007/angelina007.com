@@ -28,7 +28,7 @@ export default function Error({
         </h1>
 
         <p className="text-lg text-light-text-muted dark:text-dark-text-muted mb-4 leading-relaxed">
-          We encountered an unexpected error. Don't worry, we're working on fixing it!
+          We encountered an unexpected error. Please try again or return to the homepage.
         </p>
 
         {/* Error Details (if in development) */}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { AnimatePresence, motion } from 'framer-motion';
 import { FiMenu, FiX } from 'react-icons/fi';
@@ -11,7 +11,8 @@ import { cn } from '@/lib/utils';
 export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolling, setScrolling] = useState(false);
-  const [lastScrollY, setLastScrollY] = useState(0);
+  const lastScrollY = useRef(0);
+  const menuButton = useRef<HTMLButtonElement>(null);
   const [navVisible, setNavVisible] = useState(true);
 
   useEffect(() => {
@@ -21,7 +22,7 @@ export function Navbar() {
       if (currentScrollY < 50) {
         setNavVisible(true);
         setScrolling(false);
-      } else if (currentScrollY > lastScrollY) {
+      } else if (currentScrollY > lastScrollY.current) {
         setScrolling(true);
         setNavVisible(false);
       } else {
@@ -29,18 +30,32 @@ export function Navbar() {
         setNavVisible(true);
       }
 
-      setLastScrollY(currentScrollY);
+      lastScrollY.current = currentScrollY;
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [lastScrollY]);
+  }, []);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMobileMenuOpen(false);
+        menuButton.current?.focus();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [mobileMenuOpen]);
 
   return (
     <nav
+      aria-label="Main navigation"
       className={cn(
         'fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-out',
-        navVisible ? 'translate-y-0' : '-translate-y-full',
+        'focus-within:translate-y-0',
+        navVisible || mobileMenuOpen ? 'translate-y-0' : '-translate-y-full',
         scrolling ? 'glass border-b border-light-text/5 dark:border-dark-text/5' : 'bg-transparent'
       )}
     >
@@ -49,6 +64,7 @@ export function Navbar() {
           {/* Logo */}
           <Link
             href="/"
+            aria-label="Angelina Huang home"
             className="text-2xl font-light tracking-widest text-light-accent dark:text-dark-accent hover:opacity-80 transition-opacity"
           >
             A.
@@ -74,9 +90,13 @@ export function Navbar() {
             <ThemeToggle />
 
             <button
+              ref={menuButton}
+              type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="md:hidden p-2 hover:bg-light-bg-secondary dark:hover:bg-dark-bg-secondary transition-colors"
               aria-label="Toggle menu"
+              aria-expanded={mobileMenuOpen}
+              aria-controls={mobileMenuOpen ? 'mobile-navigation' : undefined}
             >
               {mobileMenuOpen ? (
                 <FiX className="w-6 h-6" />
@@ -92,6 +112,7 @@ export function Navbar() {
       <AnimatePresence>
         {mobileMenuOpen && (
           <motion.div
+            id="mobile-navigation"
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}

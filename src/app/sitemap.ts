@@ -1,5 +1,5 @@
 import { MetadataRoute } from 'next';
-import { FEATURED_PROJECTS, BLOG_POSTS } from '@/lib/placeholder-data';
+import { FEATURED_PROJECTS, BLOG_POSTS } from '@/lib/content';
 
 const BASE_URL = 'https://angelina007.com';
 

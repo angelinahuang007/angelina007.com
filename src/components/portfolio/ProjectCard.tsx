@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Project } from '@/types';
 import { Card } from '@/components/ui/Card';
 import { Tag } from '@/components/ui/Tag';
@@ -12,11 +12,8 @@ interface ProjectCardProps {
 }
 
 export function ProjectCard({ project }: ProjectCardProps) {
-  const router = useRouter();
-
   return (
-    <div onClick={() => router.push(`/portfolio/${project.slug}`)} role="link" tabIndex={0}>
-      <Card className="h-full overflow-hidden group cursor-pointer">
+      <Card className="relative h-full overflow-hidden group">
         {/* Thumbnail */}
         <div className={`relative h-48 ${CATEGORY_COLORS[project.category] || 'bg-light-accent'} overflow-hidden`}>
           <img
@@ -32,7 +29,12 @@ export function ProjectCard({ project }: ProjectCardProps) {
           <div className="flex items-start justify-between gap-4">
             <div>
               <h3 className="text-lg font-bold text-light-text dark:text-dark-text group-hover:text-light-accent dark:group-hover:text-dark-accent transition-colors">
-                {project.title}
+                <Link
+                  href={`/portfolio/${project.slug}`}
+                  className="after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-light-accent dark:focus-visible:after:ring-dark-accent"
+                >
+                  {project.title}
+                </Link>
               </h3>
               <p className="text-sm text-light-text-muted dark:text-dark-text-muted mt-1">
                 {project.date.split('-')[0]}
@@ -63,13 +65,12 @@ export function ProjectCard({ project }: ProjectCardProps) {
           </div>
 
           {/* Links */}
-          <div className="flex gap-4 pt-4 border-t border-light-text/10 dark:border-dark-text/10">
+          {(project.demoUrl || project.githubUrl) && <div className="relative z-10 flex gap-4 pt-4 border-t border-light-text/10 dark:border-dark-text/10">
             {project.demoUrl && (
               <a
                 href={project.demoUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
                 className="flex items-center gap-2 text-sm text-light-accent dark:text-dark-accent hover:text-light-accent/80 dark:hover:text-dark-accent/80 transition-colors"
               >
                 <FiExternalLink className="w-4 h-4" />
@@ -81,16 +82,14 @@ export function ProjectCard({ project }: ProjectCardProps) {
                 href={project.githubUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
                 className="flex items-center gap-2 text-sm text-light-accent dark:text-dark-accent hover:text-light-accent/80 dark:hover:text-dark-accent/80 transition-colors"
               >
                 <FiGithub className="w-4 h-4" />
                 Code
               </a>
             )}
-          </div>
+          </div>}
         </div>
       </Card>
-    </div>
   );
 }

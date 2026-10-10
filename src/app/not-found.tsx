@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import { Button } from '@/components/ui/Button';
 
 export default function NotFound() {
   return (
@@ -16,7 +15,7 @@ export default function NotFound() {
         </h1>
 
         <p className="text-lg text-light-text-muted dark:text-dark-text-muted mb-8 leading-relaxed">
-          It looks like you've wandered into uncharted territory. The page you're looking for doesn't exist or has been moved. Let's get you back on track!
+          It looks like you’ve wandered into uncharted territory. The page you’re looking for doesn’t exist or has been moved. Let’s get you back on track!
         </p>
 
         {/* Illustration - ASCII style */}
@@ -34,10 +33,8 @@ export default function NotFound() {
         </div>
 
         {/* CTA */}
-        <Link href="/">
-          <Button size="lg" variant="primary">
-            Go Home
-          </Button>
+        <Link href="/" className="inline-flex items-center justify-center rounded-sm px-7 py-3 bg-light-accent dark:bg-dark-accent text-white hover:opacity-90 transition-opacity">
+          Go Home
         </Link>
 
         {/* Additional Links */}

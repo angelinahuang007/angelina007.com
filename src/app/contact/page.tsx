@@ -4,42 +4,54 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { FiMail, FiCopy, FiCheck, FiExternalLink } from 'react-icons/fi';
 import { SiGithub, SiBilibili, SiYoutube, SiInstagram, SiLinkedin } from 'react-icons/si';
-import { SectionHeading } from '@/components/ui/SectionHeading';
 import { Button } from '@/components/ui/Button';
 import { SOCIAL_LINKS, SITE_METADATA } from '@/lib/constants';
 
-// 2026-07-12: 移除了假的联系表单（原表单仅在前端假装发送成功）。
-// 现为诚实版：mailto 按钮 + 复制邮箱 + 真实社交链接。将来需要真表单时再接 Formspree/Resend。
-
 const iconMap: Record<string, React.ReactNode> = {
-  GitHub: <SiGithub className="w-6 h-6" />,
-  Bilibili: <SiBilibili className="w-6 h-6" />,
-  YouTube: <SiYoutube className="w-6 h-6" />,
-  Instagram: <SiInstagram className="w-6 h-6" />,
-  LinkedIn: <SiLinkedin className="w-6 h-6" />,
+  GitHub: <SiGithub aria-hidden="true" className="w-6 h-6" />,
+  Bilibili: <SiBilibili aria-hidden="true" className="w-6 h-6" />,
+  YouTube: <SiYoutube aria-hidden="true" className="w-6 h-6" />,
+  Instagram: <SiInstagram aria-hidden="true" className="w-6 h-6" />,
+  LinkedIn: <SiLinkedin aria-hidden="true" className="w-6 h-6" />,
 };
 
+const inquiryDetails = [
+  { title: 'Goal', description: 'What are you building, and what should it do?' },
+  { title: 'Existing assets or environment', description: 'What models, scenes, references, or setup are you starting with?' },
+  { title: 'Deliverables', description: 'What do you need back, including any file or platform requirements?' },
+  { title: 'Timing', description: 'Your target date and any important milestones.' },
+];
+
+const projectEmail = `mailto:${SITE_METADATA.email}?subject=${encodeURIComponent('Project inquiry')}&body=${encodeURIComponent('Hi Angelina,\n\nProject goal:\n\nExisting assets or environment:\n\nDeliverables and requirements:\n\nTiming:\n\nThanks,\n')}`;
+const focusStyles =
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-light-accent dark:focus-visible:ring-dark-accent focus-visible:ring-offset-4 focus-visible:ring-offset-light-bg dark:focus-visible:ring-offset-dark-bg';
+
+type CopyStatus = 'idle' | 'copying' | 'copied' | 'error';
+
 export default function ContactPage() {
-  const [copied, setCopied] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<CopyStatus>('idle');
 
   const copyEmail = async () => {
+    setCopyStatus('copying');
     try {
       await navigator.clipboard.writeText(SITE_METADATA.email);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setCopyStatus('copied');
     } catch {
-      // Clipboard unavailable (e.g. non-secure context) — mailto link still works.
+      setCopyStatus('error');
     }
   };
 
   return (
     <div className="min-h-screen py-20 md:py-28 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-2xl mx-auto">
-        <div className="mb-16">
-          <SectionHeading
-            title="Get in Touch"
-            subtitle="For collaborations, questions about my work, or just to say hi — email is the best way to reach me."
-          />
+      <div className="max-w-2xl mx-auto min-w-0">
+        <div className="mb-12 space-y-3">
+          <h1 className="text-3xl md:text-4xl text-light-text dark:text-dark-text tracking-tight">
+            Get in Touch
+          </h1>
+          <p className="font-sans font-light text-light-text-muted dark:text-dark-text-muted text-base">
+            For 3D, simulation, and design projects, collaborations, or questions
+            about my work — email is the best way to reach me.
+          </p>
         </div>
 
         <motion.div
@@ -48,47 +60,86 @@ export default function ContactPage() {
           transition={{ duration: 0.5 }}
           className="space-y-12"
         >
-          {/* Email card */}
-          <div className="p-8 rounded-md bg-light-bg-secondary dark:bg-dark-bg-secondary border border-light-text/10 dark:border-dark-text/10 text-center space-y-6">
-            <FiMail className="w-8 h-8 mx-auto text-light-accent dark:text-dark-accent" />
-            <p className="font-code text-lg text-light-text dark:text-dark-text break-all">
+          <section aria-label="Email Angelina" className="min-w-0 p-6 sm:p-8 rounded-md bg-light-bg-secondary dark:bg-dark-bg-secondary border border-light-text/10 dark:border-dark-text/10 text-center">
+            <FiMail aria-hidden="true" className="w-8 h-8 mx-auto text-light-accent dark:text-dark-accent-light mb-6" />
+            <a
+              href={`mailto:${SITE_METADATA.email}`}
+              className={`inline-block max-w-full font-code text-sm sm:text-lg text-light-text dark:text-dark-text break-all select-text underline underline-offset-4 rounded-sm ${focusStyles}`}
+            >
               {SITE_METADATA.email}
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <a href={`mailto:${SITE_METADATA.email}`}>
-                <Button size="lg" variant="primary">
-                  <FiMail className="w-5 h-5" />
-                  Send an Email
-                </Button>
+            </a>
+            <div className="flex flex-col sm:flex-row flex-wrap gap-4 justify-center mt-6">
+              <a
+                href={projectEmail}
+                className={`inline-flex items-center justify-center gap-2 px-7 py-3 rounded-sm bg-light-accent dark:bg-dark-accent text-white font-medium hover:bg-light-accent/90 dark:hover:bg-dark-accent/90 transition-colors ${focusStyles}`}
+              >
+                <FiMail aria-hidden="true" className="w-5 h-5 shrink-0" />
+                Send an Email
               </a>
-              <Button size="lg" variant="secondary" onClick={copyEmail}>
-                {copied ? <FiCheck className="w-5 h-5" /> : <FiCopy className="w-5 h-5" />}
-                {copied ? 'Copied!' : 'Copy Address'}
+              <Button
+                type="button"
+                size="lg"
+                variant="secondary"
+                onClick={copyEmail}
+                disabled={copyStatus === 'copying'}
+                aria-busy={copyStatus === 'copying'}
+                className={focusStyles}
+              >
+                {copyStatus === 'copied' ? <FiCheck aria-hidden="true" className="w-5 h-5" /> : <FiCopy aria-hidden="true" className="w-5 h-5" />}
+                {copyStatus === 'copied' ? 'Copied!' : copyStatus === 'copying' ? 'Copying…' : 'Copy Address'}
               </Button>
             </div>
-          </div>
+            <p className="text-xs leading-relaxed text-light-text-muted dark:text-dark-text-muted mt-4">
+              Opens a short project brief in your email app for you to edit and send.
+            </p>
+            <p role="status" aria-live="polite" className="min-h-[1.5rem] text-sm leading-relaxed text-light-text-muted dark:text-dark-text-muted mt-3">
+              {copyStatus === 'copied' && 'Email address copied.'}
+              {copyStatus === 'error' && 'Couldn’t copy automatically. Select the address above to copy it, or use the email link.'}
+            </p>
+          </section>
 
-          {/* Social links */}
-          <div className="text-center space-y-6">
-            <h2 className="text-sm font-semibold tracking-wide uppercase text-light-text-muted dark:text-dark-text-muted">
+          <section aria-labelledby="inquiry-heading">
+            <h2 id="inquiry-heading" className="text-2xl text-light-text dark:text-dark-text mb-3">
+              Tell me about your project
+            </h2>
+            <p className="text-sm leading-relaxed text-light-text-muted dark:text-dark-text-muted mb-6">
+              A few details help me assess the work and discuss a fixed-scope
+              project quote. A short note is enough to start.
+            </p>
+            <dl className="grid sm:grid-cols-2 gap-6">
+              {inquiryDetails.map((detail) => (
+                <div key={detail.title} className="border-t border-light-text/10 dark:border-dark-text/10 pt-4">
+                  <dt className="text-sm font-medium text-light-text dark:text-dark-text mb-1">
+                    {detail.title}
+                  </dt>
+                  <dd className="text-sm leading-relaxed text-light-text-muted dark:text-dark-text-muted">
+                    {detail.description}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+
+          <section aria-labelledby="elsewhere-heading" className="text-center space-y-6">
+            <h2 id="elsewhere-heading" className="text-sm font-semibold tracking-wide uppercase text-light-text-muted dark:text-dark-text-muted">
               Elsewhere
             </h2>
-            <div className="flex justify-center gap-4">
+            <div className="flex flex-wrap justify-center gap-3 sm:gap-4">
               {SOCIAL_LINKS.map((social) => (
                 <a
                   key={social.platform}
                   href={social.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  aria-label={social.platform}
-                  className="flex items-center gap-2 px-5 py-3 rounded-md bg-light-bg-secondary dark:bg-dark-bg-secondary border border-light-text/10 dark:border-dark-text/10 text-light-text-muted dark:text-dark-text-muted hover:text-light-accent dark:hover:text-dark-accent hover:-translate-y-0.5 transition-all"
+                  aria-label={`${social.platform} (opens in a new tab)`}
+                  className={`inline-flex items-center gap-2 px-4 sm:px-5 py-3 rounded-md bg-light-bg-secondary dark:bg-dark-bg-secondary border border-light-text/10 dark:border-dark-text/10 text-light-text-muted dark:text-dark-text-muted hover:text-light-accent dark:hover:text-dark-accent hover:-translate-y-0.5 transition-all ${focusStyles}`}
                 >
-                  {iconMap[social.platform] ?? <FiExternalLink className="w-6 h-6" />}
+                  {iconMap[social.platform] ?? <FiExternalLink aria-hidden="true" className="w-6 h-6" />}
                   <span className="text-sm">{social.platform}</span>
                 </a>
               ))}
             </div>
-          </div>
+          </section>
         </motion.div>
       </div>
     </div>
