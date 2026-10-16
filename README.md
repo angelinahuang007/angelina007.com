@@ -65,6 +65,8 @@ scripts/             init-ssl.sh
 
 Deploys happen automatically on push to `main` via GitHub Actions, which builds the Docker image on the Digital Ocean droplet and restarts the stack. First-time setup, SSH key generation, DNS configuration, SSL bootstrap, and ops commands are all covered in `DesignDoc.md` (sections on Deployment Architecture and Runbook).
 
+Server-side image optimization is temporarily disabled (`images.unoptimized`) to close the affected image endpoint described in [GHSA-2xp9-vwfh-vxw4](https://github.com/vercel/next.js/security/advisories/GHSA-2xp9-vwfh-vxw4). Images use their original files, which can increase image transfer sizes; the baked 3D assets are unaffected. Re-enable optimization only after upgrading and verifying Next.js and its image-decoding dependencies.
+
 ## Interactive home scene
 
 The rooms are real meshes. `src/components/home/scene/studio.ts`, `lab.ts`, and `lab-detail.ts` define editable geometry using `kit.ts`. Wood grain, fabric weave, the rug, screens, and distant window illustrations use small reusable canvas textures. The main lab arm has its own cast fork, tapered forearm and drive housings; the north studio cushions, curtain and throw have dedicated sewn/draped surfaces.
