@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import { FiMenu, FiX } from 'react-icons/fi';
 import { NAVIGATION_LINKS } from '@/lib/constants';
@@ -9,15 +10,25 @@ import { ThemeToggle } from './ThemeToggle';
 import { cn } from '@/lib/utils';
 
 export function Navbar() {
+  const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolling, setScrolling] = useState(false);
   const lastScrollY = useRef(0);
   const menuButton = useRef<HTMLButtonElement>(null);
   const [navVisible, setNavVisible] = useState(true);
+  const [sceneVisible, setSceneVisible] = useState(pathname === '/');
+  const overScene = pathname === '/' && sceneVisible;
 
   useEffect(() => {
+    const updateSceneVisibility = () => {
+      const hero = document.querySelector('[data-room-hero]');
+      const bounds = hero?.getBoundingClientRect();
+      setSceneVisible(pathname === '/' && Boolean(bounds && bounds.bottom > 64 && bounds.top < 64));
+    };
+
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
+      updateSceneVisibility();
 
       if (currentScrollY < 50) {
         setNavVisible(true);
@@ -33,9 +44,14 @@ export function Navbar() {
       lastScrollY.current = currentScrollY;
     };
 
+    handleScroll();
     window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+    window.addEventListener('resize', updateSceneVisibility, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', updateSceneVisibility);
+    };
+  }, [pathname]);
 
   useEffect(() => {
     if (!mobileMenuOpen) return;
@@ -56,7 +72,9 @@ export function Navbar() {
         'fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-out',
         'focus-within:translate-y-0',
         navVisible || mobileMenuOpen ? 'translate-y-0' : '-translate-y-full',
-        scrolling ? 'glass border-b border-light-text/5 dark:border-dark-text/5' : 'bg-transparent'
+        overScene || !scrolling
+          ? 'bg-transparent'
+          : 'glass border-b border-light-text/5 dark:border-dark-text/5'
       )}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -65,7 +83,12 @@ export function Navbar() {
           <Link
             href="/"
             aria-label="Angelina Huang home"
-            className="text-2xl font-light tracking-widest text-light-accent dark:text-dark-accent hover:opacity-80 transition-opacity"
+            className={cn(
+              'text-2xl font-light tracking-widest hover:opacity-80 transition-opacity',
+              overScene
+                ? 'text-white [text-shadow:0_1px_5px_rgba(0,0,0,0.5)]'
+                : 'text-light-accent dark:text-dark-accent'
+            )}
           >
             A.
           </Link>
@@ -78,7 +101,12 @@ export function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className="px-4 py-2 text-sm text-light-text-muted dark:text-dark-text-muted hover:text-light-text dark:hover:text-dark-text hover:bg-light-text/5 dark:hover:bg-dark-text/5 transition-colors"
+                className={cn(
+                  'px-4 py-2 text-sm transition-colors',
+                  overScene
+                    ? 'text-white hover:text-white/75 [text-shadow:0_1px_5px_rgba(0,0,0,0.5)]'
+                    : 'text-light-text-muted dark:text-dark-text-muted hover:text-light-text dark:hover:text-dark-text hover:bg-light-text/5 dark:hover:bg-dark-text/5'
+                )}
               >
                 {link.label}
               </Link>
@@ -87,13 +115,18 @@ export function Navbar() {
 
           {/* Theme Toggle & Mobile Menu */}
           <div className="flex items-center space-x-2">
-            <ThemeToggle />
+            <ThemeToggle onScene={overScene} />
 
             <button
               ref={menuButton}
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 hover:bg-light-bg-secondary dark:hover:bg-dark-bg-secondary transition-colors"
+              className={cn(
+                'md:hidden p-2 transition-colors',
+                overScene
+                  ? 'text-white hover:text-white/75 drop-shadow-[0_1px_3px_rgba(0,0,0,0.5)]'
+                  : 'text-light-text dark:text-dark-text hover:bg-light-bg-secondary dark:hover:bg-dark-bg-secondary'
+              )}
               aria-label="Toggle menu"
               aria-expanded={mobileMenuOpen}
               aria-controls={mobileMenuOpen ? 'mobile-navigation' : undefined}

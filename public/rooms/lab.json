@@ -1,0 +1,27 @@
+{
+  "name": "阶庭试验场",
+  "camera": {
+    "position": [
+      -0.5,
+      2.9,
+      3.4
+    ],
+    "target": [
+      0.3,
+      2.3,
+      -5.8
+    ]
+  },
+  "version": "d99c2faa37cb",
+  "stats": {
+    "triangles": 202140,
+    "vertices": 205246,
+    "maxDrawCalls": 28,
+    "bytes": 2151932,
+    "atlases": 1,
+    "lightmapTexels": 2076123,
+    "lightmapCharts": 509,
+    "samples": 6014884,
+    "rays": 164474230
+  }
+}
