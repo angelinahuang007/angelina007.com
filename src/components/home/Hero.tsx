@@ -67,11 +67,24 @@ export function Hero() {
 
   return (
     <section data-room-hero className={`${styles.hero} ${mode === 'lab' ? styles.night : styles.day}`} aria-label="Angelina’s interactive studio">
+      <picture className={styles.preview}>
+        <source media="(max-width: 699px)" srcSet={`/rooms/${mode}-preview-mobile.webp?v=20261019`} type="image/webp" />
+        {/* Native picture selects the matching camera view before fetching the preview. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={`/rooms/${mode}-preview.webp?v=20261019`}
+          alt=""
+          loading="eager"
+          fetchPriority="high"
+          decoding="async"
+          className={styles.previewImage}
+        />
+      </picture>
       <div className={styles.canvasWrap} data-ready={ready}>
         {mounted && <RoomCanvas key={`${mode}-${retry}`} mode={mode} onReady={onReady} onError={onError} onTap={onTap} />}
       </div>
-      {!ready && <div className={styles.loading} role="status">
-        <span className={styles.loadingMark}>A.</span>
+      {!ready && <div className={error ? styles.loading : 'sr-only'} role="status">
+        {error && <span className={styles.loadingMark}>A.</span>}
         <p>{error ? 'The interactive room couldn’t open on this device.' : 'Opening the room…'}</p>
         {error && <><button onClick={() => setRetry(value => value + 1)}>Try again</button><a href="#services">Explore my work ↓</a></>}
       </div>}
