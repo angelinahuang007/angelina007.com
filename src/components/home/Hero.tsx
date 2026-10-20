@@ -100,7 +100,8 @@ export function Hero() {
         On a computer, click the room, then move the mouse to look around without holding a button.
         Click again or press Escape to stop. Moving outside the room or scrolling also stops mouse look.
         Focus the scene and use A / D to turn and W / S to look up or down.
-        On a phone, swipe sideways to turn and swipe up to explore the website.
+        On a phone, drag sideways or diagonally to look around, including up and down.
+        Start with a near-vertical swipe to scroll the page.
         On supported phones over HTTPS, tap the scene to allow tilt controls.
       </p>
       {ready && offerMotion && <p className={styles.motionHint}>Tap the room to enable tilt.</p>}

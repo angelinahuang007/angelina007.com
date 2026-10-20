@@ -20,6 +20,8 @@ const KEY_SPEED = 1.15;
 const TAP_SLOP = 7;
 const TAP_MAX_DURATION = 450;
 const TAP_CLICK_DELAY = 700;
+// Keep a 30-degree cone around vertical for native page scrolling.
+const TOUCH_SCROLL_RATIO = Math.sqrt(3);
 const MOUSE_YAW_RANGE = Math.PI * 2;
 const MOUSE_PITCH_RANGE = MathUtils.degToRad(70);
 // Permission belongs to this document, not an individual room's controls.
@@ -49,10 +51,17 @@ export function createLookControls(
 
   let pointer: {
     id: number;
-    touch: boolean;
     mouse: boolean;
-    dragging: boolean;
     tapEligible: boolean;
+    startedAt: number;
+    startX: number;
+    startY: number;
+    x: number;
+    y: number;
+  } | null = null;
+  let touchGesture: {
+    id: number;
+    intent: 'pending' | 'room' | 'scroll';
     startedAt: number;
     startX: number;
     startY: number;
@@ -155,33 +164,31 @@ export function createLookControls(
   }
 
   function onPointerDown(event: PointerEvent) {
+    // Touch Events own phone gestures: native scrolling can cancel Pointer Events
+    // before our custom direction boundary can keep a diagonal drag.
+    if (event.pointerType === 'touch') return;
     completedTap = null;
     if (pointer && event.pointerId !== pointer.id) pointer.tapEligible = false;
     if (disposed || !event.isPrimary || event.button !== 0 || pointer !== null) return;
-    const touch = event.pointerType === 'touch';
     const mouse = event.pointerType === 'mouse';
     if (!mouse) stopMouseLook();
     pointer = {
       id: event.pointerId,
-      touch,
       mouse,
-      dragging: !touch && !mouse,
-      tapEligible: touch || mouse,
+      tapEligible: mouse,
       startedAt: event.timeStamp,
       startX: event.clientX,
       startY: event.clientY,
       x: event.clientX,
       y: event.clientY,
     };
-    if (!touch) {
-      canvas.focus({ preventScroll: true });
-      if (!mouse) capturePointer(event.pointerId);
-      event.preventDefault();
-    }
+    canvas.focus({ preventScroll: true });
+    if (!mouse) capturePointer(event.pointerId);
+    event.preventDefault();
   }
 
   function onPointerMove(event: PointerEvent) {
-    if (disposed) return;
+    if (disposed || event.pointerType === 'touch') return;
     if (event.pointerType === 'mouse') {
       if (pointer?.mouse && pointer.id === event.pointerId
         && Math.max(Math.abs(event.clientX - pointer.startX), Math.abs(event.clientY - pointer.startY)) >= TAP_SLOP) {
@@ -191,52 +198,102 @@ export function createLookControls(
       return;
     }
     if (!pointer || event.pointerId !== pointer.id) return;
-    if (!pointer.dragging) {
-      const dx = event.clientX - pointer.startX;
-      const dy = event.clientY - pointer.startY;
-      if (Math.max(Math.abs(dx), Math.abs(dy)) < TAP_SLOP) return;
-      pointer.tapEligible = false;
-      // Do not capture a vertical touch gesture: touch-action: pan-y keeps page scrolling.
-      if (Math.abs(dy) >= Math.abs(dx)) {
-        clearPointer();
-        return;
-      }
-      pointer.dragging = true;
-      canvas.focus({ preventScroll: true });
-      capturePointer(event.pointerId);
-    }
     const dx = event.clientX - pointer.x;
     const dy = event.clientY - pointer.y;
     pointer.x = event.clientX;
     pointer.y = event.clientY;
-    // Touch rotates horizontally; pen also looks vertically.
-    turn(-dx * POINTER_SPEED, pointer.touch ? 0 : dy * POINTER_SPEED);
+    turn(-dx * POINTER_SPEED, dy * POINTER_SPEED);
     if (event.cancelable) event.preventDefault();
   }
 
   function onPointerUp(event: PointerEvent) {
+    if (event.pointerType === 'touch') return;
     if (!pointer || pointer.id !== event.pointerId) return;
     const duration = event.timeStamp - pointer.startedAt;
-    if (pointer.tapEligible && !pointer.dragging && duration >= 0 && (!pointer.touch || duration <= TAP_MAX_DURATION)
+    if (pointer.tapEligible && duration >= 0
       && Math.max(Math.abs(event.clientX - pointer.startX), Math.abs(event.clientY - pointer.startY)) < TAP_SLOP) {
-      completedTap = { id: pointer.id, touch: pointer.touch, x: event.clientX, y: event.clientY, endedAt: event.timeStamp };
+      completedTap = { id: pointer.id, touch: false, x: event.clientX, y: event.clientY, endedAt: event.timeStamp };
     }
     clearPointer();
   }
 
   function onPointerCancel(event: PointerEvent) {
+    if (event.pointerType === 'touch') return;
     if (event.pointerType === 'mouse') stopMouseLook();
     if (completedTap?.id === event.pointerId) completedTap = null;
     if (pointer?.id === event.pointerId) clearPointer();
   }
 
   function onLostPointerCapture(event: PointerEvent) {
-    // Touch releases its implicit capture after pointerup, before click. That normal
-    // release must keep a completed tap; losing capture mid-gesture cancels it.
+    if (event.pointerType === 'touch') return;
     if (pointer?.id === event.pointerId) {
       completedTap = null;
       clearPointer();
     }
+  }
+
+  function onTouchStart(event: TouchEvent) {
+    if (disposed) return;
+    completedTap = null;
+    stopMouseLook();
+    clearPointer();
+    touchGesture = null;
+    // Multi-touch stays with the browser (including pinch zoom).
+    if (event.touches.length !== 1) return;
+    const touch = event.touches[0];
+    touchGesture = {
+      id: touch.identifier, intent: 'pending', startedAt: event.timeStamp,
+      startX: touch.clientX, startY: touch.clientY,
+      x: touch.clientX, y: touch.clientY,
+    };
+  }
+
+  function onTouchMove(event: TouchEvent) {
+    if (disposed || !touchGesture) return;
+    if (event.touches.length !== 1 || event.touches[0].identifier !== touchGesture.id) {
+      touchGesture = null;
+      completedTap = null;
+      return;
+    }
+    const touch = event.touches[0];
+    const dx = touch.clientX - touchGesture.x;
+    const dy = touch.clientY - touchGesture.y;
+    if (touchGesture.intent === 'pending') {
+      const startDx = touch.clientX - touchGesture.startX;
+      const startDy = touch.clientY - touchGesture.startY;
+      if (startDx === 0 && startDy === 0) return;
+      // Decide on the first moving event. Letting early touchmoves through can
+      // hand scrolling to Safari permanently, regardless of later preventDefault.
+      touchGesture.intent = !event.cancelable || Math.abs(startDy) > Math.abs(startDx) * TOUCH_SCROLL_RATIO
+        ? 'scroll' : 'room';
+    }
+    if (touchGesture.intent === 'scroll') return;
+    if (!event.cancelable) {
+      touchGesture.intent = 'scroll';
+      return;
+    }
+    event.preventDefault();
+    touchGesture.x = touch.clientX;
+    touchGesture.y = touch.clientY;
+    // Keep both axes for the rest of this drag, even if it becomes vertical.
+    turn(-dx * POINTER_SPEED, dy * POINTER_SPEED);
+  }
+
+  function onTouchEnd(event: TouchEvent) {
+    const gesture = touchGesture;
+    touchGesture = null;
+    if (!gesture || event.touches.length !== 0 || gesture.intent !== 'pending') return;
+    const touch = Array.from(event.changedTouches).find(item => item.identifier === gesture.id);
+    const duration = event.timeStamp - gesture.startedAt;
+    if (touch && duration >= 0 && duration <= TAP_MAX_DURATION
+      && Math.max(Math.abs(touch.clientX - gesture.startX), Math.abs(touch.clientY - gesture.startY)) < TAP_SLOP) {
+      completedTap = { id: gesture.id, touch: true, x: touch.clientX, y: touch.clientY, endedAt: event.timeStamp };
+    }
+  }
+
+  function onTouchCancel() {
+    touchGesture = null;
+    completedTap = null;
   }
 
   function onClick(event: MouseEvent) {
@@ -289,6 +346,7 @@ export function createLookControls(
     stopMouseLook();
     pressed.clear();
     completedTap = null;
+    touchGesture = null;
     clearPointer();
   }
 
@@ -436,6 +494,10 @@ export function createLookControls(
     canvas.removeEventListener('pointercancel', onPointerCancel);
     canvas.removeEventListener('lostpointercapture', onLostPointerCapture);
     canvas.removeEventListener('pointerleave', onPointerLeave);
+    canvas.removeEventListener('touchstart', onTouchStart);
+    canvas.removeEventListener('touchmove', onTouchMove);
+    canvas.removeEventListener('touchend', onTouchEnd);
+    canvas.removeEventListener('touchcancel', onTouchCancel);
     canvas.removeEventListener('wheel', clearInteraction);
     canvas.removeEventListener('click', onClick);
     canvas.removeEventListener('keydown', onKeyDown);
@@ -455,6 +517,10 @@ export function createLookControls(
   canvas.addEventListener('pointercancel', onPointerCancel);
   canvas.addEventListener('lostpointercapture', onLostPointerCapture);
   canvas.addEventListener('pointerleave', onPointerLeave);
+  canvas.addEventListener('touchstart', onTouchStart, { passive: true });
+  canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+  canvas.addEventListener('touchend', onTouchEnd, { passive: true });
+  canvas.addEventListener('touchcancel', onTouchCancel, { passive: true });
   canvas.addEventListener('wheel', clearInteraction, { passive: true });
   canvas.addEventListener('click', onClick);
   canvas.addEventListener('keydown', onKeyDown);
